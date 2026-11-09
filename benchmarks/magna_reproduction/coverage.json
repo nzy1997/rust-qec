@@ -470,8 +470,16 @@
     },
     {
       "id": "test_conditional_noise.ConditionalNoiseTests.test_two_qubit_channel_order_and_mutual_exclusion",
-      "status": "unmapped",
-      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+      "status": "verified",
+      "contract": "Complete original H/M and guarded two-qubit categorical channel, with XY index5 rate1/3, YZ index10 rate1/6, the other13 alternatives zero and identity1/2. Both compiler strategies, both causal strategies and both history proposal strategies retain exact error1/4, acceptance1, target success3/4, joint Z moments1/2,2/3,5/6 and full output probabilities00=3/4,11=1/6,10=1/12,01=0. Full weight-one enumeration has three mutually exclusive supported patterns and six histories; weight-zero has one pattern and two histories with covered/omitted probability1/2 and zero error. All48 conditional identity/XY/YZ and false/true guard evaluations check half history mass, unit likelihoods and active physical path probabilities; inactive guard has unit probability and no action. Public original-noise description retains every ordered alternative, original physical channel site1 and the implicit deterministic readout gap0. Complete unchanged original native method and actually used complete rational helper, two separately derived exact models and all86 Python tests each mode pass before first Rust. Fresh production6CPP is actually loaded; the separately built testing helper is unused and no helper-use claim is made. Three distinct external v3 integration Source stimuli/binaries/logs pass baseline0 and reject XY-to-IZ101 and omitted-guard101 at the unchanged original exact error assertion. Production Source and all oracle assertions stay unchanged; whole test-file byte identity is not claimed for mutated stimuli. No production/API/default changes, native private layout/RNG identity, full parity or performance claim.",
+      "rust_tests": [
+        {
+          "package": "rmagna",
+          "target": "original_guarded_channel_order",
+          "test": "original_guarded_two_qubit_channel_order_and_mutual_exclusion",
+          "source_sha256": "4f757389b3daa68676d92ed12c18f2e9f8a669e9fdd73829f3c93be40ce58242"
+        }
+      ]
     },
     {
       "id": "test_deferred_feedback.DeclaredExpressionNativeTests.test_value_conversion_and_inactive_exponent",
