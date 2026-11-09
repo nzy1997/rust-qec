@@ -1808,3 +1808,253 @@ fn original_not_on_accept_bit_matches_truth_table_and_preserves_feedback() {
     }
     assert_eq!(total_seeded_callbacks, 32);
 }
+
+// Complete original test_exact_symbol_cancellation_keeps_affine_path.
+// Canonical public expressions preserve opaque call identities after XOR reduction.
+const SYMBOL_CANCEL_AND_CIRCUIT: &str = "H 0 1\nM 0 1\nDETECTOR rec[-2]\nDETECTOR rec[-1]\nCONTROL[and] det[-2] det[-1] -> ctrl[0]\nCONTROL[XOR] ctrl[0] rec[-1] -> ctrl[1]\nCONTROL[XOR] ctrl[0] ctrl[1] -> ctrl[2]\nPOSTSELECT ctrl[2]";
+const SYMBOL_CANCEL_AFFINE_CIRCUIT: &str =
+    "H 0\nM 0\nCONTROL[XOR](1) rec[-1] -> ctrl[0]\nPOSTSELECT ctrl[0]";
+const SYMBOL_DISTINCT_ECHO_CIRCUIT: &str = "M 0\nDETECTOR rec[-1]\nCONTROL[echo] det[-1] -> ctrl[0]\nDETECTOR rec[-1]\nCONTROL[echo] det[-1] -> ctrl[1]\nCONTROL[XOR] ctrl[0] ctrl[1] -> ctrl[2]\nPOSTSELECT ctrl[2]";
+
+fn assert_symbol_only_draw(draw: &TaskEvaluation) {
+    assert_eq!(draw.error, field("0"));
+    assert_eq!(draw.raw_error, ExactScalar::zero());
+    assert_eq!(draw.target_success, None);
+    assert_eq!(draw.raw_target_success, None);
+    assert_eq!(draw.target_normalization, None);
+    assert!(draw.moments.is_empty());
+    assert!(draw.raw_moments.is_empty());
+    assert!(draw.sampled_records.is_empty());
+    assert_eq!(draw.history_proposal_mass, None);
+    assert_eq!(draw.history_weight, field("1"));
+    assert_eq!(draw.noise_probability, rational("1"));
+    assert_eq!(draw.noise_likelihood_ratio, rational("1"));
+}
+
+fn assert_cancelled_symbol_draw(draw: &TaskEvaluation) {
+    assert_symbol_only_draw(draw);
+    assert_eq!(draw.controller_calls.len(), 1);
+    let call = &draw.controller_calls[0];
+    assert_eq!(call.call, 0);
+    assert_eq!(call.name, "and");
+    assert_eq!(call.inputs.len(), 2);
+    assert_eq!(call.outputs, vec![call.inputs[0] & call.inputs[1]]);
+    let accepted = !call.inputs[1];
+    assert_eq!(draw.accepted, field(if accepted { "1" } else { "0" }));
+    assert_eq!(
+        raw_field(&draw.raw_acceptance),
+        field(if accepted { "1/4" } else { "0" })
+    );
+    assert_eq!(
+        draw.history_mass,
+        ScalarArithmetic::default().omega(0, -4).unwrap()
+    );
+}
+
+fn assert_distinct_symbol_echo_draw(draw: &TaskEvaluation) {
+    assert_symbol_only_draw(draw);
+    assert_eq!(draw.accepted, field("1"));
+    assert_eq!(raw_field(&draw.raw_acceptance), field("1"));
+    assert_eq!(draw.history_mass, ExactScalar::one());
+    assert_eq!(draw.controller_calls.len(), 2);
+    for (expected, call) in draw.controller_calls.iter().enumerate() {
+        assert_eq!(call.call, expected);
+        assert_eq!(call.name, "echo");
+        assert_eq!(call.inputs, vec![false]);
+        assert_eq!(call.outputs, vec![false]);
+    }
+}
+
+#[test]
+fn original_exact_symbol_cancellation_keeps_affine_path() {
+    use rmagna::circuit::{BitAtom, BitExpr, Operation, RegisterVersion};
+    use rmagna::costs::ExecutionMeter;
+    use std::sync::{Arc, Mutex};
+
+    let files = Files::new();
+    let mut total_seeded_callbacks = 0;
+    for (compiler, runtime) in strategies() {
+        let observed = Arc::new(Mutex::new(
+            Vec::<(&'static str, Vec<bool>, Vec<bool>)>::new(),
+        ));
+        let and_observed = Arc::clone(&observed);
+        let echo_observed = Arc::clone(&observed);
+        let mut registry = ControllerRegistry::default();
+        registry
+            .register("and", "1", move |bits: &[bool]| {
+                assert_eq!(bits.len(), 2);
+                let output = vec![bits[0] & bits[1]];
+                and_observed
+                    .lock()
+                    .unwrap()
+                    .push(("and", bits.to_vec(), output.clone()));
+                Ok(output)
+            })
+            .unwrap();
+        registry
+            .register("echo", "1", move |bits: &[bool]| {
+                assert_eq!(bits.len(), 1);
+                let output = bits.to_vec();
+                echo_observed
+                    .lock()
+                    .unwrap()
+                    .push(("echo", bits.to_vec(), output.clone()));
+                Ok(output)
+            })
+            .unwrap();
+        let parse = ParseOptions {
+            controllers: registry.names(),
+            ..Default::default()
+        };
+        let cases = [
+            (SYMBOL_CANCEL_AND_CIRCUIT, "1/2", 1),
+            (SYMBOL_CANCEL_AFFINE_CIRCUIT, "1/2", 0),
+            (SYMBOL_DISTINCT_ECHO_CIRCUIT, "1", 2),
+        ];
+        for (case, (text, acceptance, expected_calls)) in cases.into_iter().enumerate() {
+            observed.lock().unwrap().clear();
+            let physical = parse_circuit(text, &parse).unwrap();
+            let task = parse_task("{}", &files.0, &TaskOptions::default()).unwrap();
+            let modules = task.load_modules(&physical, &parse).unwrap();
+            let mut options = EvaluationOptions::default();
+            options.runtime.strategy = runtime;
+            options.runtime.compile.compiler_strategy = compiler;
+            let evaluator = TaskEvaluator::new(&physical, &modules, &registry, options).unwrap();
+            assert!(
+                observed.lock().unwrap().is_empty(),
+                "preparation calls no controller"
+            );
+            assert_eq!(physical.external_calls(), expected_calls);
+            assert_eq!(evaluator.sampled_history(), case != 1);
+            assert_eq!(
+                evaluator.execution_route(),
+                if case == 1 {
+                    "linear_affine"
+                } else {
+                    match runtime {
+                        CausalStrategy::ColdPrefix => "causal_cold_prefix",
+                        CausalStrategy::FixedTemplate => "causal_fixed_template",
+                    }
+                }
+            );
+            let mut enumeration = TaskEnumerationOptions::default();
+            enumeration.noise.max_weight = 0;
+            let totals = evaluator.enumerate_physical(&enumeration).unwrap();
+            assert_eq!(
+                totals.masses.accepted,
+                field(acceptance),
+                "original symbol cancellation acceptance: case {case}"
+            );
+            assert_eq!(totals.covered_probability.value(), &rational("1"));
+            assert_eq!(totals.omitted_probability.value(), &rational("0"));
+            assert_eq!(totals.patterns, 1);
+            assert_eq!(totals.masses.error, field("0"));
+            assert_eq!(totals.masses.target_success, None);
+            assert_eq!(totals.target_normalization, None);
+            assert!(totals.masses.moments.is_empty());
+            assert_eq!(totals.full_acceptance.lower, field(acceptance));
+            assert_eq!(totals.full_acceptance.upper, field(acceptance));
+            assert_eq!(totals.full_error.lower, field("0"));
+            assert_eq!(totals.full_error.upper, field("0"));
+            if case == 0 {
+                assert_eq!(totals.histories, 4);
+            }
+            observed.lock().unwrap().clear();
+            for seed in 0..8 {
+                let before = observed.lock().unwrap().len();
+                let meter = ExecutionMeter::default();
+                let draw = evaluator
+                    .sample_with_costs(&mut SplitMix64::new(seed), &meter)
+                    .unwrap();
+                match case {
+                    0 => assert_cancelled_symbol_draw(&draw),
+                    1 => {
+                        assert_symbol_only_draw(&draw);
+                        assert_eq!(
+                            draw.accepted,
+                            field("1/2"),
+                            "affine selection integrates the record in every draw"
+                        );
+                        assert_eq!(raw_field(&draw.raw_acceptance), field("1/2"));
+                        assert!(draw.controller_calls.is_empty());
+                    }
+                    2 => assert_distinct_symbol_echo_draw(&draw),
+                    _ => unreachable!(),
+                }
+                let calls = observed.lock().unwrap();
+                assert_eq!(
+                    calls.len(),
+                    before + expected_calls,
+                    "actual callback count per seeded draw"
+                );
+                for (offset, call) in draw.controller_calls.iter().enumerate() {
+                    assert_eq!(calls[before + offset].0, call.name);
+                    assert_eq!(calls[before + offset].1, call.inputs);
+                    assert_eq!(calls[before + offset].2, call.outputs);
+                }
+                assert_eq!(meter.snapshot().decoder.succeeded as usize, expected_calls);
+                total_seeded_callbacks += expected_calls;
+            }
+            assert_eq!(observed.lock().unwrap().len(), 8 * expected_calls);
+            if case == 0 {
+                for (a, b) in [(false, false), (false, true), (true, false), (true, true)] {
+                    let draw = evaluator
+                        .evaluate_prescribed_history(&[], &[vec![a, b]])
+                        .unwrap();
+                    assert_eq!(draw.controller_calls[0].inputs, vec![a, b]);
+                    assert_cancelled_symbol_draw(&draw);
+                }
+            }
+            if case == 2 {
+                let draw = evaluator
+                    .evaluate_prescribed_history(&[], &[vec![false], vec![false]])
+                    .unwrap();
+                assert_distinct_symbol_echo_draw(&draw);
+            }
+            // Semantic assertions precede structure: the retained-term control
+            // fails the unchanged half-mass oracle. The alias control keeps
+            // physical acceptance one and is detected by distinct symbols.
+            let expected = match case {
+                0 => BitExpr::atom(BitAtom::Record(1)),
+                1 => BitExpr::atom(BitAtom::Record(0)).inverted(),
+                2 => {
+                    let mut expression = BitExpr::atom(BitAtom::Decision { call: 0, bit: 0 });
+                    expression.xor_assign(&BitExpr::atom(BitAtom::Decision { call: 1, bit: 0 }));
+                    expression
+                }
+                _ => unreachable!(),
+            };
+            let final_register = RegisterVersion::new(if case == 1 { 0 } else { 2 }, 0);
+            assert_eq!(
+                physical.control_analysis().expression(final_register),
+                Some(&expected),
+                "distinct opaque call symbols and exact cancellation"
+            );
+            let selections = physical
+                .operations()
+                .iter()
+                .filter_map(|op| match &op.operation {
+                    Operation::Postselect { expression } => Some(expression),
+                    _ => None,
+                })
+                .collect::<Vec<_>>();
+            assert_eq!(selections, vec![&expected]);
+            assert_eq!(expected.is_affine(), case != 2);
+            if case == 2 {
+                assert_eq!(
+                    physical
+                        .control_analysis()
+                        .expression(RegisterVersion::new(0, 0)),
+                    Some(&BitExpr::atom(BitAtom::Decision { call: 0, bit: 0 }))
+                );
+                assert_eq!(
+                    physical
+                        .control_analysis()
+                        .expression(RegisterVersion::new(1, 0)),
+                    Some(&BitExpr::atom(BitAtom::Decision { call: 1, bit: 0 }))
+                );
+            }
+        }
+    }
+    assert_eq!(total_seeded_callbacks, 96);
+}

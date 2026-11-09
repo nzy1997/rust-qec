@@ -1667,7 +1667,7 @@
           "package": "rmagna",
           "target": "original_nonlinear_postselection",
           "test": "original_affine_not_selection_and_terminal_feedback",
-          "source_sha256": "3f102c46eb0af3042ae47dcc06112bb62ecc439d4d985a4bea2e99e428c1f7ca"
+          "source_sha256": "0b0179f285d30c2082b57b0d955c83a10ebbe409a98792196eb75dcabf098de8"
         }
       ]
     },
@@ -1680,14 +1680,22 @@
           "package": "rmagna",
           "target": "original_nonlinear_postselection",
           "test": "original_dense_noncommuting_magic_instrument_with_report_noise",
-          "source_sha256": "3f102c46eb0af3042ae47dcc06112bb62ecc439d4d985a4bea2e99e428c1f7ca"
+          "source_sha256": "0b0179f285d30c2082b57b0d955c83a10ebbe409a98792196eb75dcabf098de8"
         }
       ]
     },
     {
       "id": "test_nonlinear_postselection.NonlinearPostselectionTests.test_exact_symbol_cancellation_keeps_affine_path",
-      "status": "unmapped",
-      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+      "status": "verified",
+      "contract": "Complete original exact symbol cancellation method with all three original circuits, unchanged registry/exact methods, complete feedback_template function and entire FeedbackTemplate class actually used. Both compilers and causal strategies retain exact integrated acceptance1/2,1/2,1. Repeated uses of the same AND decision cancel to public Record1; one actual AND still runs per causal seeded draw and acceptance is one minus its second input. Constant-one XOR gives complemented Record0 and the public linear_affine route integrates acceptance1/2 per draw without callback. Two echo calls with the same deterministic zero input retain distinct Decision callIDs0and1, a symbolic opaque XOR, ordered actual two-call transcripts and acceptance1. Across four configurations the witness observes96 seeded draws,32actualAND and64actualecho callbacks, and checks all four first-circuit prescribed histories and deterministic two-call replay. Public canonical expressions replace private helper layouts; formal GF2 linearity over opaque symbols is distinct from records-only affine lowering. Complete original native method/supports pass once normal/O against fresh6CPP production and6CPP actually used helper:4parses1enumeration3publiccompiles1affinesample3helperfactories each mode. Native missing error is null and Rust internal contribution0, no representation identity. Independently authored exhaustive Boolean-influence/trace and rational density/GF2 coefficient models plus all86 tooling Python tests eachmode precede first Rust. Private named-literal controls compile0test101: retaining one opaque term gives actualA3/4 before unchangedhalf oracle; aliasing third-fixture decisions preserves deterministic A1 and both callbacks but collapses its canonical expression before the unchanged distinct-symbol oracle. Entire prior1810line73893byte prefix and public Source remain unchanged by controls. No production/API/default/callback elimination/native RNG/privateABI/fullparity/performance claim.",
+      "rust_tests": [
+        {
+          "package": "rmagna",
+          "target": "original_nonlinear_postselection",
+          "test": "original_exact_symbol_cancellation_keeps_affine_path",
+          "source_sha256": "0b0179f285d30c2082b57b0d955c83a10ebbe409a98792196eb75dcabf098de8"
+        }
+      ]
     },
     {
       "id": "test_nonlinear_postselection.NonlinearPostselectionTests.test_fixed_template_assignments_and_private_boundaries",
@@ -1703,7 +1711,7 @@
           "package": "rmagna",
           "target": "original_nonlinear_postselection",
           "test": "original_full_history_final_readout_and_explicit_state",
-          "source_sha256": "3f102c46eb0af3042ae47dcc06112bb62ecc439d4d985a4bea2e99e428c1f7ca"
+          "source_sha256": "0b0179f285d30c2082b57b0d955c83a10ebbe409a98792196eb75dcabf098de8"
         }
       ]
     },
@@ -1716,7 +1724,7 @@
           "package": "rmagna",
           "target": "original_nonlinear_postselection",
           "test": "original_importance_weights_rejected_draws_and_aggregate_ratio",
-          "source_sha256": "3f102c46eb0af3042ae47dcc06112bb62ecc439d4d985a4bea2e99e428c1f7ca"
+          "source_sha256": "0b0179f285d30c2082b57b0d955c83a10ebbe409a98792196eb75dcabf098de8"
         }
       ]
     },
@@ -1729,7 +1737,7 @@
           "package": "rmagna",
           "target": "original_nonlinear_postselection",
           "test": "original_joint_duplicate_conflicting_detector_and_task_conditions",
-          "source_sha256": "3f102c46eb0af3042ae47dcc06112bb62ecc439d4d985a4bea2e99e428c1f7ca"
+          "source_sha256": "0b0179f285d30c2082b57b0d955c83a10ebbe409a98792196eb75dcabf098de8"
         }
       ]
     },
@@ -1742,7 +1750,7 @@
           "package": "rmagna",
           "target": "original_nonlinear_postselection",
           "test": "original_mixed_affine_selector_integrates_unobserved_record",
-          "source_sha256": "3f102c46eb0af3042ae47dcc06112bb62ecc439d4d985a4bea2e99e428c1f7ca"
+          "source_sha256": "0b0179f285d30c2082b57b0d955c83a10ebbe409a98792196eb75dcabf098de8"
         }
       ]
     },
@@ -1755,7 +1763,7 @@
           "package": "rmagna",
           "target": "original_nonlinear_postselection",
           "test": "original_no_future_selection_bias_and_replay_with_recovery",
-          "source_sha256": "3f102c46eb0af3042ae47dcc06112bb62ecc439d4d985a4bea2e99e428c1f7ca"
+          "source_sha256": "0b0179f285d30c2082b57b0d955c83a10ebbe409a98792196eb75dcabf098de8"
         }
       ]
     },
@@ -1768,7 +1776,7 @@
           "package": "rmagna",
           "target": "original_nonlinear_postselection",
           "test": "original_noncommuting_readout_truth_table_and_target",
-          "source_sha256": "3f102c46eb0af3042ae47dcc06112bb62ecc439d4d985a4bea2e99e428c1f7ca"
+          "source_sha256": "0b0179f285d30c2082b57b0d955c83a10ebbe409a98792196eb75dcabf098de8"
         }
       ]
     },
@@ -1786,7 +1794,7 @@
           "package": "rmagna",
           "target": "original_nonlinear_postselection",
           "test": "original_not_on_accept_bit_matches_truth_table_and_preserves_feedback",
-          "source_sha256": "3f102c46eb0af3042ae47dcc06112bb62ecc439d4d985a4bea2e99e428c1f7ca"
+          "source_sha256": "0b0179f285d30c2082b57b0d955c83a10ebbe409a98792196eb75dcabf098de8"
         }
       ]
     },
@@ -1799,7 +1807,7 @@
           "package": "rmagna",
           "target": "original_nonlinear_postselection",
           "test": "original_report_flips_select_reported_bits_and_preserve_true_output",
-          "source_sha256": "3f102c46eb0af3042ae47dcc06112bb62ecc439d4d985a4bea2e99e428c1f7ca"
+          "source_sha256": "0b0179f285d30c2082b57b0d955c83a10ebbe409a98792196eb75dcabf098de8"
         }
       ]
     },
@@ -1812,7 +1820,7 @@
           "package": "rmagna",
           "target": "original_nonlinear_postselection",
           "test": "original_selection_distinct_from_each_error_definition",
-          "source_sha256": "3f102c46eb0af3042ae47dcc06112bb62ecc439d4d985a4bea2e99e428c1f7ca"
+          "source_sha256": "0b0179f285d30c2082b57b0d955c83a10ebbe409a98792196eb75dcabf098de8"
         }
       ]
     },
@@ -1825,7 +1833,7 @@
           "package": "rmagna",
           "target": "original_nonlinear_postselection",
           "test": "original_validation_format_version_and_module_boundaries",
-          "source_sha256": "3f102c46eb0af3042ae47dcc06112bb62ecc439d4d985a4bea2e99e428c1f7ca"
+          "source_sha256": "0b0179f285d30c2082b57b0d955c83a10ebbe409a98792196eb75dcabf098de8"
         }
       ]
     },
@@ -1838,7 +1846,7 @@
           "package": "rmagna",
           "target": "original_nonlinear_postselection",
           "test": "original_versions_overwrites_repeat_and_explicit_prior_decisions",
-          "source_sha256": "3f102c46eb0af3042ae47dcc06112bb62ecc439d4d985a4bea2e99e428c1f7ca"
+          "source_sha256": "0b0179f285d30c2082b57b0d955c83a10ebbe409a98792196eb75dcabf098de8"
         }
       ]
     },
@@ -1851,25 +1859,25 @@
           "package": "rmagna",
           "target": "original_nonlinear_postselection",
           "test": "original_batch_invalid_callback_widths_fail_without_statistics",
-          "source_sha256": "3f102c46eb0af3042ae47dcc06112bb62ecc439d4d985a4bea2e99e428c1f7ca"
+          "source_sha256": "0b0179f285d30c2082b57b0d955c83a10ebbe409a98792196eb75dcabf098de8"
         },
         {
           "package": "rmagna",
           "target": "original_nonlinear_postselection",
           "test": "original_batch_callback_failure_after_rejection_is_not_filtered",
-          "source_sha256": "3f102c46eb0af3042ae47dcc06112bb62ecc439d4d985a4bea2e99e428c1f7ca"
+          "source_sha256": "0b0179f285d30c2082b57b0d955c83a10ebbe409a98792196eb75dcabf098de8"
         },
         {
           "package": "rmagna",
           "target": "original_nonlinear_postselection",
           "test": "original_batch_zero_acceptance_completes_rejected_draws",
-          "source_sha256": "3f102c46eb0af3042ae47dcc06112bb62ecc439d4d985a4bea2e99e428c1f7ca"
+          "source_sha256": "0b0179f285d30c2082b57b0d955c83a10ebbe409a98792196eb75dcabf098de8"
         },
         {
           "package": "rmagna",
           "target": "original_nonlinear_postselection",
           "test": "original_batch_non_boolean_python_return_fails_with_valid_calibration",
-          "source_sha256": "3f102c46eb0af3042ae47dcc06112bb62ecc439d4d985a4bea2e99e428c1f7ca"
+          "source_sha256": "0b0179f285d30c2082b57b0d955c83a10ebbe409a98792196eb75dcabf098de8"
         }
       ]
     },
