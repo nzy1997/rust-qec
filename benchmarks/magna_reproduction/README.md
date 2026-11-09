@@ -7,9 +7,9 @@ implement a simulator or claim reproduction of the paper's precision curves.
 
 ## Current coverage
 
-The source-bound ledger currently has 110 verified, 1 partial and 241 unmapped
+The source-bound ledger currently has 111 verified, 1 partial and 240 unmapped
 original methods, with zero architecture-specific core exclusions. It requires
-132 distinct Rust witnesses from 134 declarations across 53 targets. Strict
+133 distinct Rust witnesses from 135 declarations across 53 targets. Strict
 complete parity intentionally exits 2. The detailed per-change sections below
 retain their historical inventory snapshots; `coverage.json` is authoritative.
 
@@ -2739,3 +2739,24 @@ The native method and all complete used hooks/classes, two independent exact
 quantum models, and all 86 Python tooling tests pass in normal and optimized
 Python before the first Rust compilation. Native private object/wire layouts
 and random trajectories are outside this Rust contract.
+
+## Original complemented zero-projection selection
+
+The complete original NOT and XOR(1) method is checked under both compiler
+strategies. Both suffixes resolve to the same complemented decision expression.
+Rust encodes the final selection as the decision parity with right-hand side
+one. Zero original physical noise categories and the single implicit internal
+readout slot are checked separately.
+
+The unassigned raw decision is zero with unit mass. Explicit false and true
+assignments share the immutable program and prepared probability cache, retain
+unit unconditional mass, and give exact acceptance zero and one. The actual
+fixed causal route invokes echo once with false input and output, has unit
+physical history mass and zero acceptance, and needs no further compilation.
+
+The unchanged original native method and all used complete hooks/classes, two
+independent exact reference models, and all 86 Python tooling tests pass in
+normal and optimized modes before the first Rust compilation. External whole
+crate source copies with inverted final postselection or ignored assignment
+compile and fail the unchanged owning test. Native private wire layouts, heap
+identities, random trajectories and performance are outside this contract.
