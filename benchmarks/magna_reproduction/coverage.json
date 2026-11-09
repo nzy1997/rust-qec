@@ -465,8 +465,16 @@
     },
     {
       "id": "test_conditional_noise.ConditionalNoiseTests.test_supplied_candidate_respects_guard_and_causal_chain",
-      "status": "unmapped",
-      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+      "status": "verified",
+      "contract": "Complete original H/measurement, guarded X1 at rate1/3, second measurement, echo callback and guarded X2 at rate1/2. Both supplied faults at physical sites1,3 preserve records a=b, one actual echo callback with input/output b, acceptance1, error a, target1-a, Z=1-2a, half history mass and unit noise/history likelihoods. Active physical path probability is1/6 and inactive is1. Both compiler, causal and history proposal strategies each run32 seeds and same-seed replay:256 primary plus256 replay draws,512 calls. No native RNG identity. Separate enumeration tasks omit sample_records: full weight2 has four patterns/eight histories, covered1, error1/12, target11/12 and Z5/6; weight1 has three patterns/six histories, covered5/6, omitted1/6, zero error, accepted/target/Z5/6. Original unchanged native method, complete rational helper, two independent exact vector/density models and all86 Python tooling tests each normal/O pass before first Rust. Production6CPP is actually used; separately built testing helper is unused. Distinct external v2 Source/binaries/logs baseline0 and inverted-first-guard101/missing-late-candidate101 retain every oracle assertion and reject at original per-draw assertions. Production Source unchanged; whole test file byte identity is not claimed for mutated stimuli. Historical v1 failed task-flow receipts were not recovered; no historical recovery or production gap claimed. No production/API/default changes, full parity or performance claim.",
+      "rust_tests": [
+        {
+          "package": "rmagna",
+          "target": "original_supplied_causal_chain",
+          "test": "original_supplied_candidate_respects_guard_and_causal_chain",
+          "source_sha256": "2d6d104af70998362f3b367a312b7ac3a6168fd172d6d870169797debd1a7c7d"
+        }
+      ]
     },
     {
       "id": "test_conditional_noise.ConditionalNoiseTests.test_two_qubit_channel_order_and_mutual_exclusion",

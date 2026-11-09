@@ -7,9 +7,9 @@ implement a simulator or claim reproduction of the paper's precision curves.
 
 ## Current coverage
 
-The source-bound ledger currently has 112 verified, 1 partial and 239 unmapped
+The source-bound ledger currently has 113 verified, 1 partial and 238 unmapped
 original methods, with zero architecture-specific core exclusions. It requires
-134 distinct Rust witnesses from 136 declarations across 54 targets. Strict
+135 distinct Rust witnesses from 137 declarations across 55 targets. Strict
 complete parity intentionally exits 2. The detailed per-change sections below
 retain their historical inventory snapshots; `coverage.json` is authoritative.
 
@@ -2785,3 +2785,28 @@ Three fresh external integration stimuli with distinct sources, binaries and
 logs pass the original case and reject XY moved to IZ or an omitted guard at
 the unchanged original error assertion (exits 0/101/101). Native private layouts,
 random trajectories and performance are outside this contract.
+
+## Original supplied-noise causal chain
+
+The complete original supplied candidate selects both guarded X faults in an
+H/measurement, X1, measurement, echo and X2 chain. Across both compiler, causal
+execution and history proposal strategies, 32 seeds per configuration retain
+a=b, one actual echo callback with input/output b, acceptance one, error a,
+target success 1-a, Z moment 1-2a and history mass 1/2. Both outcomes occur.
+Noise/history likelihoods are one; active physical path probability is 1/6
+and inactive probability is one. There are 256 primary draws and 256 same-seed
+replays, for 512 sample calls. Native random trajectories are not compared.
+
+Separate enumeration tasks omit diagnostic sample records. Weight two covers
+four patterns and eight histories with error 1/12, target success 11/12 and
+Z moment 5/6. Weight one covers three patterns and six histories with covered
+mass 5/6, omitted mass 1/6, zero error and accepted/target/Z masses 5/6.
+
+The unchanged original native method and complete rational helper, independent
+exact vector and density models, and all 86 Python tooling tests pass in both
+normal and optimized modes before first Rust compilation. The production
+native module is used; the separately built testing helper is unused. Fresh
+external v2 stimuli retain all oracle assertions: baseline passes, while
+inverting the first guard or omitting the late selected fault fails the
+original per-draw assertions (exits 0/101/101). Inverting the first guard can
+retain aggregate error 1/12, so the causal assertions are essential.
