@@ -6103,3 +6103,28 @@ normal and optimized modes before the first Rust compilation. External whole
 crate source copies with inverted final postselection or ignored assignment
 compile and fail the unchanged owning test. Native private wire layouts, heap
 identities, random trajectories and performance are outside this contract.
+
+## Original guarded two-qubit categorical channel
+
+The complete original guarded H/measurement and two-qubit channel method is
+checked across both compiler, causal execution and history proposal strategies.
+Its 15 ordered alternatives retain XY at index 5 with probability 1/3 and YZ at
+index 10 with probability 1/6. Identity has probability 1/2. These alternatives
+are mutually exclusive, and an inactive guard applies no channel action.
+
+Exact output probabilities are P(00)=3/4, P(11)=1/6, P(10)=1/12 and P(01)=0.
+Acceptance is one, target success is 3/4, error is 1/4, and the joint Z moments
+are 1/2, 2/3 and 5/6. Weight-one enumeration covers three supported patterns and
+six histories with unit mass. Weight-zero has one pattern and two histories,
+half covered and half omitted mass, and zero error. All 48 prescribed branch
+queries check conditional moments, half history mass and unit likelihoods.
+Original physical channel site one is distinct from implicit readout site zero.
+
+The unchanged original native method and its complete rational helper, two
+independent exact reference models, and all 86 Python tooling tests pass in
+normal and optimized modes before the first Rust compilation. The production
+native module is actually used; the separately built testing helper is unused.
+Three fresh external integration stimuli with distinct sources, binaries and
+logs pass the original case and reject XY moved to IZ or an omitted guard at
+the unchanged original error assertion (exits 0/101/101). Native private layouts,
+random trajectories and performance are outside this contract.
