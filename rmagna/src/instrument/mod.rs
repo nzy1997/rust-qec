@@ -888,3 +888,6 @@ fn record_row(
     }
     Ok(row)
 }
+
+#[cfg(test)]
+mod original_selection_contracts;
