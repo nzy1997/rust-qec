@@ -463,8 +463,16 @@
     },
     {
       "id": "test_conditional_noise.ConditionalNoiseTests.test_parity_guard_does_not_require_all_raw_records",
-      "status": "unmapped",
-      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+      "status": "verified",
+      "contract": "Complete original H0/H1, individual M0/M1, built-in XOR control and deterministic guarded X2/Z2, task output2 with separately parsed I0 target and empty diagnostic records. Both compiler strategies, both causal strategies and both history proposals each run16 paired low-level/task draws,128 pairs256 calls. Both actual guard observations carry the same complete canonical rec0 XOR rec1 expression and value. Every draw uses one history entropy word and zero noise entropy, checked against actual caller counters; no raw records or external controller callbacks. Two coarse parity histories each have physical mass1/2, unit proposal/noise likelihoods, acceptance1, error parity, target1-parity and unit target normalization. Pair exact raw masses between Rust runtime and task only, without native/Rust RNG trajectory identity. Fixed-template task draws construct no further networks; no such cold-prefix claim. Original private parent-list length3 remains native, not a Rust counter identity. Complete unchanged original method, complete actually used parents/raw_samples/samples helpers, two independent exact full8vector/full8x8density Q(sqrt2,i) instruments preserving four individual measurement histories before aggregation, and all86 Python tests each normal/O pass before first Rust. Native two parses, one compile,16raw/formatted draws,one parent inspect,33equalities,zero approximate assertions/enumeration/explicit state calls; parsed native I0 Circuit argument preserved. Production6CPP actually used, separate testing helper unused, no rational or ZERO_TARGET helper/fixture used. Fresh distinct external Source/binaries/logs compile0, baseline0, XOR-to-single-raw-record101 and omitted-X-physical-guard101 retain all oracle assertions. Wrong raw guard preserves mean error1/2 but fails canonical-expression semantics; omitted X guard forces error1 in both independent models and is actually rejected first by the unchanged shared-guard history assertion. MPL-2.0 attribution. No historical failed prototype receipts recovered or production/API/default/full-parity/performance claim.",
+      "rust_tests": [
+        {
+          "package": "rmagna",
+          "target": "original_parity_only_histories",
+          "test": "original_parity_guard_does_not_require_all_raw_records",
+          "source_sha256": "f3431437bbd7f0ef34a82fa9112819639397842cf9f30bc36473aca27d00c1d1"
+        }
+      ]
     },
     {
       "id": "test_conditional_noise.ConditionalNoiseTests.test_shared_t_tdag_noise_has_no_guarded_route_or_virtual_noise",
