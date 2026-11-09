@@ -7,9 +7,9 @@ implement a simulator or claim reproduction of the paper's precision curves.
 
 ## Current coverage
 
-The source-bound ledger currently has 113 verified, 1 partial and 238 unmapped
+The source-bound ledger currently has 114 verified, 1 partial and 237 unmapped
 original methods, with zero architecture-specific core exclusions. It requires
-135 distinct Rust witnesses from 137 declarations across 55 targets. Strict
+136 distinct Rust witnesses from 138 declarations across 56 targets. Strict
 complete parity intentionally exits 2. The detailed per-change sections below
 retain their historical inventory snapshots; `coverage.json` is authoritative.
 
@@ -2810,3 +2810,33 @@ external v2 stimuli retain all oracle assertions: baseline passes, while
 inverting the first guard or omitting the late selected fault fails the
 original per-draw assertions (exits 0/101/101). Inverting the first guard can
 retain aggregate error 1/12, so the causal assertions are essential.
+
+## Original noncommuting conditional-noise target chain
+
+The complete original H/T/H, three-measurement chain contains two conditional
+X faults with rates 1/3 and 1/2. Its task selects output 2 and an ideal zero
+target, with no diagnostic sample records or extra observable. Both compiler,
+causal execution and history proposal strategies enumerate four patterns and
+eight positive histories with unit coverage and acceptance. The exact error is
+(2-sqrt(2))/24, checked as literal cyclotomic coefficients; target success is
+one minus error.
+
+For fixed-template sampling, both compilers and both history proposals each
+consume sixteen draws from seed 13, for 64 calls. Explicit preparation retains
+the public history/support, acceptance and target families with zero execution
+meter work. Compilation and probability/density/support cache diagnostics stay
+unchanged, with no further network compilations. Every draw checks exact target
+and error accounting; affine proposal history weights need not equal one.
+The original native purposes and preparation counter of three remain native
+facts, without claiming identical Rust private parents, counters or random
+trajectories. No rare-event sampling or performance result is claimed.
+
+The unchanged original method, its complete actually used parents and sample
+helpers, the original zero-target fixture, two independent exact Q(sqrt(2), i)
+eight-vector and eight-by-eight density models, and all 86 Python tooling tests
+pass in normal and optimized modes before first Rust compilation. Production
+native code is used; the separately built testing helper is unused, and this
+original method does not call the rational helper. Fresh external inputs keep
+every oracle assertion: baseline passes, while replacing T with S or omitting
+only the second physical guard fails the first exact-error assertion, with
+exits 0/101/101. The owning test carries MPL-2.0 attribution.

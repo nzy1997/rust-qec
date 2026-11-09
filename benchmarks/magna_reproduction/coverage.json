@@ -450,8 +450,16 @@
     },
     {
       "id": "test_conditional_noise.ConditionalNoiseTests.test_noncommuting_guard_chain_and_target_route",
-      "status": "unmapped",
-      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+      "status": "verified",
+      "contract": "Complete original H/T/H/M0, guarded X1 at rate1/3, M1, guarded X2 at rate1/2 and M2, task outputs2 with ideal zero target and no diagnostic sample records or observables. Exact full weight2 error (2-sqrt2)/24 with literal cyclotomic coefficients [1/12,-1/24,0,1/24], four potential patterns/eight positive histories, unit coverage/acceptance and target1-error across both compiler, causal and history strategies. Fixed-template sampling explicitly prepares public reported-history/support, acceptance and target families with zero execution-meter work. Both compilers and both history proposals each consume16 draws from seed13,64 calls total, retaining unchanged public compilation/probability/density/support diagnostics and zero further network compilations; exact per-draw error+target=accepted and raw accounting. Affine proposal weights need not be one. Native private parent purposes and preparation counter3 remain native facts; no Rust private counter, RNG trajectory identity or rare-error statistical claim. Complete unchanged native method, complete actually used parents/raw_samples/samples helpers, actual ZERO_TARGET fixture, two independent exact Q(sqrt2,i) eight-vector/eight-by-eight density models and all86 Python tests each normal/O pass before first Rust. Production6CPP used, separate testing helper unused; original rational helper not called. Fresh distinct external Source/binaries/logs baseline0, T-to-S101 and omitted-second-physical-guard101 retain all oracle assertions and fail the unchanged first original exact-error assertion. MPL-2.0 attribution. No historical failed prototype receipts recovered or production/API/default/full-parity/performance claim.",
+      "rust_tests": [
+        {
+          "package": "rmagna",
+          "target": "original_noncommuting_guard_chain",
+          "test": "original_noncommuting_guard_chain_and_target_route",
+          "source_sha256": "46e2e580cef5483670503f38d2f2239d0b04ced7e88e9541087c480be81bdad0"
+        }
+      ]
     },
     {
       "id": "test_conditional_noise.ConditionalNoiseTests.test_parity_guard_does_not_require_all_raw_records",
