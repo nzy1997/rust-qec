@@ -6061,3 +6061,24 @@ Retaining one canceled opaque term changes acceptance to 3/4; aliasing the two
 echo symbols preserves deterministic acceptance one but collapses their symbolic
 identity. Both private whole-file controls compile and fail their respective
 unchanged half-mass and distinct-symbol assertions after actual preconditions.
+
+## Original fixed selection assignments and reuse
+
+The complete original fixed-template method covers both compiler strategies,
+default and explicit zero/one assignments, and all 24 joint record/selection
+cells. The final selection is the decision XOR the second physical record.
+Every matching cell has mass 1/4; the unconditional mass is one. Accepted X/Z
+moments are (1/2, 0) for decision zero and (0, 1/2) for decision one.
+
+Assignment views share the immutable compiled program and prepared probability
+and density caches. Physical noise metadata reports zero original categories;
+the two implicit deterministic internal readout slots are checked separately.
+The public task compiles one fixed template and one plus-state target, then
+performs eight seeded draws per compiler without another compilation.
+
+External whole-crate source copies that invert quantum feedback or ignore an
+explicit assignment compile successfully and fail the unchanged owning oracle.
+The native method and all complete used hooks/classes, two independent exact
+quantum models, and all 86 Python tooling tests pass in normal and optimized
+Python before the first Rust compilation. Native private object/wire layouts
+and random trajectories are outside this Rust contract.

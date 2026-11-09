@@ -7,9 +7,9 @@ implement a simulator or claim reproduction of the paper's precision curves.
 
 ## Current coverage
 
-The source-bound ledger currently has 109 verified, 1 partial and 242 unmapped
+The source-bound ledger currently has 110 verified, 1 partial and 241 unmapped
 original methods, with zero architecture-specific core exclusions. It requires
-131 distinct Rust witnesses from 133 declarations across 53 targets. Strict
+132 distinct Rust witnesses from 134 declarations across 53 targets. Strict
 complete parity intentionally exits 2. The detailed per-change sections below
 retain their historical inventory snapshots; `coverage.json` is authoritative.
 
@@ -2718,3 +2718,24 @@ template identity are outside this public Rust contract.
 Only this original method is promoted. Seventeen earlier owning-file hashes
 across fourteen cases are mechanically refreshed; the complete 1,810-line,
 73,893-byte earlier prefix remains byte-identical.
+
+## Original fixed selection assignments and reuse
+
+The complete original fixed-template method covers both compiler strategies,
+default and explicit zero/one assignments, and all 24 joint record/selection
+cells. The final selection is the decision XOR the second physical record.
+Every matching cell has mass 1/4; the unconditional mass is one. Accepted X/Z
+moments are (1/2, 0) for decision zero and (0, 1/2) for decision one.
+
+Assignment views share the immutable compiled program and prepared probability
+and density caches. Physical noise metadata reports zero original categories;
+the two implicit deterministic internal readout slots are checked separately.
+The public task compiles one fixed template and one plus-state target, then
+performs eight seeded draws per compiler without another compilation.
+
+External whole-crate source copies that invert quantum feedback or ignore an
+explicit assignment compile successfully and fail the unchanged owning oracle.
+The native method and all complete used hooks/classes, two independent exact
+quantum models, and all 86 Python tooling tests pass in normal and optimized
+Python before the first Rust compilation. Native private object/wire layouts
+and random trajectories are outside this Rust contract.

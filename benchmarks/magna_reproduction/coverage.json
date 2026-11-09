@@ -1699,8 +1699,16 @@
     },
     {
       "id": "test_nonlinear_postselection.NonlinearPostselectionTests.test_fixed_template_assignments_and_private_boundaries",
-      "status": "unmapped",
-      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+      "status": "verified",
+      "contract": "Complete unchanged original three-wire H/measurement/AND/controlled-H/XOR selection method with plus target. Both compiler strategies cover default and explicit zero/one decisions, immutable compiled program identity and shared prepared probability/density caches. Zero original physical noise categories use the existing original-category metadata API; two implicit deterministic internal readout slots remain separate. Direct final event row is Decision0 XOR Record1, distinct from feedback alone. Unconditional mass is one; all24 assigned joint event cells have exact quarter mass precisely when selection=decision XOR second physical record. Accepted X/Z moments are (1/2,0) for zero and (0,1/2) for one, with target masses1/2 and1/4. Public fixed-template task preparation performs exactly two successful compilations and no further compilation across eight seeded draws per compiler. Actual original native method and every used complete hook/class pass normal/O against fresh6CPP production and6CPP identified helper, observing two parses, one public compile, two native compilations,27queries and three template factories per mode. Independently authored full complex Q(sqrt2) statevector and full rational8x8 density instrument, plus all86 Python tooling tests each mode, precede first Rust. External whole-crate Source-copy controls invert quantum feedback or ignore explicit assignment, each compile0/test101 against the unchanged entire owning oracle; public Source unchanged. No production/API/default/native RNG/private heap/wire-layout/full-parity/performance claim.",
+      "rust_tests": [
+        {
+          "package": "rmagna",
+          "target": "lib",
+          "test": "instrument::original_selection_contracts::original_fixed_template_assignments_and_private_boundaries",
+          "source_sha256": "a29525fbc9101a73a9285380215bed8eb3addd666b754534bb2f086691e4d0ee"
+        }
+      ]
     },
     {
       "id": "test_nonlinear_postselection.NonlinearPostselectionTests.test_full_history_final_readout_and_explicit_state",
