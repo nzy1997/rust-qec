@@ -6035,3 +6035,29 @@ check raw/normalized masses, history/noise weights and output moments.
 The inverted-feedback counterexample retains acceptance 1/4 but exchanges the
 joint X/Z answers; omitting the final NOT instead gives zero acceptance. Both
 external controls compile successfully and fail unchanged semantic assertions.
+
+## Original symbol cancellation and distinct opaque calls
+
+The complete original method covers three circuits under both compilers and
+both causal strategies, with exact acceptance 1/2, 1/2 and 1. Reusing the same
+AND decision twice through XOR reduces the final selection to reported record
+one. Its callback remains live on the causal route and each draw accepts one
+minus its second input. A constant-one XOR selects the complemented record on
+the public linear-affine route, integrating acceptance 1/2 in every draw with
+no external call.
+
+Two echo calls with the same deterministic zero input retain separate call IDs
+zero and one. Their XOR remains a symbolic opaque condition, both ordered
+callbacks run and acceptance is one. Algebraic linearity over opaque decision
+symbols does not establish a reported-record affine expression.
+
+Each complete Rust witness checks 96 seeded draws: 32 AND invocations and 64
+echo invocations, with actual inputs/outputs matched to the public transcript.
+Four prescribed two-bit histories and the deterministic two-call history check
+raw/normalized masses, absent target, zero internal error and unit noise/history
+weights. Native's absent error is null. No error definition or moment is added.
+
+Retaining one canceled opaque term changes acceptance to 3/4; aliasing the two
+echo symbols preserves deterministic acceptance one but collapses their symbolic
+identity. Both private whole-file controls compile and fail their respective
+unchanged half-mass and distinct-symbol assertions after actual preconditions.

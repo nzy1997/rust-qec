@@ -7,9 +7,9 @@ implement a simulator or claim reproduction of the paper's precision curves.
 
 ## Current coverage
 
-The source-bound ledger currently has 108 verified, 1 partial and 243 unmapped
+The source-bound ledger currently has 109 verified, 1 partial and 242 unmapped
 original methods, with zero architecture-specific core exclusions. It requires
-130 distinct Rust witnesses from 132 declarations across 53 targets. Strict
+131 distinct Rust witnesses from 133 declarations across 53 targets. Strict
 complete parity intentionally exits 2. The detailed per-change sections below
 retain their historical inventory snapshots; `coverage.json` is authoritative.
 
@@ -2677,3 +2677,44 @@ random trajectories and private template layouts are outside this contract.
 Only this original method is promoted. Sixteen prior owning-file hashes across
 thirteen cases are refreshed mechanically; the earlier 1,604-line, 65,275-byte
 test/helper prefix remains byte-identical.
+
+## Original symbol cancellation and distinct opaque calls
+
+The complete original method covers three circuits under both compilers and
+both causal strategies, with exact acceptance 1/2, 1/2 and 1. Reusing the same
+AND decision twice through XOR reduces the final selection to reported record
+one. Its callback remains live on the causal route and each draw accepts one
+minus its second input. A constant-one XOR selects the complemented record on
+the public linear-affine route, integrating acceptance 1/2 in every draw with
+no external call.
+
+Two echo calls with the same deterministic zero input retain separate call IDs
+zero and one. Their XOR remains a symbolic opaque condition, both ordered
+callbacks run and acceptance is one. Algebraic linearity over opaque decision
+symbols does not establish a reported-record affine expression.
+
+Each complete Rust witness checks 96 seeded draws: 32 AND invocations and 64
+echo invocations, with actual inputs/outputs matched to the public transcript.
+Four prescribed two-bit histories and the deterministic two-call history check
+raw/normalized masses, absent target, zero internal error and unit noise/history
+weights. Native's absent error is null. No error definition or moment is added.
+
+Retaining one canceled opaque term changes acceptance to 3/4; aliasing the two
+echo symbols preserves deterministic acceptance one but collapses their symbolic
+identity. Both private whole-file controls compile and fail their respective
+unchanged half-mass and distinct-symbol assertions after actual preconditions.
+
+
+The focused original_exact_symbol_cancellation_keeps_affine_path test passes
+one with seventeen filtered and the complete owning target passes eighteen.
+Before first Rust, the complete unchanged original method, registry/exact helpers,
+feedback_template function and entire FeedbackTemplate class pass in normal and
+optimized Python against fresh production and helper extensions. Each mode
+observes four parses, one enumeration, three public compilations, one affine
+sample and three actual helper factories. Both independent exact models and all
+86 Python tooling tests pass per mode. Native random trajectories and private
+template identity are outside this public Rust contract.
+
+Only this original method is promoted. Seventeen earlier owning-file hashes
+across fourteen cases are mechanically refreshed; the complete 1,810-line,
+73,893-byte earlier prefix remains byte-identical.
