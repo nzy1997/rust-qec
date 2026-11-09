@@ -891,3 +891,6 @@ fn record_row(
 
 #[cfg(test)]
 mod original_selection_contracts;
+
+#[cfg(test)]
+mod original_zero_projection;

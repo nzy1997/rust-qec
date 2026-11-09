@@ -1790,8 +1790,16 @@
     },
     {
       "id": "test_nonlinear_postselection.NonlinearPostselectionTests.test_not_and_xor_constant_use_zero_projection_template",
-      "status": "unmapped",
-      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+      "status": "verified",
+      "contract": "Complete unchanged original deterministic M/echo method with both NOT and XOR(1) suffixes. Both resolve to the same complemented Decision0 expression, have zero original physical noise categories and one separate implicit deterministic readout slot. Both compiler strategies use the direct decision event with right-hand side one. Unassigned raw decision-zero mass is one. Explicit false/true assignment views share the immutable compiled program and prepared probability cache, retain unit unconditional mass and have exact acceptance zero/one. Actual fixed causal execution invokes echo once with false input/output, unit history mass, zero final acceptance and no additional compilation. Fresh original production6CPP/helper6CPP normal/O runs execute the entire unchanged method and every used complete helper/class: two parses, two public compiles, one native compilation per suffix, six zero-event queries, eight equality and four handle identity assertions. Independent full rational8-dimensional permutation-vector and separate rational density/Boolean zero-effect models, plus all86 Python tests each mode, precede first Rust. Two external whole311-crate Source-copy controls invert final postselection or ignore explicit assignment; each compile0/test101 against the unchanged owning oracle, leaving public Source unchanged. No production/API/default/native RNG/private layout/full-parity/performance claim.",
+      "rust_tests": [
+        {
+          "package": "rmagna",
+          "target": "lib",
+          "test": "instrument::original_zero_projection::original_not_and_xor_constant_use_zero_projection_template",
+          "source_sha256": "83a1e2931fc3d59086991a4e8fb4b3077139b49f7271c135eb5aa016cdbf4487"
+        }
+      ]
     },
     {
       "id": "test_nonlinear_postselection.NonlinearPostselectionTests.test_not_on_accept_bit_matches_truth_table_and_preserves_feedback",
