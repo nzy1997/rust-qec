@@ -7,9 +7,9 @@ implement a simulator or claim reproduction of the paper's precision curves.
 
 ## Current coverage
 
-The source-bound ledger currently has 107 verified, 1 partial and 244 unmapped
+The source-bound ledger currently has 108 verified, 1 partial and 243 unmapped
 original methods, with zero architecture-specific core exclusions. It requires
-129 distinct Rust witnesses from 131 declarations across 53 targets. Strict
+130 distinct Rust witnesses from 132 declarations across 53 targets. Strict
 complete parity intentionally exits 2. The detailed per-change sections below
 retain their historical inventory snapshots; `coverage.json` is authoritative.
 
@@ -2642,3 +2642,38 @@ methods remain unmapped. The issue legacy audit flags remain unsupported; the
 supported actual full-capture interface is used. These finite checks establish
 no new API/default/sampling law, private template ABI, full compatibility or
 paper-scale performance result.
+
+## Original inverted acceptance and magic-state feedback
+
+The complete original method compares complemented AND selection and later
+XOR/NOT selection against an explicit detector reference. Both compilers and
+causal strategies accept only measured bits 11 with mass 1/4. Controlled H is
+inactive on the accepted branch, which retains T|+> on the output. Joint X is
+exactly sqrt(2)/8 and joint Z is zero. No target or error definition is supplied:
+Rust's internal error contribution is zero and native's error result is null.
+
+Eight seeded draws per configuration call AND exactly once with matching
+observed inputs and output. Preparation invokes no callback. Two public
+canonical selections contain exactly one nonaffine condition. The existing
+execution meter records one initial reference compilation and no further
+network compilations per fixed-template draw. Four prescribed histories also
+check raw/normalized masses, history/noise weights and output moments.
+
+The inverted-feedback counterexample retains acceptance 1/4 but exchanges the
+joint X/Z answers; omitting the final NOT instead gives zero acceptance. Both
+external controls compile successfully and fail unchanged semantic assertions.
+
+
+The focused original_not_on_accept_bit_matches_truth_table_and_preserves_feedback
+test passes one with sixteen filtered; its complete owning target passes
+seventeen. Before Rust, the complete unchanged original method and its complete
+registry/exact helpers, feedback_template function and FeedbackTemplate class
+execute against fresh production and identified-helper extensions in normal
+and optimized Python. Each mode observes four parses, three enumerations, one
+public compile, eight samples and one actual helper factory. Two independent
+exact models and all 86 Python tooling tests pass per mode. Native and Rust
+random trajectories and private template layouts are outside this contract.
+
+Only this original method is promoted. Sixteen prior owning-file hashes across
+thirteen cases are refreshed mechanically; the earlier 1,604-line, 65,275-byte
+test/helper prefix remains byte-identical.

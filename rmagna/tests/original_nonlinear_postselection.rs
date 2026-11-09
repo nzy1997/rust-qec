@@ -1602,3 +1602,209 @@ fn original_no_future_selection_bias_and_replay_with_recovery() {
     assert_eq!(actual_draws, 384);
     assert_eq!(actual_callbacks, 1152);
 }
+
+// Complete original test_not_on_accept_bit_matches_truth_table_and_preserves_feedback.
+// Public expressions and exact output moments replace private template layouts.
+const INVERTED_MAGIC_PREFIX: &str = "H 0 1 2\nT 2\nM 0 1\nDETECTOR rec[-2]\nDETECTOR rec[-1]\nCONTROL[and] det[-2] det[-1] -> ctrl[0]\n";
+const INVERTED_MAGIC_SUFFIX: &str = "CONTROL[NOT] ctrl[0] -> ctrl[1]\nPOSTSELECT ctrl[1]\nCH ctrl[1] 2\nCONTROL[NOT] ctrl[1] -> ctrl[2]\nCONTROL[XOR] ctrl[0] ctrl[2] rec[-1] -> ctrl[3]\nCONTROL[NOT] ctrl[3] -> ctrl[4]\nPOSTSELECT ctrl[4]";
+const INVERTED_MAGIC_REFERENCE: &str =
+    "CH !ctrl[0] 2\nDETECTOR rec[-2]\nDETECTOR rec[-1]\nPOSTSELECT !det[2]\nPOSTSELECT !det[3]";
+
+fn assert_inverted_magic_draw(draw: &TaskEvaluation) {
+    assert_eq!(draw.controller_calls.len(), 1);
+    let call = &draw.controller_calls[0];
+    assert_eq!(call.name, "and");
+    assert_eq!(call.call, 0);
+    assert_eq!(call.inputs.len(), 2);
+    let accepted = call.inputs[0] & call.inputs[1];
+    assert_eq!(call.outputs, vec![accepted]);
+    assert_eq!(draw.accepted, field(if accepted { "1" } else { "0" }));
+    assert_eq!(draw.error, field("0"));
+    assert_eq!(draw.target_success, None);
+    assert_eq!(draw.target_normalization, None);
+    assert_eq!(draw.raw_target_success, None);
+    assert_eq!(draw.raw_error, ExactScalar::zero());
+    assert_eq!(
+        draw.history_mass,
+        ScalarArithmetic::default().omega(0, -4).unwrap()
+    );
+    assert_eq!(draw.history_proposal_mass, None);
+    assert_eq!(draw.history_weight, field("1"));
+    assert_eq!(draw.noise_probability, rational("1"));
+    assert_eq!(draw.noise_likelihood_ratio, rational("1"));
+    assert!(draw.sampled_records.is_empty());
+    assert_eq!(
+        raw_field(&draw.raw_acceptance),
+        field(if accepted { "1/4" } else { "0" })
+    );
+    assert_eq!(
+        draw.moments,
+        vec![
+            dense_field("0", if accepted { "1/2" } else { "0" }),
+            field("0")
+        ]
+    );
+    assert_eq!(
+        draw.raw_moments.iter().map(raw_field).collect::<Vec<_>>(),
+        vec![
+            dense_field("0", if accepted { "1/8" } else { "0" }),
+            field("0")
+        ]
+    );
+}
+
+#[test]
+fn original_not_on_accept_bit_matches_truth_table_and_preserves_feedback() {
+    use rmagna::circuit::{BitAtom, BitExpr, Operation, RegisterVersion};
+    use rmagna::costs::ExecutionMeter;
+    use rmagna::noise::NoiseSampling;
+    use std::sync::{Arc, Mutex};
+
+    let files = Files::new();
+    let suffix = INVERTED_MAGIC_SUFFIX;
+    let text = format!("{INVERTED_MAGIC_PREFIX}{suffix}");
+    let reference_text = format!("{INVERTED_MAGIC_PREFIX}{INVERTED_MAGIC_REFERENCE}");
+    let mut total_seeded_callbacks = 0;
+    for (compiler, runtime) in strategies() {
+        let seen = Arc::new(Mutex::new(Vec::new()));
+        let observed = Arc::clone(&seen);
+        let mut registry = ControllerRegistry::default();
+        registry
+            .register("and", "1", move |bits: &[bool]| {
+                assert_eq!(bits.len(), 2);
+                observed.lock().unwrap().push(bits.to_vec());
+                Ok(vec![bits[0] & bits[1]])
+            })
+            .unwrap();
+        let parse = ParseOptions {
+            controllers: registry.names(),
+            ..Default::default()
+        };
+        let physical = parse_circuit(&text, &parse).unwrap();
+        let reference = parse_circuit(&reference_text, &parse).unwrap();
+        let task = parse_task(
+            r#"{"outputs":[2],"observables":[[1,0],[0,1]]}"#,
+            &files.0,
+            &TaskOptions::default(),
+        )
+        .unwrap();
+        let modules = task.load_modules(&physical, &parse).unwrap();
+        let reference_modules = task.load_modules(&reference, &parse).unwrap();
+        let mut options = EvaluationOptions::default();
+        options.runtime.strategy = runtime;
+        options.runtime.compile.compiler_strategy = compiler;
+        let preparation = ExecutionMeter::default();
+        let evaluator = TaskEvaluator::new_with_costs(
+            &physical,
+            &modules,
+            &registry,
+            options,
+            &NoiseSampling::Physical,
+            &preparation,
+        )
+        .unwrap();
+        assert!(
+            seen.lock().unwrap().is_empty(),
+            "preparation invokes no AND callback"
+        );
+        assert_eq!(preparation.snapshot().compilation.attempted, 1);
+        assert_eq!(preparation.snapshot().compilation.succeeded, 1);
+        assert_eq!(preparation.snapshot().compilation.failed, 0);
+        assert!(evaluator.sampled_history());
+        assert_eq!(
+            evaluator.execution_route(),
+            match runtime {
+                CausalStrategy::ColdPrefix => "causal_cold_prefix",
+                CausalStrategy::FixedTemplate => "causal_fixed_template",
+            }
+        );
+        let totals = exact(&evaluator);
+        assert_eq!(
+            totals.masses.accepted,
+            field("1/4"),
+            "original inverted acceptance"
+        );
+        assert_eq!(totals.masses.error, field("0"));
+        assert_eq!(totals.masses.target_success, None);
+        assert_eq!(totals.target_normalization, None);
+        assert_eq!(
+            totals.masses.moments,
+            vec![dense_field("0", "1/8"), field("0")],
+            "original accepted magic-state output moments"
+        );
+        let explicit =
+            TaskEvaluator::new(&reference, &reference_modules, &registry, options).unwrap();
+        let reference_totals = exact(&explicit);
+        assert_eq!(totals.masses.accepted, reference_totals.masses.accepted);
+        assert_eq!(totals.masses.error, reference_totals.masses.error);
+        assert_eq!(
+            totals.masses.target_success,
+            reference_totals.masses.target_success
+        );
+        assert_eq!(totals.masses.moments, reference_totals.masses.moments);
+        assert_eq!(totals.full_acceptance.lower, field("1/4"));
+        assert_eq!(totals.full_acceptance.upper, field("1/4"));
+        assert_eq!(totals.full_error.lower, field("0"));
+        assert_eq!(totals.full_error.upper, field("0"));
+
+        seen.lock().unwrap().clear();
+        for seed in 0..8 {
+            let before = seen.lock().unwrap().len();
+            let meter = ExecutionMeter::default();
+            let draw = evaluator
+                .sample_with_costs(&mut SplitMix64::new(seed), &meter)
+                .unwrap();
+            assert_inverted_magic_draw(&draw);
+            let observations = seen.lock().unwrap();
+            assert_eq!(
+                observations.len(),
+                before + 1,
+                "one actual AND invocation per seeded draw"
+            );
+            assert_eq!(observations[before], draw.controller_calls[0].inputs);
+            assert_eq!(meter.snapshot().decoder.succeeded, 1);
+            if runtime == CausalStrategy::FixedTemplate {
+                assert_eq!(draw.network_compilations, 0);
+                assert_eq!(meter.snapshot().compilation.attempted, 0);
+            }
+        }
+        assert_eq!(seen.lock().unwrap().len(), 8);
+        total_seeded_callbacks += 8;
+
+        for (a, b) in [(false, false), (false, true), (true, false), (true, true)] {
+            let draw = evaluator
+                .evaluate_prescribed_history(&[], &[vec![a, b]])
+                .unwrap();
+            assert_eq!(draw.controller_calls[0].inputs, vec![a, b]);
+            assert_inverted_magic_draw(&draw);
+        }
+        // Structural checks follow the semantic assertions so fixture controls
+        // fail at the unchanged acceptance/moment oracle.
+        assert_eq!(physical.external_calls(), 1);
+        let selections = physical
+            .operations()
+            .iter()
+            .filter_map(|op| match &op.operation {
+                Operation::Postselect { expression } => Some(expression),
+                _ => None,
+            })
+            .collect::<Vec<_>>();
+        let not_and = BitExpr::atom(BitAtom::Decision { call: 0, bit: 0 }).inverted();
+        let not_record = BitExpr::atom(BitAtom::Record(1)).inverted();
+        assert_eq!(selections, vec![&not_and, &not_record]);
+        assert_eq!(selections.iter().filter(|s| !s.is_affine()).count(), 1);
+        assert_eq!(
+            physical
+                .control_analysis()
+                .expression(RegisterVersion::new(1, 0)),
+            Some(&not_and)
+        );
+        assert_eq!(
+            physical
+                .control_analysis()
+                .expression(RegisterVersion::new(4, 0)),
+            Some(&not_record)
+        );
+    }
+    assert_eq!(total_seeded_callbacks, 32);
+}
