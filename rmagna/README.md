@@ -6015,3 +6015,23 @@ feedback on the declared output and a fresh recovery auxiliary. The pinned nativ
 reference observes one physical and one recovery invocation per draw; Rust checks
 two physical and one recovery invocation. Language RNG trajectories and callback
 trace counts are not claimed identical.
+
+## Original inverted acceptance and magic-state feedback
+
+The complete original method compares complemented AND selection and later
+XOR/NOT selection against an explicit detector reference. Both compilers and
+causal strategies accept only measured bits 11 with mass 1/4. Controlled H is
+inactive on the accepted branch, which retains T|+> on the output. Joint X is
+exactly sqrt(2)/8 and joint Z is zero. No target or error definition is supplied:
+Rust's internal error contribution is zero and native's error result is null.
+
+Eight seeded draws per configuration call AND exactly once with matching
+observed inputs and output. Preparation invokes no callback. Two public
+canonical selections contain exactly one nonaffine condition. The existing
+execution meter records one initial reference compilation and no further
+network compilations per fixed-template draw. Four prescribed histories also
+check raw/normalized masses, history/noise weights and output moments.
+
+The inverted-feedback counterexample retains acceptance 1/4 but exchanges the
+joint X/Z answers; omitting the final NOT instead gives zero acceptance. Both
+external controls compile successfully and fail unchanged semantic assertions.

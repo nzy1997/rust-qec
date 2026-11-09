@@ -1667,7 +1667,7 @@
           "package": "rmagna",
           "target": "original_nonlinear_postselection",
           "test": "original_affine_not_selection_and_terminal_feedback",
-          "source_sha256": "2a80b60e7e0d2d03d3ebb82f405c2c3acf0fccb53b9515eb744f0e9693ef5811"
+          "source_sha256": "3f102c46eb0af3042ae47dcc06112bb62ecc439d4d985a4bea2e99e428c1f7ca"
         }
       ]
     },
@@ -1680,7 +1680,7 @@
           "package": "rmagna",
           "target": "original_nonlinear_postselection",
           "test": "original_dense_noncommuting_magic_instrument_with_report_noise",
-          "source_sha256": "2a80b60e7e0d2d03d3ebb82f405c2c3acf0fccb53b9515eb744f0e9693ef5811"
+          "source_sha256": "3f102c46eb0af3042ae47dcc06112bb62ecc439d4d985a4bea2e99e428c1f7ca"
         }
       ]
     },
@@ -1703,7 +1703,7 @@
           "package": "rmagna",
           "target": "original_nonlinear_postselection",
           "test": "original_full_history_final_readout_and_explicit_state",
-          "source_sha256": "2a80b60e7e0d2d03d3ebb82f405c2c3acf0fccb53b9515eb744f0e9693ef5811"
+          "source_sha256": "3f102c46eb0af3042ae47dcc06112bb62ecc439d4d985a4bea2e99e428c1f7ca"
         }
       ]
     },
@@ -1716,7 +1716,7 @@
           "package": "rmagna",
           "target": "original_nonlinear_postselection",
           "test": "original_importance_weights_rejected_draws_and_aggregate_ratio",
-          "source_sha256": "2a80b60e7e0d2d03d3ebb82f405c2c3acf0fccb53b9515eb744f0e9693ef5811"
+          "source_sha256": "3f102c46eb0af3042ae47dcc06112bb62ecc439d4d985a4bea2e99e428c1f7ca"
         }
       ]
     },
@@ -1729,7 +1729,7 @@
           "package": "rmagna",
           "target": "original_nonlinear_postselection",
           "test": "original_joint_duplicate_conflicting_detector_and_task_conditions",
-          "source_sha256": "2a80b60e7e0d2d03d3ebb82f405c2c3acf0fccb53b9515eb744f0e9693ef5811"
+          "source_sha256": "3f102c46eb0af3042ae47dcc06112bb62ecc439d4d985a4bea2e99e428c1f7ca"
         }
       ]
     },
@@ -1742,7 +1742,7 @@
           "package": "rmagna",
           "target": "original_nonlinear_postselection",
           "test": "original_mixed_affine_selector_integrates_unobserved_record",
-          "source_sha256": "2a80b60e7e0d2d03d3ebb82f405c2c3acf0fccb53b9515eb744f0e9693ef5811"
+          "source_sha256": "3f102c46eb0af3042ae47dcc06112bb62ecc439d4d985a4bea2e99e428c1f7ca"
         }
       ]
     },
@@ -1755,7 +1755,7 @@
           "package": "rmagna",
           "target": "original_nonlinear_postselection",
           "test": "original_no_future_selection_bias_and_replay_with_recovery",
-          "source_sha256": "2a80b60e7e0d2d03d3ebb82f405c2c3acf0fccb53b9515eb744f0e9693ef5811"
+          "source_sha256": "3f102c46eb0af3042ae47dcc06112bb62ecc439d4d985a4bea2e99e428c1f7ca"
         }
       ]
     },
@@ -1768,7 +1768,7 @@
           "package": "rmagna",
           "target": "original_nonlinear_postselection",
           "test": "original_noncommuting_readout_truth_table_and_target",
-          "source_sha256": "2a80b60e7e0d2d03d3ebb82f405c2c3acf0fccb53b9515eb744f0e9693ef5811"
+          "source_sha256": "3f102c46eb0af3042ae47dcc06112bb62ecc439d4d985a4bea2e99e428c1f7ca"
         }
       ]
     },
@@ -1779,8 +1779,16 @@
     },
     {
       "id": "test_nonlinear_postselection.NonlinearPostselectionTests.test_not_on_accept_bit_matches_truth_table_and_preserves_feedback",
-      "status": "unmapped",
-      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+      "status": "verified",
+      "contract": "Complete original inverted acceptance and magic-state feedback method plus unchanged registry/exact support methods, complete feedback_template function and entire FeedbackTemplate class. Both compilers and causal strategies agree with the original explicit detector reference: only measured bits11 accepted, exact acceptance1/4, zero Rust error contribution, absent target, joint Xsqrt(2)/8 and Z0. Public canonical expressions retain two selections with exactly one nonaffine condition and one external AND call. Each of eight seeded draws per configuration invokes one actual AND callback with matching inputs/output; preparation invokes none. Existing public cost meters record one initial reference compilation and zero additional fixed-template draw compilations. All four prescribed histories check raw/normalized masses, exact history1/4, proposalNone, unit weights/noise probability and transcript. Complete unchanged original method/helpers pass normal/O against fresh production and identified-helper extensions: four public parses, three enumerations, one public compile, eight samples and one actual helper factory per mode. Undefined native error remains null; internal Rust zero contribution is not object-representation identity. Two independently authored exact truth/Bloch and rational quadratic-complex8x8 density models plus all86 Python tooling tests per mode complete before first Rust. Private final-source controls compile0/test101: invert only accepted quantum feedback, confirming acceptance1/4 but X0/Zsqrt(2)/8 before unchanged moment assertion; omit finalNOT, confirming acceptance0 before unchanged quarter assertion. Public Source and complete prior1604line65275byte prefix remain unchanged by controls. No production API/default/RNG/private template ABI/full-parity/performance claim.",
+      "rust_tests": [
+        {
+          "package": "rmagna",
+          "target": "original_nonlinear_postselection",
+          "test": "original_not_on_accept_bit_matches_truth_table_and_preserves_feedback",
+          "source_sha256": "3f102c46eb0af3042ae47dcc06112bb62ecc439d4d985a4bea2e99e428c1f7ca"
+        }
+      ]
     },
     {
       "id": "test_nonlinear_postselection.NonlinearPostselectionTests.test_report_flips_select_reported_bits_and_preserve_true_output",
@@ -1791,7 +1799,7 @@
           "package": "rmagna",
           "target": "original_nonlinear_postselection",
           "test": "original_report_flips_select_reported_bits_and_preserve_true_output",
-          "source_sha256": "2a80b60e7e0d2d03d3ebb82f405c2c3acf0fccb53b9515eb744f0e9693ef5811"
+          "source_sha256": "3f102c46eb0af3042ae47dcc06112bb62ecc439d4d985a4bea2e99e428c1f7ca"
         }
       ]
     },
@@ -1804,7 +1812,7 @@
           "package": "rmagna",
           "target": "original_nonlinear_postselection",
           "test": "original_selection_distinct_from_each_error_definition",
-          "source_sha256": "2a80b60e7e0d2d03d3ebb82f405c2c3acf0fccb53b9515eb744f0e9693ef5811"
+          "source_sha256": "3f102c46eb0af3042ae47dcc06112bb62ecc439d4d985a4bea2e99e428c1f7ca"
         }
       ]
     },
@@ -1817,7 +1825,7 @@
           "package": "rmagna",
           "target": "original_nonlinear_postselection",
           "test": "original_validation_format_version_and_module_boundaries",
-          "source_sha256": "2a80b60e7e0d2d03d3ebb82f405c2c3acf0fccb53b9515eb744f0e9693ef5811"
+          "source_sha256": "3f102c46eb0af3042ae47dcc06112bb62ecc439d4d985a4bea2e99e428c1f7ca"
         }
       ]
     },
@@ -1830,7 +1838,7 @@
           "package": "rmagna",
           "target": "original_nonlinear_postselection",
           "test": "original_versions_overwrites_repeat_and_explicit_prior_decisions",
-          "source_sha256": "2a80b60e7e0d2d03d3ebb82f405c2c3acf0fccb53b9515eb744f0e9693ef5811"
+          "source_sha256": "3f102c46eb0af3042ae47dcc06112bb62ecc439d4d985a4bea2e99e428c1f7ca"
         }
       ]
     },
@@ -1843,25 +1851,25 @@
           "package": "rmagna",
           "target": "original_nonlinear_postselection",
           "test": "original_batch_invalid_callback_widths_fail_without_statistics",
-          "source_sha256": "2a80b60e7e0d2d03d3ebb82f405c2c3acf0fccb53b9515eb744f0e9693ef5811"
+          "source_sha256": "3f102c46eb0af3042ae47dcc06112bb62ecc439d4d985a4bea2e99e428c1f7ca"
         },
         {
           "package": "rmagna",
           "target": "original_nonlinear_postselection",
           "test": "original_batch_callback_failure_after_rejection_is_not_filtered",
-          "source_sha256": "2a80b60e7e0d2d03d3ebb82f405c2c3acf0fccb53b9515eb744f0e9693ef5811"
+          "source_sha256": "3f102c46eb0af3042ae47dcc06112bb62ecc439d4d985a4bea2e99e428c1f7ca"
         },
         {
           "package": "rmagna",
           "target": "original_nonlinear_postselection",
           "test": "original_batch_zero_acceptance_completes_rejected_draws",
-          "source_sha256": "2a80b60e7e0d2d03d3ebb82f405c2c3acf0fccb53b9515eb744f0e9693ef5811"
+          "source_sha256": "3f102c46eb0af3042ae47dcc06112bb62ecc439d4d985a4bea2e99e428c1f7ca"
         },
         {
           "package": "rmagna",
           "target": "original_nonlinear_postselection",
           "test": "original_batch_non_boolean_python_return_fails_with_valid_calibration",
-          "source_sha256": "2a80b60e7e0d2d03d3ebb82f405c2c3acf0fccb53b9515eb744f0e9693ef5811"
+          "source_sha256": "3f102c46eb0af3042ae47dcc06112bb62ecc439d4d985a4bea2e99e428c1f7ca"
         }
       ]
     },
