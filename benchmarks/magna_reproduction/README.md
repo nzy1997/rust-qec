@@ -2894,3 +2894,14 @@ the input pair `18/10`; the Rust API reduces it to `9/5`. Two independent
 exact vector and density references cover the weighted branches, including
 nonuniform histories and interference zeros. Separate Rust checks cover
 prescribed-stream equality and validation before entropy or controller calls.
+
+## Supplied actions outside physical alternatives
+
+The pinned native boundary accepts a supplied Z on a wire owned by a guarded
+X error instruction. The Rust counterpart checks the exact weight and raw
+masses for the zero target, then uses a plus-state target and signed X
+moment to distinguish guard activation from omission. Correlated anchors,
+report flips and repeated actions have separate exact checks. The prepared
+task API exposes the original physical probability of the active choices,
+with zero mass for active action sequences outside the categorical law.
+The original-test coverage ledger retains its existing mappings.

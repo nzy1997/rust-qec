@@ -516,6 +516,9 @@ impl CausalProgram {
             options,
         })
     }
+    pub(crate) fn noise_source_sites(&self) -> &BTreeMap<usize, usize> {
+        &self.source_sites
+    }
     pub fn scaled_proposal_summary(&self) -> Option<&ScaledProposalSummary> {
         self.sampler.scaled_proposal_summary()
     }
