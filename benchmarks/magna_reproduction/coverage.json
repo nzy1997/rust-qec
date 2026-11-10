@@ -492,8 +492,16 @@
     },
     {
       "id": "test_conditional_noise.ConditionalNoiseTests.test_shared_t_tdag_noise_has_no_guarded_route_or_virtual_noise",
-      "status": "unmapped",
-      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+      "status": "verified",
+      "contract": "Complete original record and echo-controller feedback through T and controlled S-dagger with one unconditional Z channel. The unchanged pinned native method and used parents helper pass in both Python modes, with six parses, two public compiles, parent counts two and three, two complete weight-one enumerations, four equalities, two false assertions and two approximate assertions per mode. Both native paths give exact error 3/8. Two independent four-case exact models and 86 Python tests per mode pass. The attributed Rust owning test covers 16 compiler, causal and history-sampler configurations and 256 ordinary draws. Source metadata preserves one unguarded original Z category at 1/4 with identity 3/4 and an internal implicit readout site. Exact enumeration gives unit acceptance and covered mass, zero omitted mass, error 3/8, target success 5/8 and Bloch moments (sqrt(2)/4, 0, 0). The linear and causal routes, exact draw contributions, unit likelihood/history weights, echo inputs and outputs, compilation diagnostics and fixed-template construction counts are checked through public APIs. Native private parent counts are measured separately. Private external baseline and wrong-rotation and explicit-zero-readout controls compile; they exit 0, 101 and 101 at the expected assertions. MPL-2.0 attribution.",
+      "rust_tests": [
+        {
+          "package": "rmagna",
+          "target": "original_shared_t_tdag_noise_categories",
+          "test": "original_shared_t_tdag_noise_has_no_guarded_route_or_virtual_noise",
+          "source_sha256": "0904d8334206feb07fd327f42d42ea44f6bd5bef6a8af47d49c4b1df333e428e"
+        }
+      ]
     },
     {
       "id": "test_conditional_noise.ConditionalNoiseTests.test_supplied_candidate_respects_guard_and_causal_chain",
