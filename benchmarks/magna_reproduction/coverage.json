@@ -435,8 +435,16 @@
     },
     {
       "id": "test_conditional_noise.ConditionalNoiseTests.test_declared_constant_guards_and_channel_endpoints",
-      "status": "unmapped",
-      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+      "status": "verified",
+      "contract": "Complete original repeated-record XOR false guard, optional NOT true guard, and physical X channel at probability zero or one. The unchanged pinned native method and its used parents helper pass in both Python modes, each with eight parses, four compiles, four inspections with three native query parents each, four actual samples, and eight equalities. The attributed Rust owning witness checks all 32 compiler, causal and history-sampler configurations, including exact error p times guard, unit acceptance and covered mass, zero omitted mass, complementary target success, signed Z moment, unit deterministic history, no entropy or callback, and no requested report record. Public Rust route and compilation diagnostics cover construction without a private layout or RNG trajectory identity claim. Two exact models and both Python suites pass. Separate external sources compile, with baseline 0 and omitted-NOT and reversed-endpoint controls each failing the original error assertion at exit 101. MPL-2.0 attribution.",
+      "rust_tests": [
+        {
+          "package": "rmagna",
+          "target": "original_constant_noise_endpoints",
+          "test": "original_declared_constant_guards_and_channel_endpoints",
+          "source_sha256": "fd893c22b0a236811c34d486e43b2a2a5e9eef0015fa714f04c40abaf2f2f9a7"
+        }
+      ]
     },
     {
       "id": "test_conditional_noise.ConditionalNoiseTests.test_exact_dense_instruments_and_sampling",
