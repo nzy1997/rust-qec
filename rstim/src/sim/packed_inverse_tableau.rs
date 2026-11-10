@@ -472,12 +472,23 @@ impl PackedInverseTableau {
             row_y_count_mod4: vec![0; num_rows],
         };
 
-        for qubit in 0..num_qubits {
-            tableau.set_x_storage_bit(qubit, qubit);
-            tableau.set_z_storage_bit(num_qubits + qubit, qubit);
-        }
-
+        tableau.set_identity_diagonal();
         tableau
+    }
+
+    pub(crate) fn reset_identity(&mut self) {
+        self.x_plane.fill(0);
+        self.z_plane.fill(0);
+        self.signs.fill(0);
+        self.row_y_count_mod4.fill(0);
+        self.set_identity_diagonal();
+    }
+
+    fn set_identity_diagonal(&mut self) {
+        for qubit in 0..self.num_qubits {
+            self.set_x_storage_bit(qubit, qubit);
+            self.set_z_storage_bit(self.num_qubits + qubit, qubit);
+        }
     }
 
     pub fn num_qubits(&self) -> usize {
@@ -834,11 +845,17 @@ impl PackedInverseTableau {
         targets: &[(usize, bool)],
         rng: &mut R,
     ) -> Vec<bool> {
-        if targets.is_empty() {
-            return Vec::new();
-        }
         for &(q, _) in targets {
             self.check_qubit(q);
+        }
+        if targets
+            .iter()
+            .all(|&(q, _)| !self.row_has_x_support(self.num_qubits + q))
+        {
+            return targets
+                .iter()
+                .map(|&(q, inverted)| self.sign_bit(self.num_qubits + q) ^ inverted)
+                .collect();
         }
 
         let mut transposed = PackedTransposedInverseTableau::from_tableau(self);

@@ -118,8 +118,8 @@ pub struct CompiledMeasurementSampler {
 /// A reusable sampler for circuits whose `LOSS` instructions can conditionally suppress gates.
 ///
 /// Compiling once keeps the loss operation plan and noiseless reference sample out of the timed
-/// steady-state sampling path. When loss can affect a later entangling gate, sampling uses a
-/// self-contained bit-parallel CSS frame so each shot can follow its own Clifford path.
+/// steady-state sampling path. Sampling uses a bit-parallel frame for the CSS subset and a
+/// packed stabilizer tableau for native Clifford gates and loss-visible measurements.
 #[derive(Debug)]
 pub struct CompiledLossMeasurementSampler {
     instrs: Vec<StimInstr>,
