@@ -664,8 +664,16 @@
     },
     {
       "id": "test_file_api.FileApiTests.test_supplied_noise_is_validated_against_the_circuit",
-      "status": "unmapped",
-      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+      "status": "verified",
+      "contract": "Complete original supplied-noise boundary method, executed in normal and optimized Python with the five unchanged caller inputs and an independent no-report-flip control. Both compiler strategies test deterministic exact acceptance zero with the report flip and one without it, unit history and declared likelihood, and no entropy use. The witness checks the four original malformed inputs using the Rust noise validation field and original anchor and record IDs, including checked host-domain handling of wire 4294967296. The native supplied response does not expose an original categorical probability. The separate Rust physical assignment masses are zero with the impossible readout flip and 1/10 without it. The physical program stays unchanged. MPL-2.0 attribution.",
+      "rust_tests": [
+        {
+          "package": "rmagna",
+          "target": "original_supplied_noise_validation",
+          "test": "original_supplied_noise_is_validated_against_the_circuit",
+          "source_sha256": "f34755605771b4f08eab2644396214ca75ef0e65b3fc43ff12ec3ba4f4545435"
+        }
+      ]
     },
     {
       "id": "test_file_api.FileApiTests.test_supported_clifford_gates_against_stim",
