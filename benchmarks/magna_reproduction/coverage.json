@@ -609,13 +609,29 @@
     },
     {
       "id": "test_file_api.FileApiTests.test_conditional_noise_is_one_physical_channel",
-      "status": "unmapped",
-      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+      "status": "verified",
+      "contract": "Complete original constant-XOR guarded-noise file method. The unchanged Python method and original target run in normal and optimized modes. All four physical bit/guard inputs are exercised through both Rust compiler strategies, both causal strategies and both history samplers, for 32 deterministic configurations. Actual file reports check typed exact statistics and JSON acceptance and error. The physical metadata retains one original X_ERROR category, its original source address, exact guard and unit channel, while the direct compiler explicitly requires history for guarded noise and unguarded compiled readout sites retain zero probability. Direct task draws consume no entropy. MPL-2.0 attribution.",
+      "rust_tests": [
+        {
+          "package": "rmagna",
+          "target": "original_file_noise_categories",
+          "test": "original_conditional_noise_is_one_physical_channel",
+          "source_sha256": "c79fd3bf54b577d01e92ca7dd3b669410b25c604e2a88e4307672f0a9bf6b189"
+        }
+      ]
     },
     {
       "id": "test_file_api.FileApiTests.test_correlated_alternatives_are_exclusive_and_nonuniform_paulis_have_identity",
-      "status": "unmapped",
-      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+      "status": "verified",
+      "contract": "Complete original exclusive-chain and nonuniform-Pauli file method. The unchanged Python method and used noise hooks run with fresh production and identified helper products in normal and optimized modes. Both Rust compiler strategies check the two forced exclusive alternatives through typed file statistics and JSON estimates, preserving exact original category probabilities and sources. The original 32-seed range per compiler uses explicit SplitMix64 and checks identity/X/Y support, exclusion of zero-probability Z, exact physical and proposal probabilities and unit likelihood. The full exact sector sum gives error 3/4 and target success 1/4. Forced endpoints and prescribed Pauli responses consume no entropy. MPL-2.0 attribution.",
+      "rust_tests": [
+        {
+          "package": "rmagna",
+          "target": "original_file_noise_categories",
+          "test": "original_correlated_alternatives_and_nonuniform_pauli_identity",
+          "source_sha256": "c79fd3bf54b577d01e92ca7dd3b669410b25c604e2a88e4307672f0a9bf6b189"
+        }
+      ]
     },
     {
       "id": "test_file_api.FileApiTests.test_exact_target_and_multibit_readout_decoder",
