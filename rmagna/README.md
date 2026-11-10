@@ -6183,3 +6183,41 @@ original method does not call the rational helper. Fresh external inputs keep
 every oracle assertion: baseline passes, while replacing T with S or omitting
 only the second physical guard fails the first exact-error assertion, with
 exits 0/101/101. The owning test carries MPL-2.0 attribution.
+
+## Original parity-only conditional-noise histories
+
+The complete original circuit measures qubits 0 and 1 individually, computes
+one XOR control and applies deterministic X and Z faults to output 2 under that
+same control. Its task uses an ideal zero target and requests no diagnostic raw
+records. Both compilers, both causal strategies and both history proposals each
+run sixteen paired runtime/task draws: 128 pairs and 256 calls in total.
+
+Each draw observes the same complete canonical `rec0 XOR rec1` expression and
+value at both channels. Public runtime counters and actual caller counters show
+one history entropy word and zero noise entropy; the task caller also consumes
+one word. Both parity outcomes occur, each with physical mass one half. Exact
+acceptance is one, error is the parity, target success is its complement, and
+history/noise likelihoods and target normalization are one. Paired Rust streams
+check runtime/task compatibility without equating native and Rust trajectories.
+Fixed-template task draws construct no further network; cold-prefix draws carry
+no corresponding zero-construction claim. Native's private parent-list length
+of three remains a native fact, without equating it to a Rust private counter.
+
+Before first Rust compilation, the unchanged original method and its complete
+used parent/sample helpers pass in normal and optimized Python: two parses,
+one compile, sixteen raw/formatted draws, one parent inspection and all 33
+original equality assertions, with no enumeration or explicit state call. The
+native ideal target remains a separately parsed Circuit object. Production
+native code is used; the separately built testing helper, rational helper and
+ZERO_TARGET fixture are unused by this method. Two independent exact vector and
+density instruments preserve all four individual measurement histories before
+aggregating the two parity histories; all 86 Python tooling tests also pass in
+both modes. The models compare parity/target marginals without replacing the
+individual measurements by a coherent parity projection.
+
+Fresh external input controls retain every oracle assertion: baseline passes,
+replacing XOR by one raw record fails canonical-expression semantics despite
+the same mean error, and omitting only the X physical guard fails the shared-condition
+history assertion. The independent models separately show physical error one
+for that omitted-guard input. All three compile, with test exits 0/101/101. The owning Rust
+test carries MPL-2.0 attribution. No full parity or performance claim is made.
