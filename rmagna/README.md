@@ -1500,6 +1500,18 @@ outputs and records, and rejects a zero-norm projected target before entropy is
 consumed or any controller runs. `sample` draws physical categorical faults;
 `sample_prescribed` fixes potential fault choices for exact differential checks.
 Both return accepted/error estimator contributions as `ExactField` values.
+Use `sample_supplied_noise` for existing categorical fault selections with a
+caller-declared exact factor. It draws the selected causal history without
+drawing a noise proposal. The factor multiplies each history-normalized
+contribution once. Raw masses, history weights and active-path physical noise
+probabilities remain separate. The factor accepts zero and values above one.
+The raw numerator must be nonnegative and the denominator positive. Both
+must fit the tighter scalar and field coefficient budget before reduction.
+The evaluator checks the factor and fault identities before entropy or
+controller calls. These draws do not establish unbiased sampling of any noise
+law. Native custom Pauli actions outside the categorical alternatives and
+file, run and schema support are separate compatibility work.
+
 A physical Monte Carlo draw already samples the noise distribution: its
 `noise_probability` is enumeration metadata, not an additional estimator factor.
 

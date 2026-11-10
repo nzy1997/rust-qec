@@ -445,8 +445,16 @@
     },
     {
       "id": "test_conditional_noise.ConditionalNoiseTests.test_importance_weights_only_tilt_unconditional_channels",
-      "status": "unmapped",
-      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+      "status": "verified",
+      "contract": "Complete original H0, M0, guarded X_ERROR(1/3) on output 1 and unconditional Z_ERROR(1/10), with separately parsed I0 target and importance scale 5. Actual summary has one guarded and one tilted category. The supplied guarded X and declared exact 9/5 are used for sixteen seeded draws in each of eight compiler, causal strategy and history sampler combinations. Each draw preserves the exact declared factor, joint acceptance and history masses of one half, the branch-specific raw error and target masses, and active-path physical probability 9/10 or 3/10. Weighted acceptance is 9/5 and goes to error or target success according to the guard. The unchanged pinned native method runs in both Python modes with two parses, one compile, sixteen actual NoiseDraw objects and public samples, and eighteen equalities. Supplemental native checks compare the rational value of zero and 18/10, whose native integer pair remains unreduced. Two independent exact vector and density references and all 86 Python tooling tests pass in each mode. Separate Rust API tests verify reduction, zero, signed moments, correlated faults, report flips, physical postselection, recovery, nonunit target normalization, biased and interference-zero affine histories, unit prescribed values and RNG state, and invalid inputs before entropy or callbacks. Distinct external baseline and two stimulus-only controls compile and exit 0/101/101 with unchanged assertions. MPL-2.0 attribution. Native custom actions, file/run/schema integration and noise-law guarantees are outside this mapping.",
+      "rust_tests": [
+        {
+          "package": "rmagna",
+          "target": "original_supplied_noise_likelihood",
+          "test": "original_importance_weights_only_tilt_unconditional_channels",
+          "source_sha256": "9409c145c441db08a10653ca2fbf1da8e84a1a5dc67c2df85376b730752861b5"
+        }
+      ]
     },
     {
       "id": "test_conditional_noise.ConditionalNoiseTests.test_noncommuting_guard_chain_and_target_route",
