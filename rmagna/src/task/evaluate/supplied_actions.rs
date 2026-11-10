@@ -181,9 +181,10 @@ impl TaskEvaluator {
                     if let Some(gates) = actions.remove(&op.id) {
                         for &(wire, _) in &gates {
                             if !qubits.contains(&wire)
-                                && !product
-                                    .as_ref()
-                                    .is_some_and(|p| p.factors.iter().any(|&(q, _)| q == wire))
+                                && !product.as_ref().is_some_and(|p| {
+                                    // Parsed correlated products are sorted by physical wire.
+                                    p.factors.binary_search_by_key(&wire, |&(q, _)| q).is_ok()
+                                })
                             {
                                 return Err(error(
                                     "noise",
@@ -303,7 +304,10 @@ impl TaskEvaluator {
                     .noise_sites()
                     .iter()
                     .enumerate()
-                    .map(|(site, category)| (category.source_operations()[0], site))
+                    .filter_map(|(site, category)| {
+                        let anchor = category.source_operations()[0];
+                        selected.contains_key(&anchor).then_some((anchor, site))
+                    })
                     .collect();
                 &linear_sites
             }

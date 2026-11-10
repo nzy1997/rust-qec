@@ -636,3 +636,55 @@ fn unrelated_noise_keeps_the_normal_compiler_limit_order() {
     .expect("supplied evaluator must preserve the normal compiler limit order");
     assert_eq!(supplied, ordinary);
 }
+
+#[test]
+fn wide_correlated_anchor_checks_repeated_actions_by_wire() {
+    let files = Fixture::new("I 0");
+    let registry = ControllerRegistry::default();
+    let targets = (0..2048)
+        .rev()
+        .map(|wire| format!("X{wire}"))
+        .collect::<Vec<_>>()
+        .join(" ");
+    let source = format!("H 0\nE(1/7) {targets}\nI 2048");
+    let (physical, modules) = files.load(&source, r#"{"outputs":[0]}"#, &registry);
+    let mut options = EvaluationOptions::default();
+    options.runtime.compile.max_gates = 0;
+    let action = SuppliedPauliAction {
+        anchor: noise_anchors(&physical)[0],
+        wire: 2047,
+        basis: Basis::Z,
+    };
+    let mut actions = vec![action; 1024];
+    let likelihood = ratio(1, 1);
+    let prepare = |paulis: &[SuppliedPauliAction]| {
+        TaskEvaluator::prepare_supplied_actions(
+            &physical,
+            &modules,
+            &registry,
+            options,
+            SuppliedNoiseActions {
+                paulis,
+                report_flips: &[],
+                likelihood: &likelihood,
+            },
+            SuppliedActionLimits::default(),
+        )
+        .err()
+        .expect("the wire ownership check or compiler gate limit must fail")
+    };
+    let valid = prepare(&actions);
+    assert_eq!(valid.field, "circuit");
+    assert!(valid.message.contains("max_gates"), "{valid}");
+
+    actions.push(SuppliedPauliAction {
+        wire: 2048,
+        ..action
+    });
+    let invalid = prepare(&actions);
+    assert_eq!(invalid.field, "noise");
+    assert!(
+        invalid.message.contains("does not target wire 2048"),
+        "{invalid}"
+    );
+}
