@@ -448,8 +448,16 @@
     },
     {
       "id": "test_conditional_noise.ConditionalNoiseTests.test_exact_dense_instruments_and_sampling",
-      "status": "unmapped",
-      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+      "status": "verified",
+      "contract": "Complete original six dense conditional instruments, using affine XOR, external AND and mixed AND/XOR feedback with controlled X or S. The pinned original method, matrix fixture, parents and actual raw/formatted sample helpers pass in normal and optimized Python, including 3072 draws per mode. The independent exact signed-Bloch instrument agrees with the original NumPy oracle and all six exact native enumerations. The Rust owning witness checks 24 exact fixture/compiler/causal configurations, unit covered mass, zero omitted mass, literal cyclotomic acceptance and error, and exact target success. Twelve explicitly prepared fixed-template sampling configurations run 512 SplitMix64 draws each from seed 291. Exact mean acceptance and error satisfy the original 13/200 tolerance. Public compilation diagnostics and probability, density and support cache statistics remain unchanged, with zero added network compilation attempts and successful acceptance and target query work. Fresh external sources compile with an unchanged baseline and two stimulus-only controls that fail the exact error and acceptance assertions for an incorrect conditional probability and inverted postselection. MPL-2.0 attribution.",
+      "rust_tests": [
+        {
+          "package": "rmagna",
+          "target": "original_dense_conditional_instruments",
+          "test": "original_dense_conditional_instruments_and_sampling",
+          "source_sha256": "9d8f864d461bd72ec14ca20c78cd4257d67943c094bc38d31606c15824904382"
+        }
+      ]
     },
     {
       "id": "test_conditional_noise.ConditionalNoiseTests.test_importance_weights_only_tilt_unconditional_channels",
