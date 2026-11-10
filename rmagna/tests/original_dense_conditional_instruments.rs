@@ -123,7 +123,8 @@ fn check_sampling(
     let mut rng = SplitMix64::new(291);
     let mut accepted_sum = ExactField::zero();
     let mut error_sum = ExactField::zero();
-    for _ in 0..DRAWS_PER_CASE {
+    let mut observed_non_unit_correction = false;
+    for draw_index in 0..DRAWS_PER_CASE {
         let draw = sampling.sample_with_costs(&mut rng, &meter).unwrap();
         assert_eq!(draw.network_compilations, 0, "{label}");
         assert_eq!(sampling.compilation(), &compilation, "{label}");
@@ -162,6 +163,26 @@ fn check_sampling(
             "{label}"
         );
         assert_eq!(draw.noise_likelihood_ratio, rational(1, 1), "{label}");
+        // With unit noise likelihood and target norm, undoing proposal
+        // normalization must recover the raw mass for every contribution.
+        let target_success = draw.target_success.as_ref().unwrap();
+        for (quantity, contribution, raw) in [
+            ("acceptance", &draw.accepted, &draw.raw_acceptance),
+            ("error", &draw.error, &draw.raw_error),
+            (
+                "target success",
+                target_success,
+                draw.raw_target_success.as_ref().unwrap(),
+            ),
+        ] {
+            assert_eq!(
+                arithmetic.multiply(&proposal, contribution).unwrap(),
+                arithmetic.from_scalar(raw).unwrap(),
+                "{label} draw {draw_index} {quantity} proposal normalization"
+            );
+        }
+        observed_non_unit_correction |=
+            draw.history_weight != ExactField::one() && draw.raw_acceptance != ExactScalar::zero();
         assert!(draw.sampled_records.is_empty(), "{label}");
         assert_eq!(
             draw.controller_calls.len(),
@@ -169,15 +190,17 @@ fn check_sampling(
             "{label}"
         );
         assert_eq!(
-            arithmetic
-                .add(&draw.error, draw.target_success.as_ref().unwrap())
-                .unwrap(),
+            arithmetic.add(&draw.error, target_success).unwrap(),
             draw.accepted,
             "{label}"
         );
         accepted_sum = arithmetic.add(&accepted_sum, &draw.accepted).unwrap();
         error_sum = arithmetic.add(&error_sum, &draw.error).unwrap();
     }
+    assert!(
+        observed_non_unit_correction,
+        "{label} must exercise non-unit history correction on a nonzero contribution"
+    );
     let costs = meter.snapshot();
     assert_eq!(costs.compilation.attempted, 0, "{label}");
     assert_eq!(costs.query.failed, 0, "{label}");

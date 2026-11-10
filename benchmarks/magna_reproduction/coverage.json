@@ -455,7 +455,7 @@
           "package": "rmagna",
           "target": "original_dense_conditional_instruments",
           "test": "original_dense_conditional_instruments_and_sampling",
-          "source_sha256": "84b6e1cb7131074ca1dad8b11cd60d6100136b3a22825f3909b768a39dddf2c5"
+          "source_sha256": "9d8f864d461bd72ec14ca20c78cd4257d67943c094bc38d31606c15824904382"
         }
       ]
     },
