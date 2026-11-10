@@ -40,6 +40,63 @@ fn compiled_loss_sampler_interleaves_loss_flags_and_values() {
 }
 
 #[test]
+fn loss_visible_sampling_rejects_an_out_of_range_loss_probability() {
+    let circuit = parse_lines("LOSS(1.5) 0\nML 0\n").unwrap();
+    let expected = Executor::from_instrs(circuit.clone()).err().unwrap();
+    assert!(expected.contains("probability must be finite and in [0, 1]"));
+
+    for reference_sample_mode in [
+        ReferenceSampleMode::SimulateNoiseless,
+        ReferenceSampleMode::AssumeAllZero,
+    ] {
+        let direct_error =
+            CompiledLossMeasurementSampler::compile(&circuit, reference_sample_mode).unwrap_err();
+        assert_eq!(direct_error, expected);
+
+        let mut rng = StdRng::seed_from_u64(7);
+        let auto_error = sample_batch_with_options(
+            &circuit,
+            4,
+            &mut rng,
+            SampleOptions {
+                reference_sample_mode,
+                backend: SamplingBackend::Auto,
+                output_mode: SampleOutputMode::MeasurementsOnly,
+            },
+        )
+        .err()
+        .expect("Auto must reject an invalid loss probability");
+        assert_eq!(auto_error, expected);
+    }
+}
+
+#[test]
+fn consecutive_loss_visible_readouts_match_grouped_readout() {
+    let split = "SQRT_X 0\nLOSS(1) 1\nML 0\nDETECTOR rec[-1]\nMZL !1 !0\nR 1\nML 1\n";
+    let grouped = "SQRT_X 0\nLOSS(1) 1\nML 0 !1 !0\nDETECTOR rec[-5]\nR 1\nML 1\n";
+    let sample = |source| {
+        let circuit = parse_lines(source).unwrap();
+        let mut sampler =
+            CompiledLossMeasurementSampler::compile(&circuit, ReferenceSampleMode::AssumeAllZero)
+                .unwrap();
+        let mut rng = StdRng::seed_from_u64(7);
+        sampler
+            .sample(129, &mut rng, SampleOutputMode::Full)
+            .unwrap()
+    };
+    let split = sample(split);
+    let grouped = sample(grouped);
+    assert_eq!(split.measurements.num_major(), 8);
+    for shot in 0..129 {
+        let value = grouped.measurements.get(1, shot);
+        let expected = [false, value, true, false, false, !value, false, false];
+        let record: Vec<_> = (0..8).map(|m| split.measurements.get(m, shot)).collect();
+        assert_eq!(record, expected, "shot {shot}");
+        assert_eq!(split.detections.get(0, shot), value);
+    }
+}
+
+#[test]
 fn compiled_loss_sampler_matches_native_cliffords_with_and_without_lost_cz_targets() {
     for lost in [false, true] {
         let source = if lost {

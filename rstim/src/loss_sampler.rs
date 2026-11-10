@@ -8,7 +8,7 @@ mod tableau;
 
 /// A compiled, allocation-light execution plan for the common loss-aware sampling subset.
 ///
-/// Unsupported instructions cause compilation to return `None`, allowing callers to preserve
+/// Unsupported instructions cause compilation to return `Ok(None)`, allowing callers to preserve
 /// the general executor as a correctness fallback.
 #[derive(Debug)]
 pub(crate) struct LossSamplerPlan {
@@ -72,22 +72,24 @@ enum NativeClifford {
 }
 
 impl LossSamplerPlan {
-    pub(crate) fn try_compile(instrs: &[StimInstr]) -> Option<Self> {
-        let (mut ops, has_loss) = compile_ops(instrs)?;
-        if !has_loss {
-            return None;
-        }
+    pub(crate) fn try_compile(instrs: &[StimInstr]) -> Result<Option<Self>, String> {
+        let Some((mut ops, true)) = compile_ops(instrs) else {
+            return Ok(None);
+        };
         let needs_tableau = needs_tableau(&ops);
-        if needs_tableau && has_self_target_pair(&ops) {
-            return None;
+        if needs_tableau {
+            crate::validation::validate_circuit(instrs)?;
+            if has_self_target_pair(&ops) {
+                return Ok(None);
+            }
         }
         let num_simulated_qubits = compact_qubit_indices(&mut ops);
-        Some(Self {
+        Ok(Some(Self {
             num_simulated_qubits,
             num_measurements: crate::stats::num_measurements(instrs),
             needs_tableau,
             ops,
-        })
+        }))
     }
 
     pub(crate) fn num_measurements(&self) -> usize {
@@ -451,7 +453,14 @@ fn compile_ops(instrs: &[StimInstr]) -> Option<(Vec<LossOp>, bool)> {
                         Some(LossOp::MeasureZ(measurement_targets(targets)?))
                     }
                     "ML" | "MZL" if args.is_empty() => {
-                        Some(LossOp::MeasureLossZ(measurement_targets(targets)?))
+                        let targets = measurement_targets(targets)?;
+                        if let Some(LossOp::MeasureLossZ(previous)) = ops.last_mut() {
+                            // Share a tableau transpose while retaining target and record order.
+                            previous.extend(targets);
+                            None
+                        } else {
+                            Some(LossOp::MeasureLossZ(targets))
+                        }
                     }
                     "MR" | "MRZ" if args.is_empty() => {
                         Some(LossOp::MeasureResetZ(measurement_targets(targets)?))
@@ -674,7 +683,9 @@ mod tests {
              M 0\n",
         )
         .unwrap();
-        let plan = LossSamplerPlan::try_compile(&circuit).expect("supported loss plan");
+        let plan = LossSamplerPlan::try_compile(&circuit)
+            .unwrap()
+            .expect("supported loss plan");
         let reference = crate::data_path::build_reference_sample(
             &circuit,
             crate::data_path::ReferenceSampleMode::SimulateNoiseless,
@@ -698,39 +709,64 @@ mod tests {
     }
 
     #[test]
+    fn loss_visible_readouts_share_one_batch_until_a_reset() {
+        let circuit = parse_lines("LOSS(0) 0\nML 0\nTICK\nMZL !0\nR 0\nML 0\n").unwrap();
+        let plan = LossSamplerPlan::try_compile(&circuit).unwrap().unwrap();
+        let readout_sizes: Vec<_> = plan
+            .ops
+            .iter()
+            .filter_map(|op| match op {
+                super::LossOp::MeasureLossZ(targets) => Some(targets.len()),
+                _ => None,
+            })
+            .collect();
+        assert_eq!(readout_sizes, [2, 1]);
+    }
+
+    #[test]
     fn unsupported_loss_circuit_declines_fast_plan() {
         let circuit = parse_lines("LOSS(0.1) 0\nMX 0\n").unwrap();
-        assert!(LossSamplerPlan::try_compile(&circuit).is_none());
+        assert!(LossSamplerPlan::try_compile(&circuit).unwrap().is_none());
     }
 
     #[test]
     fn loss_before_later_cx_compiles_to_the_css_frame() {
         let circuit = parse_lines("X 0\nLOSS(0.5) 0\nCX 0 2\nM 0 1 2 3\n").unwrap();
-        LossSamplerPlan::try_compile(&circuit).expect("supported loss plan");
+        LossSamplerPlan::try_compile(&circuit)
+            .unwrap()
+            .expect("supported loss plan");
     }
 
     #[test]
     fn loss_at_end_of_repeated_body_compiles_with_next_iteration_cx() {
         let circuit = parse_lines("REPEAT 2 {\nCX 0 1\nLOSS(0.5) 0\n}\nM 0 1\n").unwrap();
-        LossSamplerPlan::try_compile(&circuit).expect("supported loss plan");
+        LossSamplerPlan::try_compile(&circuit)
+            .unwrap()
+            .expect("supported loss plan");
     }
 
     #[test]
     fn unrelated_cx_after_loss_compiles_to_the_css_frame() {
         let circuit = parse_lines("LOSS(0.5) 0\nCX 1 2\nM 0 1 2\n").unwrap();
-        LossSamplerPlan::try_compile(&circuit).expect("supported loss plan");
+        LossSamplerPlan::try_compile(&circuit)
+            .unwrap()
+            .expect("supported loss plan");
     }
 
     #[test]
     fn reset_between_loss_and_later_cx_compiles_to_the_css_frame() {
         let circuit = parse_lines("LOSS(0.5) 0\nR 0\nCX 0 1\nM 0 1\n").unwrap();
-        LossSamplerPlan::try_compile(&circuit).expect("supported loss plan");
+        LossSamplerPlan::try_compile(&circuit)
+            .unwrap()
+            .expect("supported loss plan");
     }
 
     #[test]
     fn repeat_reset_loss_compiles_to_the_css_frame() {
         let circuit = parse_lines("REPEAT 3 {\nCX 0 1\nLOSS(0.5) 0\nMR 0\n}\nM 0 1\n").unwrap();
-        LossSamplerPlan::try_compile(&circuit).expect("supported loss plan");
+        LossSamplerPlan::try_compile(&circuit)
+            .unwrap()
+            .expect("supported loss plan");
     }
 
     #[test]
@@ -738,7 +774,9 @@ mod tests {
         let circuit =
             parse_lines("R 0 1\nH 0\nCX 0 1\nDEPOLARIZE2(0.2) 0 1\nLOSS(0.3) 0 1\nM 0 1\n")
                 .unwrap();
-        let plan = LossSamplerPlan::try_compile(&circuit).expect("supported loss plan");
+        let plan = LossSamplerPlan::try_compile(&circuit)
+            .unwrap()
+            .expect("supported loss plan");
         let reference = crate::data_path::build_reference_sample(
             &circuit,
             crate::data_path::ReferenceSampleMode::SimulateNoiseless,
@@ -759,7 +797,9 @@ mod tests {
     #[test]
     fn gapped_qubit_labels_are_compacted_without_changing_loss_semantics() {
         let circuit = parse_lines("R 1 100\nX 1\nLOSS(1) 1\nCX 1 100\nX 100\nM 1 100\n").unwrap();
-        let plan = LossSamplerPlan::try_compile(&circuit).expect("supported loss plan");
+        let plan = LossSamplerPlan::try_compile(&circuit)
+            .unwrap()
+            .expect("supported loss plan");
         assert_eq!(plan.num_simulated_qubits, 2);
 
         let mut packed_rng = StdRng::seed_from_u64(5);
@@ -788,7 +828,9 @@ mod tests {
             "../../benchmarks/rstim_vs_stim_simulator/fixtures/stim_surface_code_rotated_memory_z_d11_r100_atom_loss.stim"
         ))
         .unwrap();
-        let plan = LossSamplerPlan::try_compile(&circuit).expect("fixture uses supported loss ops");
+        let plan = LossSamplerPlan::try_compile(&circuit)
+            .unwrap()
+            .expect("fixture uses supported loss ops");
         assert_eq!(plan.num_simulated_qubits, 241);
         assert_eq!(plan.num_measurements, 12_121);
     }

@@ -200,7 +200,7 @@ impl CompiledLossMeasurementSampler {
         instrs: &[StimInstr],
         reference_mode: ReferenceSampleMode,
     ) -> Result<Self, String> {
-        let plan = LossSamplerPlan::try_compile(instrs)
+        let plan = LossSamplerPlan::try_compile(instrs)?
             .ok_or_else(|| "circuit does not support the compiled loss sampler".to_string())?;
         let reference_sample = match reference_mode {
             ReferenceSampleMode::SimulateNoiseless => {
@@ -396,6 +396,11 @@ fn sample_batch_with_executor(
     options: SampleOptions,
     sweep_bits: Option<&[bool]>,
 ) -> Result<BatchOutput, String> {
+    let loss_plan = if sweep_bits.is_none() {
+        LossSamplerPlan::try_compile(instrs)?
+    } else {
+        None
+    };
     let ref_sample = match options.reference_sample_mode {
         ReferenceSampleMode::SimulateNoiseless => {
             build_reference_sample_with_sweep_bits_and_decision(instrs, sweep_bits)?.bits
@@ -403,11 +408,6 @@ fn sample_batch_with_executor(
         ReferenceSampleMode::AssumeAllZero => vec![false; crate::stats::num_measurements(instrs)],
     };
     let n_meas = ref_sample.len();
-    let loss_plan = if sweep_bits.is_none() {
-        LossSamplerPlan::try_compile(instrs)
-    } else {
-        None
-    };
     let mut executor = if loss_plan.is_none() {
         Some(Executor::from_instrs(instrs.to_vec())?)
     } else {
