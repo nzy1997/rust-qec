@@ -206,7 +206,7 @@ fn representable_actions_use_the_same_categorical_law_and_stream() {
     let files = Fixture::new("H 0\nI 1");
     let registry = ControllerRegistry::default();
     let (physical, modules) = files.load(
-        "M(1/5) 0\nH 1\nE(1/4) rec[-1] X1 X2\nELSE_CORRELATED_ERROR(1/3) rec[-1] Z1 Z2",
+        "H 0\nM(1/5) 0\nH 1\nE(1/4) rec[-1] X1 X2\nELSE_CORRELATED_ERROR(1/3) rec[-1] Z1 Z2",
         r#"{"outputs":[1,2],"ideal_state":"target.magna","sample_records":[0],"observables":[[1,0],[0,2]]}"#,
         &registry,
     );
@@ -250,16 +250,29 @@ fn representable_actions_use_the_same_categorical_law_and_stream() {
                     SuppliedActionLimits::default(),
                 )
                 .unwrap();
-                let mut action_rng = SplitMix64::new(123);
-                let mut category_rng = SplitMix64::new(123);
-                let from_actions = prepared.sample(&mut action_rng).unwrap();
-                let from_category = categorical
-                    .sample_supplied_noise(&faults, &likelihood, &mut category_rng)
-                    .unwrap();
-                assert!(from_actions == from_category, "same exact evaluation");
-                assert_eq!(from_actions.sampled_records, [true]);
-                assert_eq!(from_actions.noise_probability, ratio(1, 20));
-                assert_eq!(action_rng.state(), category_rng.state());
+                let mut seen = [false; 2];
+                let mut consumed_entropy = false;
+                for seed in 0..16 {
+                    let mut action_rng = SplitMix64::new(seed);
+                    let mut category_rng = SplitMix64::new(seed);
+                    let from_actions = prepared.sample(&mut action_rng).unwrap();
+                    let from_category = categorical
+                        .sample_supplied_noise(&faults, &likelihood, &mut category_rng)
+                        .unwrap();
+                    assert!(from_actions == from_category, "same exact evaluation");
+                    let [active] = from_actions.sampled_records.as_slice() else {
+                        panic!("expected one sampled report");
+                    };
+                    seen[usize::from(*active)] = true;
+                    assert_eq!(
+                        from_actions.noise_probability,
+                        if *active { ratio(1, 20) } else { ratio(1, 5) }
+                    );
+                    assert_eq!(action_rng.state(), category_rng.state());
+                    consumed_entropy |= action_rng.state() != seed;
+                }
+                assert_eq!(seen, [true, true]);
+                assert!(consumed_entropy);
             }
         }
     }
@@ -584,4 +597,42 @@ fn unguarded_custom_action_uses_the_live_wire_after_reset_without_entropy() {
         assert_eq!(draw.error, weight);
         assert_eq!(draw.moments, [weight.negated()]);
     }
+}
+
+#[test]
+fn unrelated_noise_keeps_the_normal_compiler_limit_order() {
+    let files = Fixture::new("I 0");
+    let registry = ControllerRegistry::default();
+    let (physical, modules) = files.load(
+        "H 0\nX_ERROR(1/3) 0\nREPEAT 64 {\n    DEPOLARIZE2(1/7) 0 1\n}",
+        r#"{"outputs":[0]}"#,
+        &registry,
+    );
+    let mut options = EvaluationOptions::default();
+    options.runtime.compile.max_gates = 0;
+    options.runtime.compile.max_noise_sites = 1;
+    let ordinary = TaskEvaluator::new(&physical, &modules, &registry, options)
+        .err()
+        .expect("normal compiler must enforce the gate limit first");
+    assert_eq!(ordinary.field, "circuit");
+    assert!(ordinary.message.contains("max_gates"), "{ordinary}");
+    let supplied = TaskEvaluator::prepare_supplied_actions(
+        &physical,
+        &modules,
+        &registry,
+        options,
+        SuppliedNoiseActions {
+            paulis: &[SuppliedPauliAction {
+                anchor: noise_anchors(&physical)[0],
+                wire: 0,
+                basis: Basis::X,
+            }],
+            report_flips: &[],
+            likelihood: &ratio(1, 1),
+        },
+        SuppliedActionLimits::default(),
+    )
+    .err()
+    .expect("supplied evaluator must preserve the normal compiler limit order");
+    assert_eq!(supplied, ordinary);
 }

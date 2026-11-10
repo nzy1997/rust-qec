@@ -1,6 +1,6 @@
 use super::*;
 use crate::circuit::{Basis, NoiseKind, PauliProduct};
-use crate::noise::{OriginalNoiseAction, OriginalNoiseOptions, original_noise_categories};
+use crate::noise::pauli_channels;
 use crate::probability::Probability;
 use std::collections::{BTreeMap, BTreeSet};
 
@@ -54,6 +54,41 @@ impl SuppliedActionEvaluator {
         self.evaluator
             .sample_with_faults(&self.faults, self.likelihood.clone(), random)
     }
+}
+
+struct AnchoredPaulis {
+    index: usize,
+    gates: Vec<(usize, Basis)>,
+}
+
+fn matching_alternative(
+    operation: &Operation,
+    factors: &BTreeMap<usize, Basis>,
+) -> Result<Option<usize>, TaskError> {
+    let Operation::Noise {
+        kind,
+        probabilities,
+        qubits,
+        product,
+        ..
+    } = operation
+    else {
+        unreachable!("supplied actions only group noise operations");
+    };
+    let matches = |physical: &[(usize, Basis)]| {
+        physical.len() == factors.len()
+            && physical
+                .iter()
+                .all(|(wire, basis)| factors.get(wire) == Some(basis))
+    };
+    if let NoiseKind::Correlated { alternative, .. } = kind {
+        let product = product.as_ref().expect("validated correlated product");
+        return Ok(matches(&product.factors).then_some(*alternative));
+    }
+    Ok(pauli_channels(kind, probabilities, qubits)
+        .map_err(|e| error("noise", e))?
+        .iter()
+        .position(|(_, physical)| matches(physical)))
 }
 
 impl TaskEvaluator {
@@ -118,14 +153,51 @@ impl TaskEvaluator {
         }
 
         let mut selected = BTreeMap::new();
-        let mut noise_indices = BTreeMap::new();
+        let mut groups = BTreeMap::<usize, Vec<AnchoredPaulis>>::new();
+        let mut correlated_start = 0;
         let mut next_chain = 0;
-        for (index, op) in physical.operations().iter().enumerate() {
+        let physical_operations = physical.operations();
+        for (index, op) in physical_operations.iter().enumerate() {
             match &op.operation {
-                Operation::Noise { kind, .. } => {
-                    noise_indices.insert(op.id, index);
-                    if let NoiseKind::Correlated { chain, .. } = kind {
-                        next_chain = next_chain.max(chain.saturating_add(1));
+                Operation::Noise {
+                    kind,
+                    qubits,
+                    product,
+                    ..
+                } => {
+                    // Correlated alternatives are contiguous and share a guard.
+                    let first = match kind {
+                        NoiseKind::Correlated {
+                            chain,
+                            alternative: 0,
+                        } => {
+                            correlated_start = index;
+                            next_chain = next_chain.max(chain.saturating_add(1));
+                            index
+                        }
+                        NoiseKind::Correlated { .. } => correlated_start,
+                        _ => index,
+                    };
+                    if let Some(gates) = actions.remove(&op.id) {
+                        for &(wire, _) in &gates {
+                            if !qubits.contains(&wire)
+                                && !product
+                                    .as_ref()
+                                    .is_some_and(|p| p.factors.iter().any(|&(q, _)| q == wire))
+                            {
+                                return Err(error(
+                                    "noise",
+                                    format!(
+                                        "supplied anchor {} does not target wire {wire}",
+                                        op.id
+                                    ),
+                                ));
+                            }
+                        }
+                        groups
+                            .entry(first)
+                            .or_default()
+                            .push(AnchoredPaulis { index, gates });
                     }
                 }
                 Operation::Measure { record, .. } if flips.contains(record) => {
@@ -134,127 +206,87 @@ impl TaskEvaluator {
                 _ => {}
             }
         }
-        for (&anchor, gates) in &actions {
-            let index = noise_indices
-                .get(&anchor)
-                .ok_or_else(|| error("noise", format!("unknown supplied noise anchor {anchor}")))?;
-            let Operation::Noise {
-                qubits, product, ..
-            } = &physical.operations()[*index].operation
-            else {
-                unreachable!("noise indices only contain noise operations");
-            };
-            let allowed: BTreeSet<_> = qubits
-                .iter()
-                .copied()
-                .chain(
-                    product
-                        .iter()
-                        .flat_map(|p| p.factors.iter().map(|&(q, _)| q)),
-                )
-                .collect();
-            for &(wire, _) in gates {
-                if !allowed.contains(&wire) {
-                    return Err(error(
-                        "noise",
-                        format!("supplied anchor {anchor} does not target wire {wire}"),
-                    ));
-                }
-            }
+        if let Some((&anchor, _)) = actions.first_key_value() {
+            return Err(error(
+                "noise",
+                format!("unknown supplied noise anchor {anchor}"),
+            ));
         }
 
         let mut shadow = None;
-        if !actions.is_empty() {
-            let categories = original_noise_categories(
-                physical,
-                &OriginalNoiseOptions {
-                    max_categories: options.runtime.compile.max_noise_sites,
-                    max_channels: physical.operations().len().saturating_mul(15),
-                },
-            )
-            .map_err(|e| error("noise", e))?;
-            for category in categories {
-                let mut combined = BTreeMap::<usize, u8>::new();
-                let mut count = 0;
-                let mut anchors = 0;
-                let mut action_anchor = 0;
-                for source in &category.source_operations {
-                    let Some(gates) = actions.remove(&source.operation) else {
-                        continue;
+        for (first, group) in groups {
+            let mut combined = BTreeMap::<usize, u8>::new();
+            let mut count = 0;
+            for action in &group {
+                count += action.gates.len();
+                for &(wire, basis) in &action.gates {
+                    *combined.entry(wire).or_default() ^= match basis {
+                        Basis::X => 1,
+                        Basis::Z => 2,
+                        Basis::Y => 3,
                     };
-                    anchors += 1;
-                    action_anchor = source.operation;
-                    count += gates.len();
-                    for (wire, basis) in gates {
-                        *combined.entry(wire).or_default() ^= match basis {
-                            Basis::X => 1,
-                            Basis::Z => 2,
-                            Basis::Y => 3,
-                        };
-                    }
                 }
-                if count == 0 {
-                    continue;
-                }
-                let factors: BTreeMap<_, _> = combined
-                    .into_iter()
-                    .filter_map(|(wire, bits)| {
-                        let basis = match bits {
-                            0 => return None,
-                            1 => Basis::X,
-                            2 => Basis::Z,
-                            _ => Basis::Y,
-                        };
-                        Some((wire, basis))
-                    })
-                    .collect();
-                let first = category.source_operations[0].operation;
-                if anchors == 1 && count == factors.len()
-                    && let Some(alternative) = category.channels.iter().position(|channel| {
-                        channel.source.operation == action_anchor
-                            && matches!(&channel.action, OriginalNoiseAction::Pauli { factors: physical }
-                                if physical.len() == factors.len()
-                                    && physical.iter().all(|(wire, basis)| factors.get(wire) == Some(basis)))
-                    })
-                {
-                    selected.insert(first, alternative);
-                    continue;
-                }
-
-                // A private prepared circuit replaces this category by a
-                // zero-mass selectable insertion. Its only supplied choice
-                // has zero mass under the original law. When inactive, the
-                // same guard discards it entirely, as for the original site.
-                let operations = shadow.get_or_insert_with(|| physical.operations().to_vec());
-                let chain = next_chain;
-                next_chain = next_chain
-                    .checked_add(1)
-                    .ok_or_else(|| error("noise", "supplied noise chain limit"))?;
-                operations[noise_indices[&first]].operation = Operation::Noise {
-                    kind: NoiseKind::Correlated {
-                        chain,
-                        alternative: 0,
-                    },
-                    probabilities: vec![Probability::zero()],
-                    qubits: vec![],
-                    product: Some(PauliProduct {
-                        factors: factors.into_iter().collect(),
-                        inverted: false,
-                    }),
-                    guard: category.guard,
-                };
-                for source in &category.source_operations[1..] {
-                    // Keep all expanded operation IDs and record identities.
-                    operations[noise_indices[&source.operation]].operation =
-                        Operation::Annotation {
-                            name: "TICK".into(),
-                            coordinates: vec![],
-                            qubits: vec![],
-                        };
-                }
-                selected.insert(first, 0);
             }
-            debug_assert!(actions.is_empty());
+            let factors: BTreeMap<_, _> = combined
+                .into_iter()
+                .filter_map(|(wire, bits)| {
+                    let basis = match bits {
+                        0 => return None,
+                        1 => Basis::X,
+                        2 => Basis::Z,
+                        _ => Basis::Y,
+                    };
+                    Some((wire, basis))
+                })
+                .collect();
+            let source = &physical_operations[first];
+            if group.len() == 1
+                && count == factors.len()
+                && let Some(alternative) =
+                    matching_alternative(&physical_operations[group[0].index].operation, &factors)?
+            {
+                selected.insert(source.id, alternative);
+                continue;
+            }
+
+            // This selectable insertion has zero physical mass when active.
+            // Its original guard discards it on inactive histories.
+            let Operation::Noise { kind, guard, .. } = &source.operation else {
+                unreachable!("supplied groups only start at noise operations");
+            };
+            let operations = shadow.get_or_insert_with(|| physical_operations.to_vec());
+            if let NoiseKind::Correlated { chain, .. } = kind {
+                for member in operations[first + 1..].iter_mut().take_while(|op| {
+                    matches!(op.operation, Operation::Noise {
+                        kind: NoiseKind::Correlated { chain: other, .. }, ..
+                    } if other == *chain)
+                }) {
+                    // Keep expanded operation and record identities stable.
+                    member.operation = Operation::Annotation {
+                        name: "TICK".into(),
+                        coordinates: vec![],
+                        qubits: vec![],
+                    };
+                }
+            }
+            let chain = next_chain;
+            next_chain = next_chain
+                .checked_add(1)
+                .ok_or_else(|| error("noise", "supplied noise chain limit"))?;
+            operations[first].operation = Operation::Noise {
+                kind: NoiseKind::Correlated {
+                    chain,
+                    alternative: 0,
+                },
+                probabilities: vec![Probability::zero()],
+                qubits: vec![],
+                product: Some(PauliProduct {
+                    factors: factors.into_iter().collect(),
+                    inverted: false,
+                }),
+                guard: guard.clone(),
+            };
+            selected.insert(source.id, 0);
         }
         let shadow = shadow.map(|ops| physical.runtime_view(ops));
         let evaluator = Self::new(
