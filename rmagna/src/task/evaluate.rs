@@ -3,7 +3,10 @@ use crate::circuit::{BitAtom, BitExpr};
 use crate::costs::{ExecutionMeter, OperationKind, observe};
 use crate::field::{ExactField, FieldArithmetic};
 use crate::instrument::{CompiledInstrument, FaultSelection, compile_affine, compile_unitary};
-use crate::noise::{NoiseModel, NoiseSampler, NoiseSampling, RandomSource, ScaledProposalSummary};
+use crate::noise::{
+    NoiseModel, NoiseSampler, NoiseSampling, RandomSource, ScaledProposalSummary,
+    validate_supplied_likelihood,
+};
 use crate::runtime::{
     CausalProgram, ControllerCall, ControllerRegistry, ResolvedHistory, RuntimeOptions,
 };
@@ -93,7 +96,9 @@ pub struct TaskEvaluation {
     pub history_mass: ExactScalar,
     pub history_proposal_mass: Option<ExactScalar>,
     pub history_weight: ExactField,
+    /// Active-path physical probability of the categorical fault choices.
     pub noise_probability: BigRational,
+    /// Generated noise likelihood ratio, unit prescribed weight, or caller-declared factor.
     pub noise_likelihood_ratio: BigRational,
     pub sampled_records: Vec<bool>,
     pub controller_calls: Vec<ControllerCall>,
@@ -412,10 +417,51 @@ impl TaskEvaluator {
         faults: &[FaultSelection],
         random: &mut impl RandomSource,
     ) -> Result<TaskEvaluation, TaskError> {
+        self.sample_with_faults(faults, BigRational::one(), random)
+    }
+
+    /// Sample the history for caller-supplied categorical faults and apply a
+    /// declared exact factor to the history-normalized contributions.
+    ///
+    /// The raw numerator must be nonnegative and the denominator positive.
+    /// Both must fit the smaller of the scalar and field coefficient budgets
+    /// before reduction. The factor and fault identities are checked before
+    /// entropy or controller calls. Zero and factors above one are allowed.
+    ///
+    /// The factor describes the caller's input. This route draws no noise
+    /// proposal and does not establish unbiased sampling of any noise law.
+    pub fn sample_supplied_noise(
+        &self,
+        faults: &[FaultSelection],
+        likelihood: &BigRational,
+        random: &mut impl RandomSource,
+    ) -> Result<TaskEvaluation, TaskError> {
+        let limit = self
+            .options
+            .scalars
+            .max_coefficient_bits()
+            .min(self.options.fields.max_coefficient_bits());
+        let likelihood =
+            validate_supplied_likelihood(likelihood, limit).map_err(|e| error("noise", e))?;
+        self.sample_with_faults(faults, likelihood, random)
+    }
+
+    fn sample_with_faults(
+        &self,
+        faults: &[FaultSelection],
+        likelihood: BigRational,
+        random: &mut impl RandomSource,
+    ) -> Result<TaskEvaluation, TaskError> {
         match &self.execution {
             Execution::Causal(program) => {
                 let history = program
-                    .resolve_prescribed(&self.requested, faults, random, &self.options.scalars)
+                    .resolve_with_faults(
+                        &self.requested,
+                        faults,
+                        likelihood,
+                        random,
+                        &self.options.scalars,
+                    )
                     .map_err(|e| error("runtime", e))?;
                 self.evaluate(EvaluationInput::history(&history))
             }
@@ -428,7 +474,7 @@ impl TaskEvaluator {
                     faults,
                     history_mass: &ExactScalar::one(),
                     noise_probability: &probability,
-                    likelihood: &BigRational::one(),
+                    likelihood: &likelihood,
                     history: None,
                 })
             }

@@ -7,9 +7,9 @@ implement a simulator or claim reproduction of the paper's precision curves.
 
 ## Current coverage
 
-The source-bound ledger currently has 115 verified, 1 partial and 236 unmapped
+The source-bound ledger currently has 116 verified, 1 partial and 235 unmapped
 original methods, with zero architecture-specific core exclusions. It requires
-137 distinct Rust witnesses from 139 declarations across 57 targets. Strict
+138 distinct Rust witnesses from 140 declarations across 58 targets. Strict
 complete parity intentionally exits 2. The detailed per-change sections below
 retain their historical inventory snapshots; `coverage.json` is authoritative.
 
@@ -2878,3 +2878,19 @@ the same mean error, and omitting only the X physical guard fails the shared-con
 history assertion. The independent models separately show physical error one
 for that omitted-guard input. All three compile, with test exits 0/101/101. The owning Rust
 test carries MPL-2.0 attribution. No full parity or performance claim is made.
+
+
+## Original supplied categorical noise likelihood
+
+The pinned method supplies a guarded X fault with declared likelihood `9/5`
+to a circuit with one guarded and one tilted category. The Rust owning test
+checks sixteen histories for each of eight compiler, causal strategy and
+history sampler combinations. It checks the factor, weighted contributions,
+joint masses and active-path physical probability exactly.
+
+The unchanged native method passes in normal and optimized Python with all
+eighteen original equalities. Supplemental native observations preserve
+the input pair `18/10`; the Rust API reduces it to `9/5`. Two independent
+exact vector and density references cover the weighted branches, including
+nonuniform histories and interference zeros. Separate Rust checks cover
+prescribed-stream equality and validation before entropy or controller calls.

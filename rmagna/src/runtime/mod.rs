@@ -16,7 +16,7 @@ use crate::instrument::{
 };
 use crate::noise::{
     NoiseDraw, NoiseError, NoiseModel, NoiseOptions, NoiseSampler, NoiseSampling, RandomSource,
-    ScaledProposalSummary,
+    ScaledProposalSummary, validate_supplied_likelihood,
 };
 use crate::records::{
     RecordQuery, SamplingError, SamplingOptions, propose_affine_reported_observed,
@@ -200,6 +200,23 @@ pub struct ControllerCall {
     pub inputs: Vec<bool>,
     pub outputs: Vec<bool>,
 }
+struct ExecutionNoise {
+    faults: Vec<FaultSelection>,
+    physical_probability: BigRational,
+    likelihood_ratio: BigRational,
+    entropy_words: usize,
+}
+impl From<NoiseDraw> for ExecutionNoise {
+    fn from(draw: NoiseDraw) -> Self {
+        Self {
+            faults: draw.faults,
+            physical_probability: draw.physical_probability,
+            likelihood_ratio: draw.likelihood_ratio,
+            entropy_words: draw.entropy_words,
+        }
+    }
+}
+
 pub struct CausalDraw {
     /// Joint quantum masses. Form contributions using the physical/proposal
     /// history denominator and the separately exposed noise likelihood.
@@ -208,7 +225,7 @@ pub struct CausalDraw {
     pub history_proposal_mass: Option<ExactScalar>,
     /// Probability of the active physical noise choices along this history.
     pub noise_probability: BigRational,
-    /// Noise/proposal likelihood, independent of the history likelihood.
+    /// Generated noise likelihood ratio or supplied factor, separate from the history likelihood.
     pub noise_likelihood_ratio: BigRational,
     pub conditions: Vec<(BitExpr, bool)>,
     pub controller_calls: Vec<ControllerCall>,
@@ -251,6 +268,7 @@ impl ResolvedHistory {
     pub fn noise_probability(&self) -> &BigRational {
         &self.noise_probability
     }
+    /// Generated noise likelihood ratio, unit prescribed weight, or caller-declared factor.
     pub fn noise_likelihood_ratio(&self) -> &BigRational {
         &self.noise_likelihood_ratio
     }
@@ -614,7 +632,7 @@ impl CausalProgram {
         let draw = self.sampler.draw(random)?;
         self.execute(
             requested,
-            draw,
+            draw.into(),
             random,
             arithmetic,
             HistoryMode::Sample,
@@ -629,15 +647,44 @@ impl CausalProgram {
         random: &mut impl RandomSource,
         arithmetic: &ScalarArithmetic,
     ) -> Result<ResolvedHistory, RuntimeError> {
+        self.resolve_with_faults(requested, faults, BigRational::one(), random, arithmetic)
+    }
+
+    /// Resolve sampled causal history for supplied categorical faults and an
+    /// exact caller-declared noise factor, without generating a noise proposal.
+    ///
+    /// The raw numerator must be nonnegative and the denominator positive.
+    /// Each must fit the scalar coefficient bit budget before reduction. The
+    /// factor and fault identities are checked before entropy or controller calls.
+    pub fn resolve_supplied_noise(
+        &self,
+        requested: &[BitExpr],
+        faults: &[FaultSelection],
+        likelihood: &BigRational,
+        random: &mut impl RandomSource,
+        arithmetic: &ScalarArithmetic,
+    ) -> Result<ResolvedHistory, RuntimeError> {
+        let likelihood =
+            validate_supplied_likelihood(likelihood, arithmetic.max_coefficient_bits())?;
+        self.resolve_with_faults(requested, faults, likelihood, random, arithmetic)
+    }
+
+    pub(crate) fn resolve_with_faults(
+        &self,
+        requested: &[BitExpr],
+        faults: &[FaultSelection],
+        likelihood: BigRational,
+        random: &mut impl RandomSource,
+        arithmetic: &ScalarArithmetic,
+    ) -> Result<ResolvedHistory, RuntimeError> {
         self.validate_requested(requested)?;
         let probability = self.model.probability(faults)?;
         self.execute(
             requested,
-            NoiseDraw {
+            ExecutionNoise {
                 faults: faults.to_vec(),
-                physical_probability: probability.clone(),
-                proposal_probability: probability,
-                likelihood_ratio: BigRational::one(),
+                physical_probability: probability,
+                likelihood_ratio: likelihood,
                 entropy_words: 0,
             },
             random,
@@ -705,10 +752,9 @@ impl CausalProgram {
         let probability = self.model.probability(faults)?;
         self.execute(
             requested,
-            NoiseDraw {
+            ExecutionNoise {
                 faults: faults.to_vec(),
-                physical_probability: probability.clone(),
-                proposal_probability: probability,
+                physical_probability: probability,
                 likelihood_ratio: BigRational::one(),
                 entropy_words: 0,
             },
@@ -767,7 +813,7 @@ impl CausalProgram {
     fn execute(
         &self,
         requested: &[BitExpr],
-        draw: NoiseDraw,
+        draw: ExecutionNoise,
         random: &mut impl RandomSource,
         arithmetic: &ScalarArithmetic,
         mode: HistoryMode<'_>,

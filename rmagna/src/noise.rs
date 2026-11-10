@@ -16,7 +16,7 @@ pub use sequential::{
 
 use crate::instrument::{CompiledInstrument, FaultSelection};
 use crate::probability::Probability;
-use num_bigint::BigUint;
+use num_bigint::{BigUint, Sign};
 use num_rational::BigRational;
 use num_traits::{One, Zero};
 use std::{
@@ -31,6 +31,8 @@ pub enum NoiseError {
     RepeatedFault { site: usize },
     ProposalShape,
     InvalidProposalScale,
+    InvalidSuppliedLikelihood,
+    SuppliedLikelihoodLimit { limit: u64, required: u64 },
     InvalidExcludedSite { site: usize },
     ScaledProbability { site: usize },
     MissingSupport { site: usize, choice: usize },
@@ -57,6 +59,14 @@ impl fmt::Display for NoiseError {
             Self::InvalidProposalScale => {
                 write!(f, "proposal scale must be a finite positive rational")
             }
+            Self::InvalidSuppliedLikelihood => write!(
+                f,
+                "supplied noise likelihood requires a nonnegative numerator and positive denominator"
+            ),
+            Self::SuppliedLikelihoodLimit { limit, required } => write!(
+                f,
+                "supplied noise likelihood requires {required} raw coefficient bits, limit is {limit}"
+            ),
             Self::InvalidExcludedSite { site } => write!(
                 f,
                 "excluded noise site {site} is outside the physical model"
@@ -80,6 +90,22 @@ impl fmt::Display for NoiseError {
     }
 }
 impl std::error::Error for NoiseError {}
+
+pub(crate) fn validate_supplied_likelihood(
+    likelihood: &BigRational,
+    limit: u64,
+) -> Result<BigRational, NoiseError> {
+    let numerator = likelihood.numer();
+    let denominator = likelihood.denom();
+    if numerator.sign() == Sign::Minus || denominator.sign() != Sign::Plus {
+        return Err(NoiseError::InvalidSuppliedLikelihood);
+    }
+    let required = numerator.bits().max(denominator.bits());
+    if required > limit {
+        return Err(NoiseError::SuppliedLikelihoodLimit { limit, required });
+    }
+    Ok(BigRational::new(numerator.clone(), denominator.clone()))
+}
 
 #[derive(Clone, Copy, Debug)]
 pub struct NoiseOptions {
