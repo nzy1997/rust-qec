@@ -635,8 +635,16 @@
     },
     {
       "id": "test_file_api.FileApiTests.test_exact_target_and_multibit_readout_decoder",
-      "status": "unmapped",
-      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+      "status": "verified",
+      "contract": "Complete original H/T magic-target and multibit readout file method. Both unchanged Python modes run the two original magic-target calls and the multibit readout against fresh native production. Rust uses both compilers, causal strategies and history samplers in sixteen target and eight readout configurations. Typed FileTask statistics and JSON estimates verify unit acceptance and exact error zero or one. Direct no-entropy draws verify exact target success, normalization, raw acceptance and error, history and likelihood. The original readout callback receives one true bit and returns false and true, with the second output selected as the error observable. The original nonlinear route corresponds to Rust causal_fixed_template and causal_cold_prefix. Original circuit, target and task source remain immutable. MPL-2.0 attribution.",
+      "rust_tests": [
+        {
+          "package": "rmagna",
+          "target": "original_magic_target_decoder_boundaries",
+          "test": "original_exact_target_and_multibit_readout_decoder",
+          "source_sha256": "afe3bd1a91104a97ae540b20dbf406f4e8925d428cee6552ab94221aff29ba3f"
+        }
+      ]
     },
     {
       "id": "test_file_api.FileApiTests.test_joint_error_ratio_zero_acceptance_and_failed_budgets",
@@ -665,8 +673,16 @@
     },
     {
       "id": "test_file_api.FileApiTests.test_removed_effect_and_decoder_output_shape_fail_at_compile",
-      "status": "unmapped",
-      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+      "status": "verified",
+      "contract": "Complete original removed-field and uninitialized decoder-output method. Both unchanged Python modes reject the original error_effect and decoded_error objects and the circuit reading ctrl[1] after only ctrl[0] was written. Rust rejects these inputs through its file/task loading and circuit parsing boundaries, checks the structured task fields and exact source location, and observes no registered callback invocation. MPL-2.0 attribution.",
+      "rust_tests": [
+        {
+          "package": "rmagna",
+          "target": "original_magic_target_decoder_boundaries",
+          "test": "original_removed_effect_and_decoder_output_shape_fail_at_compile",
+          "source_sha256": "afe3bd1a91104a97ae540b20dbf406f4e8925d428cee6552ab94221aff29ba3f"
+        }
+      ]
     },
     {
       "id": "test_file_api.FileApiTests.test_report_flip_changes_feedback_and_task_but_not_true_projection",
