@@ -99,7 +99,12 @@ fn scalar(bit: bool) -> ExactScalar {
     }
 }
 
-fn assert_file_report(report: &FileRunReport, error: bool, route: &str) {
+fn assert_file_report(
+    report: &FileRunReport,
+    error: bool,
+    route: &str,
+    evaluation: EvaluationOptions,
+) {
     let raw = report.raw_result();
     assert_eq!(raw.status, RunStatus::Complete);
     assert_eq!(raw.completed, 1);
@@ -113,6 +118,19 @@ fn assert_file_report(report: &FileRunReport, error: bool, route: &str) {
     assert_eq!(json["status"], "complete");
     assert_eq!(json["completed"], 1);
     assert_eq!(json["route"], route);
+    assert_eq!(
+        json["compilation"]["compiler_diagnostics"]["strategy"],
+        format!("{:?}", evaluation.runtime.compile.compiler_strategy),
+        "file compiler strategy"
+    );
+    let history_sampler = match evaluation.runtime.history_sampler {
+        HistorySampler::ExactMarginal => "exact_marginal",
+        HistorySampler::AffineSupport => "affine_support",
+    };
+    assert_eq!(
+        json["history_sampler"], history_sampler,
+        "file history sampler"
+    );
     assert_eq!(json["estimates"]["acceptance"], 1.0);
     assert_eq!(json["estimates"]["error"], error);
     assert_eq!(json["estimates"]["conditional_error"], error);
@@ -136,6 +154,11 @@ fn evaluate(
         .unwrap();
     let evaluator = TaskEvaluator::new(circuit, &modules, registry, evaluation).unwrap();
     assert_eq!(evaluator.execution_route(), route);
+    assert_eq!(
+        evaluator.compilation().strategy,
+        evaluation.runtime.compile.compiler_strategy,
+        "direct compiler strategy"
+    );
     evaluator.sample(&mut NoEntropy).unwrap()
 }
 
@@ -209,7 +232,7 @@ fn original_exact_target_and_multibit_readout_decoder() {
                 {
                     let file = load_file(path, Some(&magic_task), &empty, options).unwrap();
                     let report = file.run(&TaskRunOptions::default()).unwrap();
-                    assert_file_report(&report, error, "linear_affine");
+                    assert_file_report(&report, error, "linear_affine", options);
                     let physical = parse_circuit(source, &ParseOptions::default()).unwrap();
                     let draw = evaluate(
                         &physical,
@@ -231,7 +254,7 @@ fn original_exact_target_and_multibit_readout_decoder() {
                 let file = load_file(&readout, Some(&readout_task), &registry, options).unwrap();
                 assert!(trace.lock().unwrap().is_empty());
                 let report = file.run(&TaskRunOptions::default()).unwrap();
-                assert_file_report(&report, true, route);
+                assert_file_report(&report, true, route, options);
                 assert_eq!(
                     trace.lock().unwrap().as_slice(),
                     std::slice::from_ref(&expected_trace)

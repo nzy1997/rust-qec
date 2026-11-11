@@ -636,13 +636,13 @@
     {
       "id": "test_file_api.FileApiTests.test_exact_target_and_multibit_readout_decoder",
       "status": "verified",
-      "contract": "Complete original H/T magic-target and multibit readout file method. Both unchanged Python modes run the two original magic-target calls and the multibit readout against fresh native production. Rust uses both compilers, causal strategies and history samplers in sixteen target and eight readout configurations. Typed FileTask statistics and JSON estimates verify unit acceptance and exact error zero or one. Direct no-entropy draws verify exact target success, normalization, raw acceptance and error, history and likelihood. The original readout callback receives one true bit and returns false and true, with the second output selected as the error observable. The original nonlinear route corresponds to Rust causal_fixed_template and causal_cold_prefix. Original circuit, target and task source remain immutable. MPL-2.0 attribution.",
+      "contract": "Complete original H/T magic-target and multibit readout file method. Both unchanged Python modes run the two original magic-target calls and the multibit readout against fresh native production. Rust uses both compilers, causal strategies and history samplers in sixteen target and eight readout configurations. File reports verify compiler and history-sampler selection, unit acceptance and exact error zero or one. Direct evaluation checks the compiler diagnostic. Direct no-entropy draws verify exact target success, normalization, raw acceptance and error, history and likelihood. The original readout callback receives one true bit and returns false and true, with the second output selected as the error observable. The original nonlinear route corresponds to Rust causal_fixed_template and causal_cold_prefix. Original circuit, target and task source remain immutable. MPL-2.0 attribution.",
       "rust_tests": [
         {
           "package": "rmagna",
           "target": "original_magic_target_decoder_boundaries",
           "test": "original_exact_target_and_multibit_readout_decoder",
-          "source_sha256": "afe3bd1a91104a97ae540b20dbf406f4e8925d428cee6552ab94221aff29ba3f"
+          "source_sha256": "a8dda22d8e00d97b92077015e357d12459739e63e02848dd56a9bf75843d85ec"
         }
       ]
     },
@@ -680,7 +680,7 @@
           "package": "rmagna",
           "target": "original_magic_target_decoder_boundaries",
           "test": "original_removed_effect_and_decoder_output_shape_fail_at_compile",
-          "source_sha256": "afe3bd1a91104a97ae540b20dbf406f4e8925d428cee6552ab94221aff29ba3f"
+          "source_sha256": "a8dda22d8e00d97b92077015e357d12459739e63e02848dd56a9bf75843d85ec"
         }
       ]
     },
