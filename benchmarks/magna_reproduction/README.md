@@ -7,9 +7,9 @@ implement a simulator or claim reproduction of the paper's precision curves.
 
 ## Current coverage
 
-The source-bound ledger currently has 132 verified, 1 partial and 219 unmapped
+The source-bound ledger currently has 134 verified, 1 partial and 217 unmapped
 original methods, with zero architecture-specific core exclusions. It requires
-154 distinct Rust witnesses from 156 declarations across 66 targets. Strict
+156 distinct Rust witnesses from 158 declarations across 67 targets. Strict
 complete parity intentionally exits 2. The detailed per-change sections below
 retain their historical inventory snapshots; `coverage.json` is authoritative.
 
@@ -34,6 +34,27 @@ The [paper data deposit](https://doi.org/10.5281/zenodo.23386778) records an old
 development kernel, `853fa2369817e1be65a710b42ff80606e219e464`. Its `.stimx` inputs
 were converted to the public `.magna` files. Historical and public input hashes
 are different; do not claim byte-identical replay of the historical kernel.
+
+## Original file decoder moments and XOR marginalization
+
+`original_file_decoder_moments` owns both complete original FileApi decoder
+methods across both compilers, both causal strategies and both history samplers.
+It retains the literal CS/CH/CY circuit, all three choose-decoder outputs, original
+Z/X/Y mask order and all eight seeded compiled-file calls. Independent exact
+Bloch rotations give initial (X,Y,Z)=(s,s,0) and changed (0,-s,s), with
+s=sqrt(2)/2. Typed and JSON file reports preserve absent error metrics without
+a target. These are global conditional moments, not individual Pauli outcomes.
+
+The original XOR method retains all three record parents, echo feedback, the
+zero target, postselection and all four seeded compiled-file calls. Independent
+masses are A=1/2, E=bit/2 and S=(1-bit)/2. Public canonical control expressions,
+endpoint probes and paired Rust runtime/task draws establish one consumed
+history word, one observation group and no requested raw record materialization.
+Observation groups do not count every scalar marginal contraction. Preparation
+and inspection invoke no decoder; complete callback traces and immutable source
+operations/files are checked. Rust SplitMix64 seed trajectories are independent
+of the original native Random(seed). Wrong controlled gate, Bloch sign and
+removed postselection mutations each compile and fail exact assertions.
 
 ## Original file gate matrices and task ownership
 
