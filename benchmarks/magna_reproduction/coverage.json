@@ -674,13 +674,29 @@
     },
     {
       "id": "test_file_api.FileApiTests.test_nonlinear_mixed_gates_use_actual_decoder_and_global_conditional_moments",
-      "status": "unmapped",
-      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+      "status": "verified",
+      "contract": "Complete original FileApi method preserving literal CS/CH/CY circuit, three-output choose decoder, Z/X/Y mask order, preparation without callbacks and all eight seeded compiled FileTask calls in every compiler/causal/history configuration. Exact independent Bloch rotations anchor initial (X,Y,Z)=(s,s,0), changed (0,-s,s), s=sqrt(2)/2. Endpoint streams force both decoder branches through actual public TaskEvaluator and CausalProgram draws, with full callback traces, one entropy word, one observation group, no requested records and exact raw/conditional moments. Typed/JSON file estimates retain absent error metrics without a target. Rust RNG pairing is internal only; no native seed trajectory or individual-outcome claim. MPL-2.0 attribution.",
+      "rust_tests": [
+        {
+          "package": "rmagna",
+          "target": "original_file_decoder_moments",
+          "test": "original_nonlinear_mixed_gates_use_actual_decoder_and_global_conditional_moments",
+          "source_sha256": "01171f980730436030907472976c908c420940912509cd6b91be85e325838eef"
+        }
+      ]
     },
     {
       "id": "test_file_api.FileApiTests.test_only_required_xor_information_is_sampled_and_postselection_is_preserved",
-      "status": "unmapped",
-      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+      "status": "verified",
+      "contract": "Complete original FileApi method preserving all three original XOR parents, public canonical control expressions, echo feedback, original postselection and explicit one-wire zero target. All eight compiler/causal/history configurations execute all four original seeded compiled FileTask calls and direct paired Rust draws. Independent parity/postselection masses retain A=1/2, E=bit/2 and S=(1-bit)/2, including raw history-normalized masses. Endpoint streams force both branches, with one actual entropy word, one observation-group diagnostic, complete callback traces and no requested raw record materialization. Scalar marginal contractions remain distinct from observation groups; native RNG paths are not equated. MPL-2.0 attribution.",
+      "rust_tests": [
+        {
+          "package": "rmagna",
+          "target": "original_file_decoder_moments",
+          "test": "original_only_required_xor_information_is_sampled_and_postselection_is_preserved",
+          "source_sha256": "01171f980730436030907472976c908c420940912509cd6b91be85e325838eef"
+        }
+      ]
     },
     {
       "id": "test_file_api.FileApiTests.test_pauli_products_resets_and_measure_reset_reports",
