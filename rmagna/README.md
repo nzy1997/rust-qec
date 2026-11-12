@@ -1509,8 +1509,23 @@ The raw numerator must be nonnegative and the denominator positive. Both
 must fit the tighter scalar and field coefficient budget before reduction.
 The evaluator checks the factor and fault identities before entropy or
 controller calls. These draws do not establish unbiased sampling of any noise
-law. Native custom Pauli actions outside the categorical alternatives and
-file, run and schema support are separate compatibility work.
+law.
+
+`TaskEvaluator::prepare_supplied_actions` also accepts Pauli actions outside
+the physical alternatives. Each expanded noise instruction owns its target
+wires and each physical measurement owns its record. Actions follow circuit
+order across anchors and caller order at one anchor. Repetitions compose as
+Paulis, with a common branch phase canceling in masses and moments. Repeated
+report flips compose by XOR. The raw list bounds and identities are checked
+during preparation, before history sampling or controller calls.
+
+The prepared evaluator samples only the task history. Its physical noise
+probability is the mass of the exact active choices under the original
+categorical law. A sequence outside that law has zero physical mass when
+active, including a repeated Pauli sequence with the same net effect as a
+categorical alternative. An inactive guard discards its actions and their
+physical probability. The declared exact factor weights contributions
+independently. File, run and schema support remain separate compatibility work.
 
 A physical Monte Carlo draw already samples the noise distribution: its
 `noise_probability` is enumeration metadata, not an additional estimator factor.

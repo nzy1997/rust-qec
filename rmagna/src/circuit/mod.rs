@@ -337,7 +337,7 @@ impl Circuit {
 }
 
 impl Circuit {
-    // Only the causal runtime constructs these views from validated parsed
+    // Internal execution paths construct these views from validated parsed
     // operations. Original operation IDs and physical wire labels stay stable.
     pub(crate) fn runtime_view(&self, operations: Vec<LocatedOperation>) -> Self {
         let num_records = operations

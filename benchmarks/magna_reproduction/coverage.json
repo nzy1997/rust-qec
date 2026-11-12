@@ -435,13 +435,29 @@
     },
     {
       "id": "test_conditional_noise.ConditionalNoiseTests.test_declared_constant_guards_and_channel_endpoints",
-      "status": "unmapped",
-      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+      "status": "verified",
+      "contract": "Complete original repeated-record XOR false guard, optional NOT true guard, and physical X channel at probability zero or one. The unchanged pinned native method and its used parents helper pass in both Python modes, each with eight parses, four compiles, four inspections with three native query parents each, four actual samples, and eight equalities. The attributed Rust owning witness checks all 32 compiler, causal and history-sampler configurations, including exact error p times guard, unit acceptance and covered mass, zero omitted mass, complementary target success, signed Z moment, unit deterministic history, no entropy or callback, and no requested report record. Public Rust route and compilation diagnostics cover construction without a private layout or RNG trajectory identity claim. Two exact models and both Python suites pass. Separate external sources compile, with baseline 0 and omitted-NOT and reversed-endpoint controls each failing the original error assertion at exit 101. MPL-2.0 attribution.",
+      "rust_tests": [
+        {
+          "package": "rmagna",
+          "target": "original_constant_noise_endpoints",
+          "test": "original_declared_constant_guards_and_channel_endpoints",
+          "source_sha256": "fd893c22b0a236811c34d486e43b2a2a5e9eef0015fa714f04c40abaf2f2f9a7"
+        }
+      ]
     },
     {
       "id": "test_conditional_noise.ConditionalNoiseTests.test_exact_dense_instruments_and_sampling",
-      "status": "unmapped",
-      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+      "status": "verified",
+      "contract": "Complete original six dense conditional instruments, using affine XOR, external AND and mixed AND/XOR feedback with controlled X or S. The pinned original method, matrix fixture, parents and actual raw/formatted sample helpers pass in normal and optimized Python, including 3072 draws per mode. The independent exact signed-Bloch instrument agrees with the original NumPy oracle and all six exact native enumerations. The Rust owning witness checks 24 exact fixture/compiler/causal configurations, unit covered mass, zero omitted mass, literal cyclotomic acceptance and error, and exact target success. Twelve explicitly prepared fixed-template sampling configurations run 512 SplitMix64 draws each from seed 291. Exact mean acceptance and error satisfy the original 13/200 tolerance. Public compilation diagnostics and probability, density and support cache statistics remain unchanged, with zero added network compilation attempts and successful acceptance and target query work. Fresh external sources compile with an unchanged baseline and two stimulus-only controls that fail the exact error and acceptance assertions for an incorrect conditional probability and inverted postselection. MPL-2.0 attribution.",
+      "rust_tests": [
+        {
+          "package": "rmagna",
+          "target": "original_dense_conditional_instruments",
+          "test": "original_dense_conditional_instruments_and_sampling",
+          "source_sha256": "9d8f864d461bd72ec14ca20c78cd4257d67943c094bc38d31606c15824904382"
+        }
+      ]
     },
     {
       "id": "test_conditional_noise.ConditionalNoiseTests.test_importance_weights_only_tilt_unconditional_channels",
@@ -484,8 +500,16 @@
     },
     {
       "id": "test_conditional_noise.ConditionalNoiseTests.test_shared_t_tdag_noise_has_no_guarded_route_or_virtual_noise",
-      "status": "unmapped",
-      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+      "status": "verified",
+      "contract": "Complete original record and echo-controller feedback through T and controlled S-dagger with one unconditional Z channel. The unchanged pinned native method and used parents helper pass in both Python modes, with six parses, two public compiles, parent counts two and three, two complete weight-one enumerations, four equalities, two false assertions and two approximate assertions per mode. Both native paths give exact error 3/8. Two independent four-case exact models and 86 Python tests per mode pass. The attributed Rust owning test covers 16 compiler, causal and history-sampler configurations and 256 ordinary draws. Source metadata preserves one unguarded original Z category at 1/4 with identity 3/4 and an internal implicit readout site. Exact enumeration gives unit acceptance and covered mass, zero omitted mass, error 3/8, target success 5/8 and Bloch moments (sqrt(2)/4, 0, 0). The linear and causal routes, exact draw contributions, unit likelihood/history weights, echo inputs and outputs, compilation diagnostics and fixed-template construction counts are checked through public APIs. Native private parent counts are measured separately. Private external baseline and wrong-rotation and explicit-zero-readout controls compile; they exit 0, 101 and 101 at the expected assertions. MPL-2.0 attribution.",
+      "rust_tests": [
+        {
+          "package": "rmagna",
+          "target": "original_shared_t_tdag_noise_categories",
+          "test": "original_shared_t_tdag_noise_has_no_guarded_route_or_virtual_noise",
+          "source_sha256": "0904d8334206feb07fd327f42d42ea44f6bd5bef6a8af47d49c4b1df333e428e"
+        }
+      ]
     },
     {
       "id": "test_conditional_noise.ConditionalNoiseTests.test_supplied_candidate_respects_guard_and_causal_chain",
@@ -585,18 +609,42 @@
     },
     {
       "id": "test_file_api.FileApiTests.test_conditional_noise_is_one_physical_channel",
-      "status": "unmapped",
-      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+      "status": "verified",
+      "contract": "Complete original constant-XOR guarded-noise file method. The unchanged Python method and original target run in normal and optimized modes. All four physical bit/guard inputs are exercised through both Rust compiler strategies, both causal strategies and both history samplers, for 32 deterministic configurations. Actual file reports check typed exact statistics and JSON acceptance and error. The physical metadata retains one original X_ERROR category, its original source address, exact guard and unit channel, while the direct compiler explicitly requires history for guarded noise and unguarded compiled readout sites retain zero probability. Direct task draws consume no entropy. MPL-2.0 attribution.",
+      "rust_tests": [
+        {
+          "package": "rmagna",
+          "target": "original_file_noise_categories",
+          "test": "original_conditional_noise_is_one_physical_channel",
+          "source_sha256": "c79fd3bf54b577d01e92ca7dd3b669410b25c604e2a88e4307672f0a9bf6b189"
+        }
+      ]
     },
     {
       "id": "test_file_api.FileApiTests.test_correlated_alternatives_are_exclusive_and_nonuniform_paulis_have_identity",
-      "status": "unmapped",
-      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+      "status": "verified",
+      "contract": "Complete original exclusive-chain and nonuniform-Pauli file method. The unchanged Python method and used noise hooks run with fresh production and identified helper products in normal and optimized modes. Both Rust compiler strategies check the two forced exclusive alternatives through typed file statistics and JSON estimates, preserving exact original category probabilities and sources. The original 32-seed range per compiler uses explicit SplitMix64 and checks identity/X/Y support, exclusion of zero-probability Z, exact physical and proposal probabilities and unit likelihood. The full exact sector sum gives error 3/4 and target success 1/4. Forced endpoints and prescribed Pauli responses consume no entropy. MPL-2.0 attribution.",
+      "rust_tests": [
+        {
+          "package": "rmagna",
+          "target": "original_file_noise_categories",
+          "test": "original_correlated_alternatives_and_nonuniform_pauli_identity",
+          "source_sha256": "c79fd3bf54b577d01e92ca7dd3b669410b25c604e2a88e4307672f0a9bf6b189"
+        }
+      ]
     },
     {
       "id": "test_file_api.FileApiTests.test_exact_target_and_multibit_readout_decoder",
-      "status": "unmapped",
-      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+      "status": "verified",
+      "contract": "Complete original H/T magic-target and multibit readout file method. Both unchanged Python modes run the two original magic-target calls and the multibit readout against fresh native production. Rust uses both compilers, causal strategies and history samplers in sixteen target and eight readout configurations. File reports verify compiler and history-sampler selection, unit acceptance and exact error zero or one. Direct evaluation checks the compiler diagnostic. Direct no-entropy draws verify exact target success, normalization, raw acceptance and error, history and likelihood. The original readout callback receives one true bit and returns false and true, with the second output selected as the error observable. The original nonlinear route corresponds to Rust causal_fixed_template and causal_cold_prefix. Original circuit, target and task source remain immutable. MPL-2.0 attribution.",
+      "rust_tests": [
+        {
+          "package": "rmagna",
+          "target": "original_magic_target_decoder_boundaries",
+          "test": "original_exact_target_and_multibit_readout_decoder",
+          "source_sha256": "a8dda22d8e00d97b92077015e357d12459739e63e02848dd56a9bf75843d85ec"
+        }
+      ]
     },
     {
       "id": "test_file_api.FileApiTests.test_joint_error_ratio_zero_acceptance_and_failed_budgets",
@@ -625,8 +673,16 @@
     },
     {
       "id": "test_file_api.FileApiTests.test_removed_effect_and_decoder_output_shape_fail_at_compile",
-      "status": "unmapped",
-      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+      "status": "verified",
+      "contract": "Complete original removed-field and uninitialized decoder-output method. Both unchanged Python modes reject the original error_effect and decoded_error objects and the circuit reading ctrl[1] after only ctrl[0] was written. Rust rejects these inputs through its file/task loading and circuit parsing boundaries, checks the structured task fields and exact source location, and observes no registered callback invocation. MPL-2.0 attribution.",
+      "rust_tests": [
+        {
+          "package": "rmagna",
+          "target": "original_magic_target_decoder_boundaries",
+          "test": "original_removed_effect_and_decoder_output_shape_fail_at_compile",
+          "source_sha256": "a8dda22d8e00d97b92077015e357d12459739e63e02848dd56a9bf75843d85ec"
+        }
+      ]
     },
     {
       "id": "test_file_api.FileApiTests.test_report_flip_changes_feedback_and_task_but_not_true_projection",
@@ -640,8 +696,16 @@
     },
     {
       "id": "test_file_api.FileApiTests.test_supplied_noise_is_validated_against_the_circuit",
-      "status": "unmapped",
-      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+      "status": "verified",
+      "contract": "Complete original supplied-noise boundary method, executed in normal and optimized Python with the five unchanged caller inputs and an independent no-report-flip control. Both compiler strategies test deterministic exact acceptance zero with the report flip and one without it, unit history and declared likelihood, and no entropy use. The witness checks the four original malformed inputs using the Rust noise validation field and original anchor and record IDs, including checked host-domain handling of wire 4294967296. The native supplied response does not expose an original categorical probability. The separate Rust physical assignment masses are zero with the impossible readout flip and 1/10 without it. The physical program stays unchanged. MPL-2.0 attribution.",
+      "rust_tests": [
+        {
+          "package": "rmagna",
+          "target": "original_supplied_noise_validation",
+          "test": "original_supplied_noise_is_validated_against_the_circuit",
+          "source_sha256": "f34755605771b4f08eab2644396214ca75ef0e65b3fc43ff12ec3ba4f4545435"
+        }
+      ]
     },
     {
       "id": "test_file_api.FileApiTests.test_supported_clifford_gates_against_stim",

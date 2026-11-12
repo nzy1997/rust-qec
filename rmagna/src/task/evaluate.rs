@@ -15,8 +15,12 @@ use crate::unitary::{CompiledUnitary, DensityBoundary};
 use num_rational::BigRational;
 use num_traits::One;
 mod preparation;
+mod supplied_actions;
 pub use preparation::{
     FamilyPreparationCounts, SamplingPreparationOptions, SamplingPreparationReport,
+};
+pub use supplied_actions::{
+    SuppliedActionEvaluator, SuppliedActionLimits, SuppliedNoiseActions, SuppliedPauliAction,
 };
 mod enumeration;
 mod run;
