@@ -12,6 +12,7 @@ pub use insertions::{InsertionPreparation, PreparedInsertionStatistics};
 pub use preparation::{InstrumentQueryLayout, QueryPreparationOutcome};
 mod probabilities;
 mod support;
+mod vacuum;
 use crate::circuit::{BitAtom, BitExpr, Circuit};
 use crate::gf2::{AffineSupport, BitVector, Gf2Error};
 use crate::pauli::{PauliError, PauliWord};
@@ -30,6 +31,7 @@ use std::{
     sync::Arc,
 };
 pub use support::{PreparedSupportStatistics, ReportedSupportExpansion};
+pub(crate) use vacuum::{VacuumLayout, compile_vacuum_task};
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum InstrumentError {
@@ -40,6 +42,9 @@ pub enum InstrumentError {
     PreparedQueryCacheUnavailable,
     PreparedInsertionCatalogUnavailable,
     UncapturedSupportQuery,
+    UncapturedOutput {
+        qubit: usize,
+    },
     UnknownDecision {
         call: usize,
         bit: usize,
@@ -78,6 +83,10 @@ pub enum InstrumentError {
 impl fmt::Display for InstrumentError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
+            Self::UncapturedOutput { qubit } => write!(
+                f,
+                "output qubit {qubit} was not retained by the vacuum task layout"
+            ),
             Self::UncapturedSupportQuery => write!(
                 f,
                 "reported query is outside the captured support transport; declare all required observation parities"
@@ -241,7 +250,7 @@ pub struct CompiledInstrument {
     density_queries: Arc<densities::DensityQueries>,
     moment_queries: Arc<moments::MomentQueries>,
     support_queries: Arc<support::SupportQueries>,
-    live_wires: Arc<Vec<usize>>,
+    live_wires: Arc<Vec<Option<usize>>>,
     record_wires: Arc<Vec<usize>>,
     event_rows: Arc<Vec<BitVector>>,
     outcomes: BitVector,
@@ -280,7 +289,7 @@ pub fn compile_affine_stabilizer(
     options: &CompileOptions,
     arithmetic: &ScalarArithmetic,
 ) -> Result<CompiledInstrument, InstrumentError> {
-    lower::compile(circuit, input, options, arithmetic, false)
+    lower::compile(circuit, input, options, arithmetic, false, None)
 }
 
 /// Compile validated owned operations with an all-zero physical input.
@@ -329,7 +338,7 @@ pub(crate) fn compile_causal_stabilizer(
     options: &CompileOptions,
     arithmetic: &ScalarArithmetic,
 ) -> Result<CompiledInstrument, InstrumentError> {
-    lower::compile(circuit, input, options, arithmetic, true)
+    lower::compile(circuit, input, options, arithmetic, true, None)
 }
 /// Compile a measurement-free pure target from its text frontend. Gate phases
 /// follow the standard matrices. Instrument operations are rejected explicitly.
@@ -680,7 +689,8 @@ impl CompiledInstrument {
                     .ok_or(InstrumentError::QubitOutOfBounds {
                         qubit,
                         width: self.num_qubits(),
-                    })
+                    })?
+                    .ok_or(InstrumentError::UncapturedOutput { qubit })
             })
             .collect()
     }

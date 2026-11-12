@@ -2,7 +2,9 @@ use super::*;
 use crate::circuit::{BitAtom, BitExpr};
 use crate::costs::{ExecutionMeter, OperationKind, observe};
 use crate::field::{ExactField, FieldArithmetic};
-use crate::instrument::{CompiledInstrument, FaultSelection, compile_affine, compile_unitary};
+use crate::instrument::{
+    CompiledInstrument, FaultSelection, VacuumLayout, compile_unitary, compile_vacuum_task,
+};
 use crate::noise::{
     NoiseModel, NoiseSampler, NoiseSampling, RandomSource, ScaledProposalSummary,
     validate_supplied_likelihood,
@@ -241,8 +243,9 @@ impl TaskEvaluator {
             .map(|&record| BitExpr::atom(BitAtom::Record(record)))
             .collect::<Vec<_>>();
         let execution = if composed.needs_history_sampling() || !requested.is_empty() {
-            let mut program = CausalProgram::new_observed(
+            let mut program = CausalProgram::new_vacuum_task_observed(
                 &composed,
+                &task.outputs,
                 registry,
                 options.runtime,
                 a,
@@ -256,7 +259,9 @@ impl TaskEvaluator {
             Execution::Causal(Box::new(program))
         } else {
             let instrument = observe(meter, OperationKind::Compilation, || {
-                compile_affine(&composed, &options.runtime.compile, a)
+                let layout = VacuumLayout::for_task(&composed, &task.outputs)
+                    .map_err(|e| error("circuit", e))?;
+                compile_vacuum_task(&composed, &layout, &options.runtime.compile, a, false)
                     .map_err(|e| error("circuit", e))
             })?;
             let model = NoiseModel::physical(&instrument, &options.runtime.noise)

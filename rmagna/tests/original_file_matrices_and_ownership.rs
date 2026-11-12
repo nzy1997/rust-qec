@@ -407,7 +407,14 @@ fn original_untouched_qubit_indices_add_no_wires() {
             a["compilation"]["compiler_diagnostics"]["coherent_width"],
             b["compilation"]["compiler_diagnostics"]["coherent_width"]
         );
-        // Width/resource optimization remains tracked by #1080.
+        assert_eq!(
+            a["compilation"]["compiler_diagnostics"]["coherent_width"],
+            7
+        );
+        assert_eq!(
+            b["compilation"]["compiler_diagnostics"]["coherent_width"],
+            7
+        );
     }
     assert_eq!(
         std::fs::read_to_string(files.0.join("target.magna")).unwrap(),

@@ -13,7 +13,7 @@ struct PendingSite {
 struct Lowering<'a> {
     options: &'a CompileOptions,
     program: Vec<U>,
-    live: Vec<usize>,
+    live: Vec<Option<usize>>,
     records: Vec<usize>,
     width: usize,
     work: Option<usize>,
@@ -23,6 +23,9 @@ struct Lowering<'a> {
     decisions: BTreeMap<(usize, usize), usize>,
 }
 impl Lowering<'_> {
+    fn wire(&self, qubit: usize) -> usize {
+        self.live[qubit].expect("vacuum task layout retains every quantum operand")
+    }
     fn fresh(&mut self) -> Result<usize, InstrumentError> {
         let wire = self.width;
         if wire >= self.options.max_coherent_qubits {
@@ -62,7 +65,7 @@ impl Lowering<'_> {
     }
     fn reset(&mut self, qubit: usize, basis: Basis) -> Result<(), InstrumentError> {
         let wire = self.fresh()?;
-        self.live[qubit] = wire;
+        self.live[qubit] = Some(wire);
         self.prepare(wire, basis)
     }
     fn unitary(
@@ -72,7 +75,7 @@ impl Lowering<'_> {
         control: &Option<BitExpr>,
         source: usize,
     ) -> Result<(), InstrumentError> {
-        let targets = qubits.iter().map(|&q| self.live[q]).collect::<Vec<_>>();
+        let targets = qubits.iter().map(|&q| self.wire(q)).collect::<Vec<_>>();
         let Some(control) = control else {
             return self.extend(gates::lower(gate, &targets));
         };
@@ -167,7 +170,7 @@ impl Lowering<'_> {
     ) -> Result<(), InstrumentError> {
         let record = self.fresh()?;
         for &(q, basis) in &product.factors {
-            let wire = self.live[q];
+            let wire = self.wire(q);
             if basis == Basis::Y {
                 self.extend([U::Clifford(C::S {
                     qubit: wire,
@@ -216,7 +219,7 @@ impl Lowering<'_> {
                 .expect("correlated product was validated by parser")
                 .factors
                 .iter()
-                .map(|&(q, b)| (self.live[q], b))
+                .map(|&(q, b)| (self.wire(q), b))
                 .collect::<Vec<_>>();
             if *alternative == 0 {
                 let index = self.site(source, vec![(probabilities[0].clone(), factors)])?;
@@ -232,7 +235,7 @@ impl Lowering<'_> {
             }
             return Ok(());
         }
-        let live_qubits = qubits.iter().map(|&q| self.live[q]).collect::<Vec<_>>();
+        let live_qubits = qubits.iter().map(|&q| self.wire(q)).collect::<Vec<_>>();
         let alternatives = crate::noise::pauli_channels(kind, probabilities, &live_qubits)?;
         self.site(source, alternatives)?;
         Ok(())
@@ -245,21 +248,26 @@ pub(super) fn compile(
     options: &CompileOptions,
     arithmetic: &ScalarArithmetic,
     causal: bool,
+    vacuum: Option<&VacuumLayout>,
 ) -> Result<CompiledInstrument, InstrumentError> {
-    crate::unitary::validate_stabilizer_input(input, circuit.num_qubits(), arithmetic)?;
-    if circuit.num_qubits() > options.max_coherent_qubits {
+    let width = vacuum.map_or(circuit.num_qubits(), VacuumLayout::width);
+    crate::unitary::validate_stabilizer_input(input, width, arithmetic)?;
+    if width > options.max_coherent_qubits {
         return Err(InstrumentError::ResourceLimit {
             option: "max_coherent_qubits",
             limit: options.max_coherent_qubits,
-            required: circuit.num_qubits(),
+            required: width,
         });
     }
     let mut state = Lowering {
         options,
         program: Vec::new(),
-        live: (0..circuit.num_qubits()).collect(),
+        live: vacuum.map_or_else(
+            || (0..circuit.num_qubits()).map(Some).collect(),
+            |layout| layout.live.clone(),
+        ),
         records: Vec::new(),
-        width: circuit.num_qubits(),
+        width,
         work: None,
         sites: Vec::new(),
         chains: BTreeMap::new(),
