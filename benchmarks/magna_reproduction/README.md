@@ -7,9 +7,9 @@ implement a simulator or claim reproduction of the paper's precision curves.
 
 ## Current coverage
 
-The source-bound ledger currently has 128 verified, 1 partial and 223 unmapped
+The source-bound ledger currently has 132 verified, 1 partial and 219 unmapped
 original methods, with zero architecture-specific core exclusions. It requires
-150 distinct Rust witnesses from 152 declarations across 65 targets. Strict
+154 distinct Rust witnesses from 156 declarations across 66 targets. Strict
 complete parity intentionally exits 2. The detailed per-change sections below
 retain their historical inventory snapshots; `coverage.json` is authoritative.
 
@@ -34,6 +34,38 @@ The [paper data deposit](https://doi.org/10.5281/zenodo.23386778) records an old
 development kernel, `853fa2369817e1be65a710b42ff80606e219e464`. Its `.stimx` inputs
 were converted to the public `.magna` files. Historical and public input hashes
 are different; do not claim byte-identical replay of the historical kernel.
+
+## Original file gate matrices and task ownership
+
+`original_file_matrix_reference.py` captures the two complete pinned gate
+methods using their original NumPy helpers, preparation prefix and method
+bodies. It imports NumPy and Stim for reference generation. The generator
+executes no Magna code. The 28 fixed-input circuits contain 312 nonidentity
+Pauli moments. Finite algebraic matrix components are lifted into exact
+Fraction arithmetic in Q(omega), checked for exact unitarity and compared
+with every original NumPy expectation. The artifact binds the pinned method
+source, generator and Python/NumPy/Stim versions.
+
+Regenerate into a new path with the retained reference environment, repeat
+with `-O`, and compare both captures with
+`rmagna/tests/data/original-file-matrices.json`.
+
+```sh
+python3 -I -B benchmarks/magna_reproduction/original_file_matrix_reference.py \
+  --upstream /absolute/path/to/pinned/magna --out /absolute/path/to/new-matrices.json
+```
+
+The owning Rust target executes both compilers, causal settings and history
+samplers through typed/JSON file results and direct no-entropy draws. The
+63-moment cases explicitly request 65 statistics dimensions. Default-64 runs
+reject during run validation, and raised-budget runs retain all moments in
+fresh and compiled/reused tasks. Existing constructor fingerprint/content
+validation remains covered by the file API regressions.
+
+The same target retains the complete sparse/compact recovery protocols and
+1200-parent XOR/owned-task methods. Exact sparse/compact A/E/S totals are
+1/2, 1/4 and 1/4. Coherent-width diagnostics remain 14/7 and are tracked by
+#1080. The matrix fixture covers the original fixed prepared inputs.
 
 ## Verify the reference
 
