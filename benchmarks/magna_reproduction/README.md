@@ -7,9 +7,9 @@ implement a simulator or claim reproduction of the paper's precision curves.
 
 ## Current coverage
 
-The source-bound ledger currently has 116 verified, 1 partial and 235 unmapped
+The source-bound ledger currently has 128 verified, 1 partial and 223 unmapped
 original methods, with zero architecture-specific core exclusions. It requires
-138 distinct Rust witnesses from 140 declarations across 58 targets. Strict
+150 distinct Rust witnesses from 152 declarations across 65 targets. Strict
 complete parity intentionally exits 2. The detailed per-change sections below
 retain their historical inventory snapshots; `coverage.json` is authoritative.
 
