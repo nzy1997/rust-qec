@@ -64,8 +64,55 @@ validation remains covered by the file API regressions.
 
 The same target retains the complete sparse/compact recovery protocols and
 1200-parent XOR/owned-task methods. Exact sparse/compact A/E/S totals are
-1/2, 1/4 and 1/4. Coherent-width diagnostics remain 14/7 and are tracked by
-#1080. The matrix fixture covers the original fixed prepared inputs.
+1/2, 1/4 and 1/4. The owning witness now requires coherent widths 7/7,
+compared with the retained pre-optimization 14/7 observation in #1080. The
+matrix fixture covers the original fixed prepared inputs.
+
+### Sparse vacuum task execution
+
+Task evaluation starts from the vacuum. After physical/recovery composition,
+a private layout retains every potential quantum operand and every selected
+output, including idle outputs. Only untouched, unobserved factorized zero
+wires are omitted. Both linear and causal task execution use the layout;
+cold prefixes reuse the full potential layout so callbacks cannot change
+wire addresses between histories. Parsed operations, physical IDs, noise
+anchors, records, controller slots, output order and source text remain
+unchanged. Supplied Pauli actions are validated against the original source
+before the task layout is constructed.
+
+Generic instrument/runtime compilation retains every physical wire. Explicit
+stabilizer inputs keep their complete public width and BitVector contracts;
+an untouched wire may be entangled. Omitting task outputs still selects all
+physical wires and therefore retains every idle output. This is not dead-gate
+or reset-lifetime elimination. The physical lookup table still scales with
+the source width; coherent-network width is the optimized resource.
+
+For the original sparse case the three retained initial wires are physical
+3 and 5 plus recovery auxiliary 9. Compact labels retain physical 0 and 1
+plus recovery auxiliary 2. Each has two measurement-record wires and one
+feedback-work wire. The public `coherent_width` also includes the compiler's
+phase/query coordinate, giving seven in both cases. `max_coherent_qubits`
+continues to bound instrument lowering before compiler phase coordinates,
+as it does in the generic API; this change preserves that budget contract.
+
+Run the independent sparse-index width/resource diagnostic with an optional
+coherent-lowering budget (default 16):
+
+```sh
+cargo run --locked -p rmagna --example sparse_task_width -- 16 > sparse-width.json
+```
+
+It records both compilers at source output labels 0, 3, 63, 1023 and 16383,
+ambient composed width up to 32770, actual coherent geometry, resource
+rejections and exact A/E/S checks. With vacuum task lowering all ten rows
+complete at width seven within the same budget. Reverting to ambient-wire
+retention gives widths 7/14 for the original pair and rejects the larger
+gaps at budget 16. Single-run compilation/enumeration times are diagnostic
+only; neither peak-memory improvement nor paper-scale performance parity
+is claimed. `sparse_vacuum_tasks` separately checks all ordered three-output
+Paulis against a four-wire dense oracle, independent idle X/Y/Z factors,
+resource failures, explicit entangled inputs, source-addressed supplied
+noise, records/callbacks, correlated products, resets and the empty task.
 
 ## Verify the reference
 

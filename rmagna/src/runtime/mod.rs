@@ -11,8 +11,8 @@ use crate::circuit::{BitAtom, BitExpr, Circuit, LocatedOperation, Operation};
 use crate::costs::{CostError, ExecutionMeter, OperationKind, observe};
 use crate::gf2::BitVector;
 use crate::instrument::{
-    CompileOptions, CompiledInstrument, ExactMasses, FaultSelection, InstrumentError,
-    compile_affine_stabilizer, compile_causal_stabilizer,
+    CompileOptions, CompiledInstrument, ExactMasses, FaultSelection, InstrumentError, VacuumLayout,
+    compile_affine_stabilizer, compile_causal_stabilizer, compile_vacuum_task,
 };
 use crate::noise::{
     NoiseDraw, NoiseError, NoiseModel, NoiseOptions, NoiseSampler, NoiseSampling, RandomSource,
@@ -322,6 +322,7 @@ impl ResolvedHistory {
 pub struct CausalProgram {
     circuit: Circuit,
     initial: AffineKet,
+    vacuum: Option<VacuumLayout>,
     model: NoiseModel,
     sampler: NoiseSampler,
     registry: ControllerRegistry,
@@ -330,6 +331,11 @@ pub struct CausalProgram {
     reference: Option<CompiledInstrument>,
     compilation: crate::unitary::CompilationDiagnostics,
     guarded_sites: std::collections::BTreeSet<usize>,
+}
+enum InitialInput<'a> {
+    Zero,
+    Stabilizer(&'a AffineKet),
+    TaskVacuum(&'a [usize]),
 }
 impl CausalProgram {
     /// The owning task declares all terminal requested records in addition to
@@ -402,8 +408,35 @@ impl CausalProgram {
         sampling: &NoiseSampling,
         meter: Option<&ExecutionMeter>,
     ) -> Result<Self, RuntimeError> {
-        Self::new_stabilizer_observed(
-            circuit, None, registry, options, arithmetic, sampling, meter,
+        Self::new_initial_observed(
+            circuit,
+            InitialInput::Zero,
+            registry,
+            options,
+            arithmetic,
+            sampling,
+            meter,
+        )
+    }
+    /// Only an owning task can restrict terminal outputs and guarantee a vacuum
+    /// input. Reuse one layout for all potential operations and cold prefixes.
+    pub(crate) fn new_vacuum_task_observed(
+        circuit: &Circuit,
+        outputs: &[usize],
+        registry: &ControllerRegistry,
+        options: RuntimeOptions,
+        arithmetic: &ScalarArithmetic,
+        sampling: &NoiseSampling,
+        meter: Option<&ExecutionMeter>,
+    ) -> Result<Self, RuntimeError> {
+        Self::new_initial_observed(
+            circuit,
+            InitialInput::TaskVacuum(outputs),
+            registry,
+            options,
+            arithmetic,
+            sampling,
+            meter,
         )
     }
     /// Own a normalized independent initial stabilizer state for every history.
@@ -435,9 +468,9 @@ impl CausalProgram {
         arithmetic: &ScalarArithmetic,
         sampling: &NoiseSampling,
     ) -> Result<Self, RuntimeError> {
-        Self::new_stabilizer_observed(
+        Self::new_initial_observed(
             circuit,
-            Some(input),
+            InitialInput::Stabilizer(input),
             registry,
             options,
             arithmetic,
@@ -445,9 +478,9 @@ impl CausalProgram {
             None,
         )
     }
-    fn new_stabilizer_observed(
+    fn new_initial_observed(
         circuit: &Circuit,
-        input: Option<&AffineKet>,
+        initial: InitialInput<'_>,
         registry: &ControllerRegistry,
         options: RuntimeOptions,
         arithmetic: &ScalarArithmetic,
@@ -466,14 +499,39 @@ impl CausalProgram {
                 return Err(RuntimeError::MissingBinding { name: name.clone() });
             }
         }
+        let vacuum = match initial {
+            InitialInput::TaskVacuum(outputs) => Some(VacuumLayout::for_task(circuit, outputs)?),
+            _ => None,
+        };
         let zero;
-        let input = if let Some(input) = input {
-            input
-        } else {
-            zero = crate::instrument::zero_input(circuit.num_qubits(), &options.compile)?;
-            &zero
+        let input = match initial {
+            InitialInput::Stabilizer(input) => input,
+            _ => {
+                zero = crate::instrument::zero_input(
+                    vacuum
+                        .as_ref()
+                        .map_or(circuit.num_qubits(), VacuumLayout::width),
+                    &options.compile,
+                )?;
+                &zero
+            }
         };
         let reference = observe(meter, OperationKind::Compilation, || {
+            if let Some(layout) = &vacuum {
+                return match options.strategy {
+                    CausalStrategy::FixedTemplate => {
+                        compile_vacuum_task(circuit, layout, &options.compile, arithmetic, true)
+                    }
+                    CausalStrategy::ColdPrefix => compile_vacuum_task(
+                        &resolve::potential(circuit),
+                        layout,
+                        &options.compile,
+                        arithmetic,
+                        false,
+                    ),
+                }
+                .map_err(RuntimeError::from);
+            }
             match options.strategy {
                 CausalStrategy::FixedTemplate => {
                     compile_causal_stabilizer(circuit, input, &options.compile, arithmetic)
@@ -509,6 +567,7 @@ impl CausalProgram {
             guarded_sites,
             circuit: circuit.clone(),
             initial: input.clone(),
+            vacuum,
             sampler,
             model,
             registry: registry.clone(),
@@ -1013,6 +1072,16 @@ impl PathState<'_> {
             let prefix = self.program.circuit.runtime_view(self.resolved(end)?);
             self.mode.compilation()?;
             let instrument = observe(self.meter, OperationKind::Compilation, || {
+                if let Some(layout) = &self.program.vacuum {
+                    return compile_vacuum_task(
+                        &prefix,
+                        layout,
+                        &self.program.options.compile,
+                        arithmetic,
+                        false,
+                    )
+                    .map_err(RuntimeError::from);
+                }
                 compile_affine_stabilizer(
                     &prefix,
                     &self.program.initial,

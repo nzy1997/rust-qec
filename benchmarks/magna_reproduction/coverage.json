@@ -668,7 +668,7 @@
           "package": "rmagna",
           "target": "original_file_matrices_and_ownership",
           "test": "original_magic_and_controlled_extensions_against_independent_matrices",
-          "source_sha256": "8526b150a7839be9d042dc42ea7949c2a481815f38c454e41e42f53dac9c0d14"
+          "source_sha256": "dcaec46a06f59f022c31f814d3f10d7cf13cc280440325347e1fb6b2a741430a"
         }
       ]
     },
@@ -748,7 +748,7 @@
           "package": "rmagna",
           "target": "original_file_matrices_and_ownership",
           "test": "original_supported_clifford_gates_against_stim",
-          "source_sha256": "8526b150a7839be9d042dc42ea7949c2a481815f38c454e41e42f53dac9c0d14"
+          "source_sha256": "dcaec46a06f59f022c31f814d3f10d7cf13cc280440325347e1fb6b2a741430a"
         }
       ]
     },
@@ -768,13 +768,13 @@
     {
       "id": "test_file_api.FileApiTests.test_untouched_qubit_indices_add_no_wires",
       "status": "verified",
-      "contract": "Complete original sparse-label FileApi semantic method, preserving both physical/recovery circuit strings, output maps and H/T target. Both original native Python modes pass. All eight Rust compiler/causal/history configurations perform actual FileTask low-weight enumeration with exact typed and JSON A=1/2, E=1/4 and S=1/4, full covered noise probability and immutable input files. Sparse/compact masses agree exactly. Public coherent-width diagnostics are retained as 14/7 and the separate optimization gap remains #1080. This mapping establishes original exact-total semantics. MPL-2.0 attribution.",
+      "contract": "Complete original sparse-label FileApi semantic method, preserving both physical/recovery circuit strings, output maps and H/T target. Both original native Python modes pass. All eight Rust compiler/causal/history configurations perform actual FileTask low-weight enumeration with exact typed and JSON A=1/2, E=1/4 and S=1/4, full covered noise probability and immutable input files. Sparse/compact masses agree exactly. The additional #1080 optimization witness requires public coherent widths 7/7 after task-specific vacuum lowering; the pre-optimization 14/7 evidence is retained separately. This mapping establishes original exact-total semantics. MPL-2.0 attribution.",
       "rust_tests": [
         {
           "package": "rmagna",
           "target": "original_file_matrices_and_ownership",
           "test": "original_untouched_qubit_indices_add_no_wires",
-          "source_sha256": "8526b150a7839be9d042dc42ea7949c2a481815f38c454e41e42f53dac9c0d14"
+          "source_sha256": "dcaec46a06f59f022c31f814d3f10d7cf13cc280440325347e1fb6b2a741430a"
         }
       ]
     },
@@ -787,7 +787,7 @@
           "package": "rmagna",
           "target": "original_file_matrices_and_ownership",
           "test": "original_wide_parity_has_balanced_lowering_and_owned_task",
-          "source_sha256": "8526b150a7839be9d042dc42ea7949c2a481815f38c454e41e42f53dac9c0d14"
+          "source_sha256": "dcaec46a06f59f022c31f814d3f10d7cf13cc280440325347e1fb6b2a741430a"
         }
       ]
     },
