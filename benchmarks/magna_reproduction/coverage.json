@@ -661,8 +661,16 @@
     },
     {
       "id": "test_file_api.FileApiTests.test_magic_and_controlled_extensions_against_independent_matrices",
-      "status": "unmapped",
-      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+      "status": "verified",
+      "contract": "Complete original seven-gate T/T_DAG/CS/CS_DAG/CH/CCX/CCZ FileApi method, retaining original independent matrix constructors, fixed input preparation and full Pauli order. Source-pinned exact Fraction Q(omega) references cover 312 moments across this method and its Clifford companion. All eight compiler/causal/history configurations execute actual typed/JSON FileTask results and direct no-entropy draws. The 63-moment three-wire cases explicitly use 65 statistics dimensions, preserve default-64 rejection before zero-work deadlines, and verify fresh/compiled reuse, fingerprints, complete moment counts and query counters. The existing snapshot-only constructor admission is retained. Finite fixed-input matrix scope, independent Rust execution and MPL-2.0 attribution.",
+      "rust_tests": [
+        {
+          "package": "rmagna",
+          "target": "original_file_matrices_and_ownership",
+          "test": "original_magic_and_controlled_extensions_against_independent_matrices",
+          "source_sha256": "8526b150a7839be9d042dc42ea7949c2a481815f38c454e41e42f53dac9c0d14"
+        }
+      ]
     },
     {
       "id": "test_file_api.FileApiTests.test_nonlinear_mixed_gates_use_actual_decoder_and_global_conditional_moments",
@@ -733,8 +741,16 @@
     },
     {
       "id": "test_file_api.FileApiTests.test_supported_clifford_gates_against_stim",
-      "status": "unmapped",
-      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+      "status": "verified",
+      "contract": "Complete original 21-gate FileApi Clifford method with original fixed prepared inputs and every nonidentity Pauli mask in source order. A source-pinned standalone generator executes only original NumPy helpers, preparation prefix and gate-test bodies, uses Stim matrices lifted to exact Q(omega), checks exact unitarity and cross-checks exact Fraction moments against the original NumPy expectations. Both compilers, causal settings and history samplers execute every circuit through FileTask typed/JSON and direct no-entropy evaluation, with exact field equality and the original 2e-7 plus 1e-7 relative NumPy comparison. Source and physical operations stay immutable. MPL-2.0 attribution.",
+      "rust_tests": [
+        {
+          "package": "rmagna",
+          "target": "original_file_matrices_and_ownership",
+          "test": "original_supported_clifford_gates_against_stim",
+          "source_sha256": "8526b150a7839be9d042dc42ea7949c2a481815f38c454e41e42f53dac9c0d14"
+        }
+      ]
     },
     {
       "id": "test_file_api.FileApiTests.test_tiny_exact_masses_keep_scientific_values_and_conditional_ratio",
@@ -751,13 +767,29 @@
     },
     {
       "id": "test_file_api.FileApiTests.test_untouched_qubit_indices_add_no_wires",
-      "status": "unmapped",
-      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+      "status": "verified",
+      "contract": "Complete original sparse-label FileApi semantic method, preserving both physical/recovery circuit strings, output maps and H/T target. Both original native Python modes pass. All eight Rust compiler/causal/history configurations perform actual FileTask low-weight enumeration with exact typed and JSON A=1/2, E=1/4 and S=1/4, full covered noise probability and immutable input files. Sparse/compact masses agree exactly. Public coherent-width diagnostics are retained as 14/7 and the separate optimization gap remains #1080. This mapping establishes original exact-total semantics. MPL-2.0 attribution.",
+      "rust_tests": [
+        {
+          "package": "rmagna",
+          "target": "original_file_matrices_and_ownership",
+          "test": "original_untouched_qubit_indices_add_no_wires",
+          "source_sha256": "8526b150a7839be9d042dc42ea7949c2a481815f38c454e41e42f53dac9c0d14"
+        }
+      ]
     },
     {
       "id": "test_file_api.FileApiTests.test_wide_parity_has_balanced_lowering_and_owned_task",
-      "status": "unmapped",
-      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+      "status": "verified",
+      "contract": "Complete original 1200-record XOR and owned-task FileApi method. Both original native Python modes pass. All eight Rust configurations retain the literal 1200 measurements and all reversed record parents, one original Control input list and a flat canonical output parity with all distinct record atoms. Actual FileTask execution and direct no-entropy evaluation preserve unit acceptance, Z output moment and empty callback trace. The original one-moment task is loaded and compiled before the caller JSON mask is mutated into an invalid three-element mask; captured fingerprints, compiled moment count and exact result remain unchanged. Parsed operations and source files stay immutable. This is Rust owned-task semantics. MPL-2.0 attribution.",
+      "rust_tests": [
+        {
+          "package": "rmagna",
+          "target": "original_file_matrices_and_ownership",
+          "test": "original_wide_parity_has_balanced_lowering_and_owned_task",
+          "source_sha256": "8526b150a7839be9d042dc42ea7949c2a481815f38c454e41e42f53dac9c0d14"
+        }
+      ]
     },
     {
       "id": "test_file_batch.NativeBatchTests.test_aggregate_matches_single_draws",
