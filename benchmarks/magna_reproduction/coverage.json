@@ -648,8 +648,16 @@
     },
     {
       "id": "test_file_api.FileApiTests.test_joint_error_ratio_zero_acceptance_and_failed_budgets",
-      "status": "unmapped",
-      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+      "status": "verified",
+      "contract": "Complete original physical file report method. The unchanged original passes against the pinned native extension in normal and optimized Python. Eight Rust compiler/causal/sampler configurations retain the original two-Hadamard even selection, deterministic rejection and three-draw query-quota failure. Explicit one- and two-wire zero targets represent the original width-inferred zero target. Typed and JSON results assert exact acceptance one half, joint error one quarter, conditional error one half and zero conditional standard error; zero acceptance has undefined conditional error. The quota-two failure retains precisely two committed draws, absent full estimates, exact partial statistics, query counts and failing draw two. Native ResourceLimit maps to the existing Rust TaskError and quota message. Files remain immutable. MPL-2.0 attribution.",
+      "rust_tests": [
+        {
+          "package": "rmagna",
+          "target": "original_file_reports",
+          "test": "original_joint_error_ratio_zero_acceptance_and_failed_budgets",
+          "source_sha256": "f281063227b11e58473229f2eaef1ddaa02c63f3d7035f8a8754ea52005dd74e"
+        }
+      ]
     },
     {
       "id": "test_file_api.FileApiTests.test_magic_and_controlled_extensions_against_independent_matrices",
@@ -668,8 +676,16 @@
     },
     {
       "id": "test_file_api.FileApiTests.test_pauli_products_resets_and_measure_reset_reports",
-      "status": "unmapped",
-      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+      "status": "verified",
+      "contract": "Complete original seven-case Pauli-product/reset file method. Both Python modes execute the unchanged original circuits. Rust executes 56 compiler/causal/sampler configurations with all original MXX, MYY, MZZ, joint MPP, Z reset and flipped Y/X measure-reset circuits. Typed and JSON FileTask results plus separate direct no-entropy evaluation verify complete runs, exact unit acceptance, absent error/target metrics, empty moments/controller traces, exact raw acceptance and unit history/noise likelihoods. File compiler/sampler and direct compiler diagnostics are asserted. Parsed operations and files remain immutable. MPL-2.0 attribution.",
+      "rust_tests": [
+        {
+          "package": "rmagna",
+          "target": "original_file_reports",
+          "test": "original_pauli_products_resets_and_measure_reset_reports",
+          "source_sha256": "f281063227b11e58473229f2eaef1ddaa02c63f3d7035f8a8754ea52005dd74e"
+        }
+      ]
     },
     {
       "id": "test_file_api.FileApiTests.test_removed_effect_and_decoder_output_shape_fail_at_compile",
@@ -686,8 +702,16 @@
     },
     {
       "id": "test_file_api.FileApiTests.test_report_flip_changes_feedback_and_task_but_not_true_projection",
-      "status": "unmapped",
-      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+      "status": "verified",
+      "contract": "Complete original forced-report-flip file method. The unchanged original passes against native production in normal and optimized Python. Eight compiler/causal/sampler configurations retain M(1), reported-record feedback and inverted detector selection. Typed and JSON FileTask results plus separate direct no-entropy evaluation give unit acceptance, exact Z moments +1 and -1, absent target/error metrics in file results, unit raw acceptance/history/noise likelihood and empty controller traces. File compiler/sampler and direct compiler diagnostics are asserted. Parsed physical operations and input source remain immutable. MPL-2.0 attribution.",
+      "rust_tests": [
+        {
+          "package": "rmagna",
+          "target": "original_file_reports",
+          "test": "original_report_flip_changes_feedback_and_task_but_not_true_projection",
+          "source_sha256": "f281063227b11e58473229f2eaef1ddaa02c63f3d7035f8a8754ea52005dd74e"
+        }
+      ]
     },
     {
       "id": "test_file_api.FileApiTests.test_signal_handlers_run_during_one_long_native_batch",
@@ -714,8 +738,16 @@
     },
     {
       "id": "test_file_api.FileApiTests.test_tiny_exact_masses_keep_scientific_values_and_conditional_ratio",
-      "status": "unmapped",
-      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+      "status": "verified",
+      "contract": "Complete original synthetic summary method. The unchanged original passes in both Python modes. Two literal rows with acceptance 9*2^-1160, error 3*2^-1160 and unit history/noise weights pass through public ExactStatistics and HistoryEfficiency APIs. The paired ratio is exactly one third and all mean-estimator variances are exactly zero. Public batch export, using a real empty-run envelope solely for validated report structure, retains acceptance (0.5625,-1156), error (0.75,-1158), null underflowed ordinary estimates, finite conditional error, both underflow field paths and exact-zero scientific and ordinary uncertainties. Serialization preserves typed masses. This synthetic statistics witness makes no tiny-acceptance physical-circuit claim. MPL-2.0 attribution.",
+      "rust_tests": [
+        {
+          "package": "rmagna",
+          "target": "original_file_reports",
+          "test": "original_tiny_exact_masses_keep_scientific_values_and_conditional_ratio",
+          "source_sha256": "f281063227b11e58473229f2eaef1ddaa02c63f3d7035f8a8754ea52005dd74e"
+        }
+      ]
     },
     {
       "id": "test_file_api.FileApiTests.test_untouched_qubit_indices_add_no_wires",
