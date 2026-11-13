@@ -161,13 +161,29 @@
     },
     {
       "id": "test_capped_affine.CappedAffineTests.test_biased_t_full_support",
-      "status": "unmapped",
-      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+      "status": "verified",
+      "contract": "All 32 original biased-T draws retain correlated X records, proposal mass 1/2, exact physical masses (2 plus/minus sqrt(2))/4, history weights 1 plus/minus 1/sqrt(2), projected target norm 1/2 and exact accepted/error/target responses. Both compilers, causal strategies and cold/fixed query modes preserve both observed outcomes and fixed-template warm support statistics; no Native counter or RNG identity is assumed.",
+      "rust_tests": [
+        {
+          "package": "rmagna",
+          "target": "original_capped_affine",
+          "test": "original_biased_t_full_support_retains_correlated_records_and_exact_weights",
+          "source_sha256": "94be2f377a803836506d96f094797fe4c7aaf85b6178f5f4a4fe591d562a988d"
+        }
+      ]
     },
     {
       "id": "test_capped_affine.CappedAffineTests.test_complete_support_weights_and_encoded_target",
-      "status": "unmapped",
-      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+      "status": "verified",
+      "contract": "All eight original readout-flip/physical-X assignments and 64 draws each retain independently derived complete measurement laws, actual two callback groups, correlated final records, declared likelihood 3/2, target norm 1/2 and exact accepted/error/target contributions. Source-derived categories resolve readout sites 0/1 and physical site 3 while preserving the implicit zero-rate gap. Exact physical integration gives total mass 1, acceptance 19/28 and target success 3/14, independently of the supplied likelihood factor. Both compiler/causal/cold-fixed configurations retain fixed-template resources.",
+      "rust_tests": [
+        {
+          "package": "rmagna",
+          "target": "original_capped_affine",
+          "test": "original_complete_support_weights_encoded_target_and_exact_physical_integration",
+          "source_sha256": "94be2f377a803836506d96f094797fe4c7aaf85b6178f5f4a4fe591d562a988d"
+        }
+      ]
     },
     {
       "id": "test_capped_affine.CappedAffineTests.test_conditional_noise_and_pauli_feedback",
@@ -184,18 +200,42 @@
     },
     {
       "id": "test_capped_affine.CappedAffineTests.test_general_transport_reuse_respects_actual_feedback",
-      "status": "unmapped",
-      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+      "status": "verified",
+      "contract": "All 32 original draws observe the actual echo input and output, apply reported Z feedback and retain deterministic second X result zero, proposal mass 1/2 and exact biased physical/history weights. Both first outcomes occur under all compiler/causal/cold-fixed configurations. Fixed templates compile no new networks and retain immutable support observations; cold prefixes have no reusable parent.",
+      "rust_tests": [
+        {
+          "package": "rmagna",
+          "target": "original_capped_affine",
+          "test": "original_general_transport_reuse_respects_actual_z_feedback_and_biased_weights",
+          "source_sha256": "94be2f377a803836506d96f094797fe4c7aaf85b6178f5f4a4fe591d562a988d"
+        }
+      ]
     },
     {
       "id": "test_capped_affine.CappedAffineTests.test_large_affine_envelope_without_record_enumeration",
-      "status": "unmapped",
-      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+      "status": "verified",
+      "contract": "The original eight sequential draws retain all 82 reported records, the duplicated first X result, exact q=2^-81 and physical mass equal to the biased-T branch times 2^-80. Both compilers/causal strategies/cold-fixed modes give exact history and acceptance weights. Actual Rust doubled-probability support has rank two and at most four retained terms, stable across fixed draws; no 2^81 support enumeration, Native mother-term counter equality or performance claim is made.",
+      "rust_tests": [
+        {
+          "package": "rmagna",
+          "target": "original_capped_affine",
+          "test": "original_large_affine_envelope_samples_82_records_without_enumerating_support",
+          "source_sha256": "94be2f377a803836506d96f094797fe4c7aaf85b6178f5f4a4fe591d562a988d"
+        }
+      ]
     },
     {
       "id": "test_capped_affine.CappedAffineTests.test_nonaffine_support_keeps_interference_zeros",
-      "status": "unmapped",
-      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+      "status": "verified",
+      "contract": "A literal four-bit Walsh sum independently verifies every physical mass, all 16 proposals and six interference zeros over the original 128 draws. The complete report-flip/echo/X-feedback/postselection continuation retains all 12 conditional proposals, exact q=1/8 or 1/16, its two zero-mass proposals, actual callback inputs, target/error contributions and unit proposal sum over 128 draws. Both compilers, causal strategies and cold/fixed modes preserve immutable fixed-template observations.",
+      "rust_tests": [
+        {
+          "package": "rmagna",
+          "target": "original_capped_affine",
+          "test": "original_nonaffine_walsh_zeros_and_adaptive_report_flip_preserve_exact_proposals",
+          "source_sha256": "94be2f377a803836506d96f094797fe4c7aaf85b6178f5f4a4fe591d562a988d"
+        }
+      ]
     },
     {
       "id": "test_capped_affine.CappedAffineTests.test_nonuniform_dense_feedback_and_guarded_noise",
@@ -1462,8 +1502,16 @@
     },
     {
       "id": "test_kernel_contract.KernelContractTests.test_literal_internal_ids_do_not_collide_with_original_ids",
-      "status": "unmapped",
-      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+      "status": "verified",
+      "contract": "Both original literal slash-ID scenarios preserve source, controller-emission and inserted-fault typed identities and exact vectors (1,omega)/sqrt(2) and (-i,i*omega)/sqrt(2), with unit probability and no spurious records/environments. Both compilers compare ordinary/direct/absorbed amplitudes after dropping source instruments and repeatedly preparing explicit resources, retaining decisions, anchor order, diagnostics and one actual callback only. Immutable Rust snapshots replace the three private Native structure-cache settings.",
+      "rust_tests": [
+        {
+          "package": "rmagna",
+          "target": "original_literal_ids",
+          "test": "original_literal_ids_preserve_distinct_emission_fault_and_source_origins",
+          "source_sha256": "9859652edefbff962325ead6f7072199ab2912d9c70e0d2313fcfa18e5c40131"
+        }
+      ]
     },
     {
       "id": "test_kernel_contract.KernelContractTests.test_no_old_probability_entry_in_production_extension",
@@ -1472,8 +1520,16 @@
     },
     {
       "id": "test_kernel_contract.KernelContractTests.test_options_change_revalidates_resource_budget",
-      "status": "unmapped",
-      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+      "status": "verified",
+      "contract": "The complete plus/T/destructive-X m=0 case uses the explicit immutable source-resource certificate before any record projection or absorption. Both compilers retain actual NativeSelection source rank one and two certified terms under a two-term/four-pair cap, exact amplitude (1+omega)/2 and probability (2+sqrt(2))/4. Recompilation with source rank zero rejects explicitly; an independent Native-policy rank-zero error propagates without fiber fallback. Earlier results, restored rank-one results, branch metadata and direct amplitudes remain exact after rank/term/pair/path/row/geometry refusals. Actual projected side entries and pair work are reported rather than equated to the source term count.",
+      "rust_tests": [
+        {
+          "package": "rmagna",
+          "target": "original_resource_revalidation",
+          "test": "original_changed_source_budget_rejects_stale_resource_without_projected_absorption",
+          "source_sha256": "967f836f7cb8b24bcaae24107f78d953207da157cc80e21590ed9eb27105d379"
+        }
+      ]
     },
     {
       "id": "test_kernel_contract.KernelContractTests.test_public_certificate_facades_keep_budgets_and_zero_semantics",
@@ -1911,28 +1967,68 @@
     },
     {
       "id": "test_noise_law_cache.NoiseLawCacheTests.test_cache_eviction_keeps_the_original_channel_order",
-      "status": "unmapped",
-      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+      "status": "verified",
+      "contract": "All 35 distinct original two-step laws and 39 ordered locations preserve immediate repeats and later reuse of the first/last laws under scale three. Source actions, physical and proposal tables, exact per-draw P/Q/likelihood and 19+18 entropy continuity agree with independent rational laws over the original 64/37 finite counts. Rust immutable-plan reuse is the counterpart; Native LRU capacity and private cache eviction are not asserted.",
+      "rust_tests": [
+        {
+          "package": "rmagna",
+          "target": "original_noise_laws",
+          "test": "original_more_than_32_laws_keep_39_location_order_and_earlier_reuse",
+          "source_sha256": "5c2dc3aed971a74558fcd7c7078a32dc714b3b788653ac8dafd002bb1da8d43d"
+        }
+      ]
     },
     {
       "id": "test_noise_law_cache.NoiseLawCacheTests.test_chain_and_exclusive_probabilities_have_distinct_keys",
-      "status": "unmapped",
-      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+      "status": "verified",
+      "contract": "The complete alternating correlated-chain versus exclusive laws retain six ordered locations in both starting orders, physical and scale-two proposals, independently derived rational masses, identities, action/source metadata and tilt/endpoint counts. All 64 original finite seeded-shape draws and 37 sequential draws agree with independent law products and explicit 19+18 entropy-state restoration. Immutable Rust plans replace the private Native law-key cache.",
+      "rust_tests": [
+        {
+          "package": "rmagna",
+          "target": "original_noise_laws",
+          "test": "original_chain_and_exclusive_laws_remain_distinct_on_repeated_reuse",
+          "source_sha256": "5c2dc3aed971a74558fcd7c7078a32dc714b3b788653ac8dafd002bb1da8d43d"
+        }
+      ]
     },
     {
       "id": "test_noise_law_cache.NoiseLawCacheTests.test_guards_reuse_physical_laws_without_importance_tilting",
-      "status": "unmapped",
-      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+      "status": "verified",
+      "contract": "All seven original measurement/chain/exclusive categories preserve guarded rows 1/4/5, physical readout law, unmodified guarded probabilities and exact unguarded scaling at physical, one-half and two settings. Channel/action/anchor order, category/endpoint/tilt/exclusion summaries, physical/proposal masses and likelihood products are checked over 64 finite draws and 37 sequential draws with restored entropy. No Native cache or RNG identity is assumed.",
+      "rust_tests": [
+        {
+          "package": "rmagna",
+          "target": "original_noise_laws",
+          "test": "original_guarded_laws_remain_physical_under_importance_scaling",
+          "source_sha256": "5c2dc3aed971a74558fcd7c7078a32dc714b3b788653ac8dafd002bb1da8d43d"
+        }
+      ]
     },
     {
       "id": "test_noise_law_cache.NoiseLawCacheTests.test_long_chains_large_rationals_and_unreachable_tails",
-      "status": "unmapped",
-      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+      "status": "verified",
+      "contract": "All five original chains repeated twice retain explicit zero/unit endpoints, unreachable tails, denominator 2^80+7, its large numerator and all 65 conditional steps, with exact independently constructed survival laws. Physical and half-scale plans preserve every ordered source/action/probability and sampled P/Q/likelihood product over 64 finite and 37 resumed sequential draws. Arbitrary-precision probabilities remain accepted without a 64-bit ceiling.",
+      "rust_tests": [
+        {
+          "package": "rmagna",
+          "target": "original_noise_laws",
+          "test": "original_long_chains_retain_large_rationals_endpoints_and_unreachable_tails",
+          "source_sha256": "5c2dc3aed971a74558fcd7c7078a32dc714b3b788653ac8dafd002bb1da8d43d"
+        }
+      ]
     },
     {
       "id": "test_noise_law_cache.NoiseLawCacheTests.test_repeated_laws_keep_location_actions_report_flips_and_order",
-      "status": "unmapped",
-      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+      "status": "verified",
+      "contract": "Both original repeated correlated laws, all three explicit measurement-report categories and physical/half-scale proposals preserve category, alternative, source and temporal action order. Rust canonically orders commuting distinct-wire Pauli factors, explicitly replacing Native textual tuple order; no Native action-payload ABI is claimed. Independent rational laws, identities, tilt summaries, exact physical/proposal/likelihood factors and 64 finite plus 37 entropy-restored sequential draws agree while the source circuit and metadata remain unchanged.",
+      "rust_tests": [
+        {
+          "package": "rmagna",
+          "target": "original_noise_laws",
+          "test": "original_repeated_laws_keep_ordered_pauli_factors_and_separate_report_records",
+          "source_sha256": "5c2dc3aed971a74558fcd7c7078a32dc714b3b788653ac8dafd002bb1da8d43d"
+        }
+      ]
     },
     {
       "id": "test_noise_numeric_fastpaths.NoiseNumericFastpathTests.test_depolarizing_and_nonuniform_channels_match_declared_law",
@@ -2234,8 +2330,16 @@
     },
     {
       "id": "test_packed_noise.PackedNoiseTests.test_guarded_sites_share_a_group_but_wait_for_their_causal_instruction",
-      "status": "unmapped",
-      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+      "status": "verified",
+      "contract": "All 32 original control/compiler/causal/history/query configurations retain 65 guarded and 65 unconditional deterministic X locations, both control outcomes and four draws. Exact target responses, Pauli moments, requested records, source/category/guard provenance and unchanged circuit bytes agree for direct evaluation and loaded FileTask owned JSON reports. Sentinel entropy proves zero RNG consumption. An explicit finite preparation cap accommodates 65 ordered conditional prefixes; Native packed layout and throughput are not Rust ABI claims.",
+      "rust_tests": [
+        {
+          "package": "rmagna",
+          "target": "original_packed_guards",
+          "test": "original_guarded_locations_preserve_causal_positions_across_two_full_blocks",
+          "source_sha256": "0b20accea77426b04c87b1635737e20dfde5a8d42b4f888314c8c13acc5dc72e"
+        }
+      ]
     },
     {
       "id": "test_packed_noise.PackedNoiseTests.test_large_weight_group_without_count_table",
@@ -2244,8 +2348,16 @@
     },
     {
       "id": "test_packed_noise.PackedNoiseTests.test_marginals_and_joint_law_across_lanes_and_blocks",
-      "status": "unmapped",
-      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+      "status": "verified",
+      "contract": "All 131 original quarter-Bernoulli locations and 4096 draws retain ordered unique assignments, exact probability 3^(131-k)/4^131, P=Q, unit likelihood and 131 consumed independent entropy words per draw. All six original marginals and four cross-boundary joint events pass strict integer squared six-sigma bounds, with marginals checked before joint laws. The model remains unchanged; Rust entropy replaces Python/native packed-layout identity and no throughput claim is made.",
+      "rust_tests": [
+        {
+          "package": "rmagna",
+          "target": "original_packed_distribution",
+          "test": "original_marginals_and_joint_law_cross_all_lane_and_block_boundaries",
+          "source_sha256": "988e0a89113d0b73f99b37270e2d5a4ed224da4be5618104c5a4f7be79da45ae"
+        }
+      ]
     },
     {
       "id": "test_packed_noise.PackedNoiseTests.test_sparse_actions_weights_and_partitioning",
@@ -3248,23 +3360,55 @@
     },
     {
       "id": "test_unified_simulator.UnifiedTests.test_causal_callback_and_ir_rejection",
-      "status": "unmapped",
-      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+      "status": "verified",
+      "contract": "A future callback parent is rejected before invocation. The complete hidden-parent scenario exposes only the declared earlier false report and propagates typed UndeclaredParent errors through four fresh compiler/extraction attempts, with no returned branch or cached callback result. Actual callback counts remain zero for future-parent admission and four for the repeated hidden-parent failures.",
+      "rust_tests": [
+        {
+          "package": "rmagna",
+          "target": "original_unified_core",
+          "test": "original_causal_callback_rejects_future_and_hidden_parents_without_cached_results",
+          "source_sha256": "d1f53f30be458030d6c04b4e090392bf8eb6d2e4d70f5d542e3b1c0568433a53"
+        }
+      ]
     },
     {
       "id": "test_unified_simulator.UnifiedTests.test_fixed_input_absorption_and_noise",
-      "status": "unmapped",
-      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+      "status": "verified",
+      "contract": "Fixed-input T has quotient rank zero. The original after-S Y fault and a supplementary negative-Y eigenstate preserve every exact complex amplitude through ordinary expansion, direct coherent queries and absorbed certificates under both compilers. A literal three-plus CCZ state has rank three and two certified terms with an explicit built-in catalogue; all eight amplitudes and unit norms agree with independent physical matrices.",
+      "rust_tests": [
+        {
+          "package": "rmagna",
+          "target": "original_unified_core",
+          "test": "original_fixed_input_absorption_noise_and_two_term_ccz",
+          "source_sha256": "d1f53f30be458030d6c04b4e090392bf8eb6d2e4d70f5d542e3b1c0568433a53"
+        }
+      ]
     },
     {
       "id": "test_unified_simulator.UnifiedTests.test_gaussian_internal_contraction",
-      "status": "unmapped",
-      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+      "status": "verified",
+      "contract": "All 140 original scenario shapes with zero through six paths and zero through three boundary bits enumerate literal complex path sums using independent Rust entropy and cyclotomic phases. Every output amplitude agrees with Gaussian-contracted kets, including dependent columns, eliminated scalar factors and exact zero branches. This is a full finite contraction witness, not Python random-stream identity.",
+      "rust_tests": [
+        {
+          "package": "rmagna",
+          "target": "original_unified_core",
+          "test": "original_gaussian_internal_contraction_all_140_literal_path_sums",
+          "source_sha256": "d1f53f30be458030d6c04b4e090392bf8eb6d2e4d70f5d542e3b1c0568433a53"
+        }
+      ]
     },
     {
       "id": "test_unified_simulator.UnifiedTests.test_initial_path_budget_and_invalid_gate_lifetimes",
-      "status": "unmapped",
-      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+      "status": "verified",
+      "contract": "Both compilers enforce exact initial and lowered-path boundaries required=2/limit=1, return no compiled state on failure, and preserve all four literal plus amplitudes and unit norm at the admitted boundary. OriginalGate::Cx fixes arity statically; the checked owned OperationProgram runtime boundary explicitly rejects source CX with three targets. Reset of inactive wire 9 returns the typed lifetime error. Saved and freshly compiled valid branches remain exact after every refusal.",
+      "rust_tests": [
+        {
+          "package": "rmagna",
+          "target": "original_unified_admission",
+          "test": "original_initial_path_budget_and_invalid_gate_lifetimes_leave_valid_branch_usable",
+          "source_sha256": "1650debd483aa745d2200c5be2715fb92360b6ea59428c7e2ac8805dfc0953f8"
+        }
+      ]
     },
     {
       "id": "test_unified_simulator.UnifiedTests.test_output_environment_observables",
@@ -3281,8 +3425,16 @@
     },
     {
       "id": "test_unified_simulator.UnifiedTests.test_random_noncommuting_networks",
-      "status": "unmapped",
-      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+      "status": "verified",
+      "contract": "All sixty original shapes, one through three inputs and twenty eight-operation trials each, use independent Rust entropy, explicit initial complex coefficients and literal matrices/projectors. Every ordinary, coherent and absorbed amplitude and exact norm agrees under both compilers, with chronological retired reset environments and original output order. All eight initial global phases, H/S/T/Y/CX/CZ/reset, X/Y/Z measurements, zero/nonzero branches and multiple resets are explicitly exercised; no Python RNG or private layout identity is asserted.",
+      "rust_tests": [
+        {
+          "package": "rmagna",
+          "target": "original_unified_networks",
+          "test": "original_sixty_noncommuting_networks_match_literal_complex_states_and_reset_order",
+          "source_sha256": "a0d24ea088f5b5d997f145935bd59c85e5a1ef1e61f9e433bf5a98546fe5feda"
+        }
+      ]
     },
     {
       "id": "test_unified_simulator.UnifiedTests.test_small_instruments_all_records",
