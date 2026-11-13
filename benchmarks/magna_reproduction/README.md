@@ -7,9 +7,9 @@ implement a simulator or claim reproduction of the paper's precision curves.
 
 ## Current coverage
 
-The source-bound ledger currently has 139 verified, 2 partial and 211 unmapped
+The source-bound ledger currently has 149 verified, 2 partial and 201 unmapped
 original methods, with zero architecture-specific core exclusions. It requires
-163 distinct Rust witnesses from 165 declarations across 69 targets. Strict
+173 distinct Rust witnesses from 175 declarations across 71 targets. Strict
 complete parity intentionally exits 2. The detailed per-change sections below
 retain their historical inventory snapshots; `coverage.json` is authoritative.
 
@@ -3036,3 +3036,41 @@ report flips and repeated actions have separate exact checks. The prepared
 task API exposes the original physical probability of the active choices,
 with zero mass for active action sequences outside the categorical law.
 The original-test coverage ledger retains its existing mappings.
+
+## Original native statistics and sampling declarations
+
+Run the complete original methods with:
+
+```sh
+cargo test --locked -p rmagna --test original_native_and_importance --test sampling_declarations
+make test-magna-task-json
+```
+
+The first target preserves four methods from `test_file_native.py` and five
+from `test_importance_sampling.py` at the pinned upstream commit. The second
+preserves the remaining importance configuration and real CLI method, plus
+bounded parser and option-ordering tests. The Makefile also checks the declaration
+parser with `serde_json/arbitrary_precision` and `serde_json/float_roundtrip`.
+
+Exact literal Fraction witnesses anchor both finite summary methods, including
+signed moments, paired uncertainty and ESS. Extreme weights retain scientific
+values and explicit overflow or underflow paths. Actual recovery callbacks,
+original seed sets, complete Rust noise streams and normalized sampling metadata
+are checked. Statistical rows constructed directly in the tests are synthetic;
+they are not measured circuit work. Typed probability laws and explicit output
+boundaries preserve the finite contracts without claiming native RNG or ABI
+identity.
+
+`--sampling FILE` uses the production bounded parser shared with library callers.
+It accepts strict physical or importance objects, preserves integer and rational
+string precision, and gives floating JSON tokens the pinned decimal-string
+binary64 semantics. File and scalar policies join the same semantic fingerprint
+path. The CLI checks conflicts and declaration failures before circuit loading
+or decoder imports. See the crate README for limits and examples.
+
+These ten complete mappings leave 149 verified, 2 partial and 201 unmapped
+original methods. All 173 distinct witnesses from 175 declarations across 71
+targets must execute. Strict complete parity still exits 2, with no architecture
+exclusions. Boundary/nonfinite methods, Python SIGALRM delivery, sparse-width
+performance, M6 compatibility and M7 paper experiments retain their existing
+incomplete status.

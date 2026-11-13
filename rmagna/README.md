@@ -523,7 +523,27 @@ catalogs require `--insertion-preparation prepared`; their entry/byte limits are
 explicit options and bound the catalog estimate rather than process memory.
 `--noise-proposal-scale 3/2` or `--noise-proposal-scale 1.5` selects exactly the
 same rational importance proposal, including when the requested scale equals one.
-The CLI rejects duplicate, unknown and inapplicable options before decoder imports.
+`--sampling sampling.json` loads the same immutable policy through the library's
+`load_sampling_declaration` API. For example:
+
+```json
+{"method":"importance","proposal_scale":"500/77"}
+```
+
+An empty object or `{"method":"physical"}` selects physical sampling. Importance
+requires `proposal_scale`; other fields and Boolean scales are rejected. Integer
+JSON tokens and rational strings remain exact. Floating JSON tokens follow the
+pinned Python interface's decimal-string binary64 semantics: numeric
+`1.0000000000000001` becomes one, while the quoted string preserves the exact
+fraction. The default limits are 16 KiB of UTF-8 JSON, 4096 characters per numeric
+token and a decimal exponent magnitude of 4096. Library callers can configure
+these limits with `SamplingDeclarationOptions`. The resolved policy appears in
+`sampling.configuration` and the existing semantic sampling fingerprint.
+
+The file option conflicts with `--noise-proposal-scale`; neither sampling option
+is available in `enumerate`. Read, parse and option-conflict errors precede circuit
+loading and decoder imports. The CLI rejects duplicate, unknown and inapplicable
+options before decoder imports.
 
 External Python decoders require `--controllers controllers.json`; optionally
 select `--python /path/to/python` and `--module-root /path/to/decoder/sources`.

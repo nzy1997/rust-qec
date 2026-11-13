@@ -876,13 +876,29 @@
     },
     {
       "id": "test_file_native.NativeFileRuntimeTests.test_categories_zero_one_residual_and_large_rational_inputs",
-      "status": "unmapped",
-      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+      "status": "verified",
+      "contract": "All four original categorical cases, seed 10 and the 10**500 denominator use typed exact probabilities and identity-first alternatives. All 1024 original seed indices check the original 0.7/0.1/0.2 frequencies with tolerance 0.045; selected alternatives are independently fixed. Rust streams are independently seeded; no native RNG ABI identity is claimed.",
+      "rust_tests": [
+        {
+          "package": "rmagna",
+          "target": "original_native_and_importance",
+          "test": "original_categories_zero_one_residual_and_large_rational_inputs",
+          "source_sha256": "6da10da310c7c5c2dbb27213c8d29267ee219e36ac68f9a7d752678c451857cf"
+        }
+      ]
     },
     {
       "id": "test_file_native.NativeFileRuntimeTests.test_category_rejects_invalid_fraction",
-      "status": "unmapped",
-      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+      "status": "verified",
+      "contract": "All four original invalid categories reject zero denominator, negative numerator, negative denominator and overfull 3/4 + 1/2 through public typed probability constructors and checked sums.",
+      "rust_tests": [
+        {
+          "package": "rmagna",
+          "target": "original_native_and_importance",
+          "test": "original_category_rejects_invalid_fraction",
+          "source_sha256": "6da10da310c7c5c2dbb27213c8d29267ee219e36ac68f9a7d752678c451857cf"
+        }
+      ]
     },
     {
       "id": "test_file_native.NativeFileRuntimeTests.test_complex_terms_cancel_before_sampling",
@@ -912,8 +928,16 @@
     },
     {
       "id": "test_file_native.NativeFileRuntimeTests.test_native_summary_matches_paired_delta_method",
-      "status": "unmapped",
-      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+      "status": "verified",
+      "contract": "All four original finite decimal rows and both signed moments retain exact means, the complete covariance of the mean, all standard errors, paired ratio 7/25 and paired variance 9128/1171875. Independent literal Fraction witnesses anchor the statistics with finite export tolerance 1e-11. Exact decimal translation does not claim native float-bit identity.",
+      "rust_tests": [
+        {
+          "package": "rmagna",
+          "target": "original_native_and_importance",
+          "test": "original_native_summary_matches_paired_delta_method",
+          "source_sha256": "6da10da310c7c5c2dbb27213c8d29267ee219e36ac68f9a7d752678c451857cf"
+        }
+      ]
     },
     {
       "id": "test_file_native.NativeFileRuntimeTests.test_scaled_scalar_ratios_exact_cancellation",
@@ -969,8 +993,16 @@
     },
     {
       "id": "test_file_native.NativeFileRuntimeTests.test_summary_missing_metrics_single_draw_and_zero_acceptance",
-      "status": "unmapped",
-      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+      "status": "verified",
+      "contract": "An actually empty exact accumulator retains absent summary and paired ratio. Actual one-draw missing-error and two-draw zero-acceptance circuits preserve null versus zero estimates and uncertainties through batch export. No zero-shot batch is invented.",
+      "rust_tests": [
+        {
+          "package": "rmagna",
+          "target": "original_native_and_importance",
+          "test": "original_summary_missing_metrics_single_draw_and_zero_acceptance",
+          "source_sha256": "6da10da310c7c5c2dbb27213c8d29267ee219e36ac68f9a7d752678c451857cf"
+        }
+      ]
     },
     {
       "id": "test_file_native.NativeFileRuntimeTests.test_summary_rejects_nonfinite_and_inconsistent_metrics",
@@ -1256,28 +1288,68 @@
     },
     {
       "id": "test_importance_sampling.ImportanceSamplingTests.test_complex_terminal_recovery_keeps_true_born_sampling",
-      "status": "unmapped",
-      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+      "status": "verified",
+      "contract": "All twelve original seeds execute the X_ERROR(1/10) physical circuit, zero target and H/measurement/echo-controlled-X recovery with scale five, supplied X and likelihood 1/5. Exact acceptance and error, complete callback transcript, one callback per draw, both recovery branches, unit history factor and scientific weight (0.8,-2) are checked. Rust explicitly names output zero and uses independent streams.",
+      "rust_tests": [
+        {
+          "package": "rmagna",
+          "target": "original_native_and_importance",
+          "test": "original_complex_terminal_recovery_keeps_true_born_sampling",
+          "source_sha256": "6da10da310c7c5c2dbb27213c8d29267ee219e36ac68f9a7d752678c451857cf"
+        }
+      ]
     },
     {
       "id": "test_importance_sampling.ImportanceSamplingTests.test_huge_and_tiny_weights_remain_range_safe",
-      "status": "unmapped",
-      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+      "status": "verified",
+      "contract": "Both original weights 2**2000 and 2**-2000 retain scientific pairs (0.5,2001) and (0.5,-1999), null ordinary acceptance with the correct overflow or underflow path, conditional error one and ESS two. A real task rejects negative supplied likelihood before entropy; its positive counterpart demonstrably consumes entropy. Signed contributions remain distinct from nonnegative supplied weights.",
+      "rust_tests": [
+        {
+          "package": "rmagna",
+          "target": "original_native_and_importance",
+          "test": "original_huge_and_tiny_weights_remain_range_safe",
+          "source_sha256": "6da10da310c7c5c2dbb27213c8d29267ee219e36ac68f9a7d752678c451857cf"
+        }
+      ]
     },
     {
       "id": "test_importance_sampling.ImportanceSamplingTests.test_invalid_proposals_and_cli_config",
-      "status": "unmapped",
-      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+      "status": "verified",
+      "contract": "All ten original invalid declarations reject through the production bounded sampling parser. The original physical/task/sampling files, importance scale 100 and real validate, inspect and 16-shot run execute through --sampling. Scalar and file policies have identical semantic sampling fingerprints and estimates. Empty physical, exact integer and rational-string precision, decimal-string binary64 float semantics, feature combinations, resource bounds, conflicts and read errors have additional owning assertions. This normalized Rust interface does not claim Python keyword or RNG ABI identity.",
+      "rust_tests": [
+        {
+          "package": "rmagna",
+          "target": "sampling_declarations",
+          "test": "original_invalid_proposals_and_cli_config",
+          "source_sha256": "61ed08eb24da9f77aea30aa1e13aca0c99fb9e7c1702ef3d83a59608ff1b2743"
+        }
+      ]
     },
     {
       "id": "test_importance_sampling.ImportanceSamplingTests.test_native_draws_return_exact_likelihood_products",
-      "status": "unmapped",
-      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+      "status": "verified",
+      "contract": "All 64 original seeds retain the two original proposal categories through equivalent normalized P/Q laws, with literal factors 9/5 or 1/5 and 8/5 or 2/5. Plain and weighted choices and full Rust RNG states agree. Empty laws consume no entropy and retain unit likelihood; an absent physical factor law rejects mismatched shape. No native raw-factor or unreduced payload ABI is claimed.",
+      "rust_tests": [
+        {
+          "package": "rmagna",
+          "target": "original_native_and_importance",
+          "test": "original_native_draws_return_exact_likelihood_products",
+          "source_sha256": "6da10da310c7c5c2dbb27213c8d29267ee219e36ac68f9a7d752678c451857cf"
+        }
+      ]
     },
     {
       "id": "test_importance_sampling.ImportanceSamplingTests.test_reproducibility_and_physical_mode_unchanged",
-      "status": "unmapped",
-      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+      "status": "verified",
+      "contract": "The original circuit, output-one zero target, 32 shots and seed four compare default physical, explicit physical and unit importance exact statistics and exported estimates. Unit ESS is 32 and scaled-category count is zero. All 64 noise draws from seed 51 and final RNG states agree. Repeated scale-two statistics and fingerprints agree, while physical and scale-two fingerprints differ. Normalized metadata and enum defaults are explicit typed translations.",
+      "rust_tests": [
+        {
+          "package": "rmagna",
+          "target": "original_native_and_importance",
+          "test": "original_reproducibility_and_physical_mode_unchanged",
+          "source_sha256": "6da10da310c7c5c2dbb27213c8d29267ee219e36ac68f9a7d752678c451857cf"
+        }
+      ]
     },
     {
       "id": "test_importance_sampling.ImportanceSamplingTests.test_scaled_channel_totals_preserve_full_support_or_fail",
@@ -1294,8 +1366,16 @@
     },
     {
       "id": "test_importance_sampling.ImportanceSamplingTests.test_weighted_summary_uses_joint_means_and_paired_ratio_errors",
-      "status": "unmapped",
-      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+      "status": "verified",
+      "contract": "All four original literal weights and metric rows yield exact joint means 13/16 and 5/16, moment 3/16, ratio 5/13, paired variance 872/85683, mean weight 23/24 and ESS 529/193. Independent Fraction witnesses and finite export checks use tolerance 1e-11. These are explicitly synthetic statistical rows, not measured quantum work.",
+      "rust_tests": [
+        {
+          "package": "rmagna",
+          "target": "original_native_and_importance",
+          "test": "original_weighted_summary_uses_joint_means_and_paired_ratio_errors",
+          "source_sha256": "6da10da310c7c5c2dbb27213c8d29267ee219e36ac68f9a7d752678c451857cf"
+        }
+      ]
     },
     {
       "id": "test_incremental_history.IncrementalHistoryTests.test_complete_draw_rng_and_controller_replay",

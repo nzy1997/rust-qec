@@ -37,6 +37,7 @@ Run configuration:
   --seed N                            u64 seed (default 0; run, stream or compare-samplers)
   --progress-every N                  Positive committed-draw interval on stderr (run only)
   --noise-proposal-scale RATIONAL      Exact positive scale; unavailable in enumerate
+  --sampling FILE                     Sampling JSON (max 16384 bytes); conflicts with --noise-proposal-scale
   --compiler shared|parity_copies      Default shared
   --history-sampler affine_support|exact_marginal   Default affine_support; not enumerate/compare-samplers
   --causal-strategy fixed|cold         Default fixed
@@ -290,6 +291,7 @@ impl Args {
             }
         } else if let Some(flag) = [
             "--noise-proposal-scale",
+            "--sampling",
             "--history-sampler",
             "--max-record-values",
         ]
@@ -405,7 +407,19 @@ impl Args {
             }
         }
 
-        let sampling = if let Some(text) = flags.text("--noise-proposal-scale") {
+        if flags.0.contains_key("--sampling") && flags.0.contains_key("--noise-proposal-scale") {
+            return Err(
+                "--sampling conflicts with --noise-proposal-scale; supply one sampling declaration"
+                    .into(),
+            );
+        }
+        let sampling = if let Some(path) = flags.text("--sampling") {
+            rmagna::noise::load_sampling_declaration(
+                std::path::Path::new(&path),
+                &rmagna::noise::SamplingDeclarationOptions::default(),
+            )
+            .map_err(|e| format!("--sampling: {e}"))?
+        } else if let Some(text) = flags.text("--noise-proposal-scale") {
             let proposal_scale = ProbabilityParser::default()
                 .rational(&text)
                 .map_err(|e| format!("--noise-proposal-scale: {e}"))?;
@@ -506,6 +520,7 @@ fn parse_tokens(raw: Vec<String>) -> Result<(Mode, PathBuf, Flags), String> {
                 | "--max-insertion-table-bytes"
                 | "--max-insertion-catalog-entries"
                 | "--noise-proposal-scale"
+                | "--sampling"
         ) && !ENUMERATION_FLAGS.contains(&arg.as_str())
             && !PREPARATION_FLAGS.contains(&arg.as_str())
             && !COMPARISON_FLAGS.contains(&arg.as_str())
