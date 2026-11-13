@@ -6473,3 +6473,197 @@ assert!(!certificate.probability().is_zero());
 This explicit source admission replaces the original mutable simulator option
 change for this finite contract. It does not establish Python cache identity,
 Native object layout, a performance result or complete original API coverage.
+
+## Owned scalar probabilities for collected original callbacks
+
+`OriginalBranch::prepare_scalar_probability` freezes the branch's already
+collected literal gates, physical faults and true projection outcomes. It owns
+its coherent reference and query, so the source instrument, callback handles
+and branch can all be dropped. Repeated evaluation cannot recollect a callback.
+`physical_outcomes()` includes measurement signs; `records()` also preserves
+true and reported labels. It is a single scalar network query, with physical
+legs traced before its explicitly selected phase resource is prepared.
+
+Initial input and coherent lowering retain their existing limits. Query options
+separately admit event rows, named occurrences, doubled paths, conservative
+packed geometry and phase terms. Side-only path, side-entry and pair caps can
+be zero. The existing initial-embedding geometry cap still applies when the
+instrument is constructed; it is not a side-only budget. Static network queries
+keep their source-specific geometry clamps. Resource errors propagate directly;
+no strategy is selected as a fallback.
+
+```rust
+use rmagna::{clifford::CliffordCircuit, gf2::BitVector,
+    instrument::{OriginalAssignment, OriginalControl, OriginalGate as G,
+        OriginalInstrument, OriginalLimits, OriginalNetworkOptions,
+        OriginalNetworkResource, OriginalOperation}, phase::NativePhaseOptions,
+    scalar::ScalarArithmetic, unitary::{CompilerStrategy, ExpansionLimits}};
+use std::sync::Arc;
+let a = ScalarArithmetic::default();
+let operations = vec![
+    OriginalOperation { id: "h".into(), gate: G::H(0) },
+    OriginalOperation { id: "m".into(), gate: G::Measure {
+        factors: vec![(0, rmagna::instrument::OriginalPauli::Z)],
+        inverted: false, record: "a".into() } },
+    OriginalOperation { id: "c".into(), gate: G::Control },
+];
+let control = OriginalControl {
+    operation: "c".into(), parents: vec!["a".into()], version: "literal-v1".into(),
+    callback: Arc::new(|reports| Ok(vec![G::H(0), G::Phase {
+        wires: vec![0], turns: 1 + i64::from(reports.get("a")?) }])),
+};
+let limits = OriginalLimits { expansion: ExpansionLimits {
+    max_path_bits: 0, max_side_terms: 0, max_pairs: 0, ..Default::default()
+}, ..Default::default() };
+let instrument = OriginalInstrument::new(vec![0], vec![0],
+    CliffordCircuit::computational(BitVector::zeros(1)?)?, operations,
+    vec![control], limits, &a)?;
+let branch = instrument.compile(&OriginalAssignment {
+    true_values: vec![("a".into(), false)], ..Default::default()
+}, CompilerStrategy::ParityCopies, &a)?;
+assert!(branch.expansion(&a).is_err());
+let options = OriginalNetworkOptions {
+    resource: OriginalNetworkResource::Native(NativePhaseOptions::default()),
+    ..Default::default()
+};
+let query = branch.prepare_scalar_probability(&options, &a)?;
+drop(branch);
+drop(instrument);
+assert_eq!(query.evaluate(&a)?.value, a.omega(0, -2)?);
+assert!(!query.evaluate(&a)?.value.is_zero());
+# Ok::<(), Box<dyn std::error::Error>>(())
+```
+
+Immutable ownership supplies the finite callback-reuse contract. It does not
+reproduce Python feedback hints, private cache layout or an RNG/class ABI, and
+does not establish a performance improvement.
+
+## Declared control expressions and coherent affine feedback
+
+`ControlExpression`, `ControlGate` and `ControlRule` retain immutable arithmetic
+and ordered emission rules. Arbitrary-width signed constants reduce modulo eight
+before narrowing. Boolean NOT uses zero truth; XOR/AND/OR are bitwise integer
+operations, and addition/multiplication use modulo-eight arithmetic. Record
+values are explicit `i32` inputs; original Boolean reports convert to zero or one.
+A gate evaluates its guard before its exponent. An inactive missing exponent is
+not read; an active missing record returns `ControlRuleError::MissingRecord`.
+
+Constructors check arities, distinct targets, exponent use, declared parents,
+expression depth/node/name budgets and aggregate rule budgets. Depth is capped
+at 256. `OriginalDeclaredControl` binds an owned rule to its original identity,
+version and ordered parents. `OriginalInstrument::new_with_declared_controls`
+retains it as the authoritative callback. `control_rule()` returns declarations
+without invoking or inferring opaque callbacks. A declared I retains its target
+metadata but has no quantum action or target lifetime requirement.
+
+`compile_trace` now accepts supported declared-affine rules. Their Boolean guards
+are structurally bit constants, records, NOT and XOR. Ordered X/Y/Z/H/CX/CZ and
+even controlled parity phases lower coherently; supported constant-guard phase
+arithmetic also retains its absolute phase. Inactive exponent syntax remains
+lazy. Opaque callbacks, nonlinear guards and controlled odd phases fail before
+any callback, without a resource fallback. Literal branch compilation remains
+available for general callbacks.
+
+Report flips affect the coherent controller and then restore its true record
+legs. Final queries relabel reported coordinates once. Measurement signs,
+original fault anchors, destructive lifetimes, reset environments and declared
+output order remain explicit. `compile_trace_with_declared_limits` admits
+per-gate/total target occurrences and canonical affine preparation words;
+assignment replacement also admits fault targets and actual report masks before
+allocating them. The limits count conservative logical words, not process RSS,
+allocator overhead or scalar limbs. Coherent wire/gate/path and scalar query
+resource limits still apply. This route invents no callback execution counts,
+Native work-wire identities or common-axis/cache certificates.
+
+```rust
+use rmagna::{clifford::CliffordCircuit, gf2::BitVector,
+    instrument::{ControlExpression as E, ControlGate, ControlGateKind,
+        ControlOperator, ControlRule, OriginalDeclaredControl, OriginalGate as G,
+        OriginalInstrument, OriginalLimits, OriginalNetworkOptions,
+        OriginalOperation, OriginalPauli, OriginalRecordParity, OriginalTraceAssignment},
+    pauli::PauliWord, scalar::ScalarArithmetic, unitary::CompilerStrategy};
+let a = ScalarArithmetic::default();
+let limits = Default::default();
+let guard = E::compose(ControlOperator::Not,
+    vec![E::record("a".into(), limits)?], limits)?;
+let rule = ControlRule::new(vec![ControlGate::new(ControlGateKind::X,
+    vec![1], None, guard, limits)?], limits)?;
+let declaration = OriginalDeclaredControl::new("c".into(),
+    vec!["a".into()], "rule-v1".into(), rule)?;
+let instrument = OriginalInstrument::new_with_declared_controls(
+    vec![0, 1], vec![1, 0],
+    CliffordCircuit::computational(BitVector::zeros(2)?)?, vec![
+        OriginalOperation { id: "h".into(), gate: G::H(0) },
+        OriginalOperation { id: "m".into(), gate: G::Measure {
+            factors: vec![(0, OriginalPauli::Z)], inverted: false, record: "a".into() } },
+        OriginalOperation { id: "c".into(), gate: G::Control },
+    ], vec![declaration], OriginalLimits::default(), &a)?;
+assert!(instrument.control_rule("c").is_some());
+let trace = instrument.compile_trace(CompilerStrategy::ParityCopies, &a)?;
+let view = trace.with_assignment(&OriginalTraceAssignment {
+    report_flips: vec!["a".into()], ..Default::default()
+}, &a)?;
+let z_output = PauliWord::new(BitVector::zeros(3)?,
+    BitVector::from_indices(3, [0])?, 0)?;
+let event = OriginalRecordParity { records: vec!["a".into()], inverted: false };
+let query = trace.prepare_network_moment(&z_output, &[event],
+    &OriginalNetworkOptions::default(), &a)?;
+assert_eq!(query.evaluate(&view, &BitVector::zeros(1)?, &a)?.value,
+    a.omega(0, -2)?.negated());
+# Ok::<(), Box<dyn std::error::Error>>(())
+```
+
+## Mixed output and reported-record scalar events
+
+`prepare_boundary_event_probability` and `prepare_boundary_event_moment` accept
+Z-parity rows in declared output order followed by record order, matching
+`network_width()`. Each family fixes the event layout and resource; outcomes and
+assignment views remain evaluation inputs. `resource()` exposes the actual
+selected final scalar resource. Physical legs outside the open boundary are
+traced before selection. These methods construct no coherent-side expansion.
+
+Record readout inversions and assignment flips translate event outcomes and
+record Z/Y signs once. Hermitian words must commute with every event. Duplicate
+or contradictory events keep their exact masses, including zero, and raw event
+moments are not divided by acceptance. Shape, event count, occurrence, doubled
+path and conservative geometry limits fail explicitly. The record-only methods
+retain their existing admission and coordinate conventions.
+
+```rust
+use rmagna::{clifford::CliffordCircuit, gf2::BitVector,
+    instrument::{OriginalGate as G, OriginalInstrument, OriginalLimits,
+        OriginalNetworkOptions, OriginalNetworkResource, OriginalOperation,
+        OriginalPauli, OriginalTraceAssignment}, pauli::PauliWord,
+    phase::NativePhaseOptions, scalar::{ExactScalar, ScalarArithmetic},
+    unitary::CompilerStrategy};
+let a = ScalarArithmetic::default();
+let instrument = OriginalInstrument::new(vec![0], vec![0],
+    CliffordCircuit::computational(BitVector::zeros(1)?)?, vec![
+        OriginalOperation { id: "h".into(), gate: G::H(0) },
+        OriginalOperation { id: "m".into(), gate: G::Measure {
+            factors: vec![(0, OriginalPauli::Z)], inverted: false, record: "a".into() } },
+    ], vec![], OriginalLimits::default(), &a)?;
+let trace = instrument.compile_trace(CompilerStrategy::ParityCopies, &a)?;
+let options = OriginalNetworkOptions {
+    resource: OriginalNetworkResource::Native(NativePhaseOptions::default()),
+    ..Default::default()
+};
+let row = BitVector::from_indices(2, [0, 1])?; // Output 0 XOR reported a.
+let probability = trace.prepare_boundary_event_probability(&[row.clone()], &options, &a)?;
+let zz = PauliWord::new(BitVector::zeros(2)?, row.clone(), 0)?;
+let moment = trace.prepare_boundary_event_moment(&zz, &[row], &options, &a)?;
+let view = trace.with_assignment(&OriginalTraceAssignment {
+    report_flips: vec!["a".into()], ..Default::default()
+}, &a)?;
+let odd = BitVector::from_indices(1, [0])?;
+assert_eq!(probability.evaluate(&view, &odd, &a)?.value, ExactScalar::one());
+assert_eq!(moment.evaluate(&view, &odd, &a)?.value, ExactScalar::one().negated());
+# Ok::<(), Box<dyn std::error::Error>>(())
+```
+
+The finite owning witnesses cover the original four-history callback, declared
+expression conversion, four affine feedback methods, 129-qubit mixed-event
+method and seven-family direct affine boundary task. The direct task integrates
+unneeded reports, returns exact unnormalized acceptance/moments, and consumes no
+random words. Complex/opaque feedback sampling, remaining source methods, paper
+Monte Carlo experiments and performance conclusions remain separate work.

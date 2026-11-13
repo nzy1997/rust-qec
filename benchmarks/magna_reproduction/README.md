@@ -7,9 +7,9 @@ implement a simulator or claim reproduction of the paper's precision curves.
 
 ## Current coverage
 
-The source-bound ledger currently has 214 verified, 2 partial and 136 unmapped
+The source-bound ledger currently has 222 verified, 2 partial and 128 unmapped
 original methods, with zero architecture-specific core exclusions. It requires
-238 distinct Rust witnesses from 240 declarations across 99 targets. Strict
+247 distinct Rust witnesses from 249 declarations across 104 targets. Strict
 complete parity intentionally exits 2. The detailed per-change sections below
 retain their historical inventory snapshots; `coverage.json` is authoritative.
 
@@ -3244,9 +3244,59 @@ fiber fallback. Earlier certificates remain usable; observed projected side work
 is distinguished from source term counts. The API and a compiling example are
 in the rmagna README.
 
-Current coverage is 214 verified, 2 partial and 136 unmapped, with zero architecture
-exclusions: 238 distinct witnesses from 240 declarations across 99 mapped targets.
+At this batch snapshot, coverage was 214 verified, 2 partial and 136 unmapped,
+with zero architecture exclusions: 238 distinct witnesses from 240 declarations
+across 99 mapped targets.
 Remaining original methods, full public compatibility, Monte Carlo precision and
 paper-scale performance remain incomplete. Complete-parity exit 2 is intentional;
 actual fresh report creation and current source/ledger/execution bindings must
 still validate independently.
+
+
+## Owned callback probabilities and direct affine boundary tasks
+
+The final ordered batch adds five owning targets:
+
+```sh
+cargo test --locked -p rmagna --test original_callback_queries --test original_control_rules
+cargo test --locked -p rmagna --test original_affine_feedback --test original_boundary_events
+cargo test --locked -p rmagna --test original_direct_affine_boundary
+```
+
+All four true histories of the original general H/T callback and Y fault retain
+literal complex vectors, exact single-sided probabilities and callback counts.
+Owned scalar queries survive source deletion and work with side-only path,
+entry and pair caps zero. Arbitrary-size declared constants, lazy exponents,
+ordered rules and actual reported parents retain their explicit Rust types and
+immutable declarations, without probing opaque callbacks.
+
+The four complete affine-feedback methods match literal matrices and signed
+projectors under both compilers, with all original joint flip/fault/event/word
+combinations. Supplemental cases exercise every supported affine Clifford
+family, even variable phases, 65/129 physical widths, high record indices,
+empty controls and declared target/geometry/mask admission. True record legs
+are restored after controllers; reported outcomes and words relabel once.
+Opaque, nonlinear and controlled odd phases reject explicitly.
+
+Mixed output/record scalar events complete the 129-qubit T-product witness,
+including probability 1/2, X128/Y128 moments 1/(2 sqrt(2)), the original exact
+linear identity, HTH probability and explicit commutation/path failures.
+Analytical two-output/one-record cases cover all sixteen flip/fault combinations,
+output order, record coherence, contradictory rows and typed admission errors.
+The public examples are compiled as rmagna doctests.
+
+The final direct task runs all 126 original-scenario draws and eight deterministic
+flip supplements. Independent physical vectors retain total one, raw acceptance
+and every X/Y/Z moment for X/Y/S/H/CX/CZ/PHASE2, including the Y fault after an
+inactive control, measurement/reset lifetimes and output order [1,2,0]. Returned
+reports are empty; three sentinel entropy states and entropy-call counts remain
+unchanged. Actual final-query resource receipts and limits stay visible.
+
+Eight complete original methods gain nine source-bound witnesses; the second
+direct witness distinguishes duplicate report-flip cancellation. Current coverage
+is 222 verified, 2 partial and 128 unmapped, with zero architecture exclusions:
+247 distinct witnesses from 249 declarations across 104 targets. Completing this
+issue batch does not establish complete original API coverage, complex feedback
+sampling, Native cache/RNG identity, Monte Carlo precision or paper performance.
+Fresh complete-parity audit exit 2 remains intentional and must still produce a
+valid new report bound to the actual ledger, execution manifest and sources.

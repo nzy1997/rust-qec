@@ -89,8 +89,22 @@
     },
     {
       "id": "test_boundary_sampling.BoundarySamplingTests.test_all_affine_cliffords_keep_exact_acceptance_and_effects",
-      "status": "unmapped",
-      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+      "status": "verified",
+      "contract": "Complete original seven-family direct affine task: X/Y/S/H/CX/CZ/PHASE2 under NOT reported a, MZ a/MX b, reset-zero q0, output order [1,2,0], unconditional Y1 fault after control, all three original flip lists, both compilers and three sentinel RNG states (126 draws). Exact independent physical matrices/projectors/reset integration check total one, postselected raw acceptance and every signed X/Y/Z moment, with actual selected Native resource receipts. Eight deterministic empty/single/double/triple-flip supplements distinguish duplicate XOR cancellation. Reports stay empty and entropy calls/state remain unchanged. No complex feedback, Native RNG/class ABI, conditional renormalization or paper/performance claim.",
+      "rust_tests": [
+        {
+          "package": "rmagna",
+          "target": "original_direct_affine_boundary",
+          "test": "original_seven_affine_clifford_boundary_tasks_keep_exact_acceptance_and_effects",
+          "source_sha256": "ab466eeabbc4801f3d0df29fdd0d2fc2613411d108bbd3e1fe03649a7f04e7fb"
+        },
+        {
+          "package": "rmagna",
+          "target": "original_direct_affine_boundary",
+          "test": "duplicate_report_flips_cancel_on_deterministic_boundary_postselection",
+          "source_sha256": "ab466eeabbc4801f3d0df29fdd0d2fc2613411d108bbd3e1fe03649a7f04e7fb"
+        }
+      ]
     },
     {
       "id": "test_boundary_sampling.BoundarySamplingTests.test_commuting_kernel_includes_joint_parities",
@@ -579,33 +593,81 @@
     },
     {
       "id": "test_deferred_feedback.DeclaredExpressionNativeTests.test_value_conversion_and_inactive_exponent",
-      "status": "unmapped",
-      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+      "status": "verified",
+      "contract": "Complete declared-expression conversion/lazy-emission method: immutable cloning and dependencies; arbitrary-width 2^200+3 reduced modulo eight before narrowing; every four Boolean assignment; exact selected parity-phase payload; inactive missing exponent succeeds without access and active missing record fails with the typed name. Explicit Rust integer reports and Boolean conversion replace dynamic value objects. Supplemental tests separately retain bitwise/arithmetic/order/admission and actual original reported-parent/fault-anchor behavior; no opaque callback inference or private ABI claim.",
+      "rust_tests": [
+        {
+          "package": "rmagna",
+          "target": "original_control_rules",
+          "test": "original_declared_expression_converts_large_values_and_skips_inactive_exponents",
+          "source_sha256": "b54dd2dae36759d5bc6fc1e1c0806c7abf06c7fa042aec65465a7a0d935a372f"
+        }
+      ]
     },
     {
       "id": "test_deferred_feedback.DeferredFeedbackTests.test_explicit_unsupported_controls",
-      "status": "unmapped",
-      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+      "status": "verified",
+      "contract": "Complete original opaque callback, structurally nonlinear AND guard and controlled odd-T phase refusals under both compilers. Opaque source returns the existing static-trace metadata refusal, declarations return typed UnsupportedFeedback, and a real atomic callback counter stays zero. No truth table probes, literal collection or resource fallback can accept an unsupported declaration. Supplemental separate witnesses cover supported affine grammar, exact even phase arithmetic and resource/packed-width boundaries; they do not imply complex feedback support.",
+      "rust_tests": [
+        {
+          "package": "rmagna",
+          "target": "original_affine_feedback",
+          "test": "complete_explicit_unsupported_controls_do_not_invoke_callbacks",
+          "source_sha256": "a36ca6337c189a59929ed8b573800251f6422c4387885abf04a418c1e7c78387"
+        }
+      ]
     },
     {
       "id": "test_deferred_feedback.DeferredFeedbackTests.test_literal_joint_events_and_output_observables",
-      "status": "unmapped",
-      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+      "status": "verified",
+      "contract": "Complete three-wire H/T/Pauli-readout/destructive-X/ordered declared Y, even parity phase, X and S rule scenario. Both compilers, every original flip/fault/event/observable combination (288 exact moments), and every physical coherent amplitude agree with independent literal matrices. Original four fault choices and chronological anchors, zero/one/no parity event, true record restoration and ordered quantum outputs are explicit. The side route witnesses this method; distinct Native scalar and wide-source methods remain separately mapped.",
+      "rust_tests": [
+        {
+          "package": "rmagna",
+          "target": "original_affine_feedback",
+          "test": "complete_literal_joint_events_and_output_observables",
+          "source_sha256": "a36ca6337c189a59929ed8b573800251f6422c4387885abf04a418c1e7c78387"
+        }
+      ]
     },
     {
       "id": "test_deferred_feedback.DeferredFeedbackTests.test_native_literal_joint_events_and_output_observables",
-      "status": "unmapped",
-      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+      "status": "verified",
+      "contract": "Complete explicit Native scalar counterpart of the literal declared-affine joint-event scenario. Both compilers and all 288 original flip/fault/event/observable combinations match independent literal complex matrices after physical tracing and selected final-query Native preparation. Source controls consume report flips and restore true legs; RHS/word relabeling occurs once. No side expansion substitutes for this scalar witness and no private Native work-wire/resource/cache identity is asserted.",
+      "rust_tests": [
+        {
+          "package": "rmagna",
+          "target": "original_affine_feedback",
+          "test": "complete_native_literal_joint_events_and_output_observables",
+          "source_sha256": "a36ca6337c189a59929ed8b573800251f6422c4387885abf04a418c1e7c78387"
+        }
+      ]
     },
     {
       "id": "test_deferred_feedback.DeferredFeedbackTests.test_native_wide_trace_and_explicit_resource_failure",
-      "status": "unmapped",
-      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+      "status": "verified",
+      "contract": "Complete 129-qubit product T|+> method using mixed physical-output event Z0 Z1=0, both compilers and explicit Native final-scalar policy/catalogue. Probability is exactly 1/2 and X128/Y128 event moments are each 1/(2 sqrt(2)), including the original exact linear identity and actual resource rank/term receipts. Anticommuting X0 and doubled-path cap two reject explicitly; the separate HTH event gives (2+sqrt(2))/4. Physical legs are traced before resource selection, without a full-side expansion or fallback. Supplemental analytical and typed-error cases preserve output/record order and single report relabeling.",
+      "rust_tests": [
+        {
+          "package": "rmagna",
+          "target": "original_boundary_events",
+          "test": "complete_native_wide_trace_and_explicit_resource_failure",
+          "source_sha256": "c98bcc463f245253e472e944c8c655fe042e183cd7c3801361c76d81ddd431e6"
+        }
+      ]
     },
     {
       "id": "test_deferred_feedback.DeferredFeedbackTests.test_signed_pauli_products_and_report_fault_anchors",
-      "status": "unmapped",
-      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+      "status": "verified",
+      "contract": "Complete signed Y0 Z1 measurement, original measurement-anchored Z fault, report-controlled Y1 and subsequent X0 X1 measurement. Both compilers, all four report-flip masks, all true histories and all original output observables agree with independent complex matrices/signed projectors on side and explicit Native scalar routes. Full physical coherent amplitudes use the actual uninverted Pauli-product record leg; reported signs translate exactly once. Original anchors, true/report distinction and output order are preserved without Native layout/cache identity claims.",
+      "rust_tests": [
+        {
+          "package": "rmagna",
+          "target": "original_affine_feedback",
+          "test": "complete_signed_pauli_products_and_report_fault_anchors",
+          "source_sha256": "a36ca6337c189a59929ed8b573800251f6422c4387885abf04a418c1e7c78387"
+        }
+      ]
     },
     {
       "id": "test_detector_feedback.DetectorFeedbackTests.test_future_and_ambiguous_uses_rejected",
@@ -1497,8 +1559,16 @@
     },
     {
       "id": "test_kernel_contract.KernelContractTests.test_legacy_flags_cannot_select_an_old_kernel_and_general_callbacks_work",
-      "status": "unmapped",
-      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+      "status": "verified",
+      "contract": "Complete four-history plus-state Z/callback H+T^(1+reported_a)/Y-fault/X example, with report flip a, both compilers and explicit Catalogue/Native scalar policies. Independent literal vectors retain absolute complex phases; exact probabilities sum to one, callbacks run exactly four times and eight after separate ordinary compilations. Owned single-sided queries survive branch/source deletion and work with side path/entry/pair caps zero. Supplemental typed admission tests cover initial/coherent/scalar/Native limits. Immutable literal ownership replaces private Python feedback/reuse hints; no cache/RNG ABI or performance claim.",
+      "rust_tests": [
+        {
+          "package": "rmagna",
+          "target": "original_callback_queries",
+          "test": "original_general_quantum_callbacks_use_owned_single_sided_probabilities",
+          "source_sha256": "7b0041ee3d15a35659e434d5381044acc0ff85a79c80302a59c963d60c8d021a"
+        }
+      ]
     },
     {
       "id": "test_kernel_contract.KernelContractTests.test_literal_internal_ids_do_not_collide_with_original_ids",

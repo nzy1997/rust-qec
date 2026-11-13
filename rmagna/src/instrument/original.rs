@@ -42,17 +42,28 @@ use std::{
     fmt,
     sync::Arc,
 };
+#[path = "original_branch_probability.rs"]
+mod branch_probability;
+pub use branch_probability::PreparedOriginalBranchProbability;
+
+#[path = "original_control_rules.rs"]
+mod control_rules;
+pub use control_rules::{
+    ControlEmission, ControlExpression, ControlGate, ControlGateKind, ControlOperator, ControlRule,
+    ControlRuleError, ControlRuleLimits, OriginalDeclaredControl,
+};
+
 #[path = "original_trace.rs"]
 mod trace;
 pub use trace::{
     OriginalBoundaryDraw, OriginalBoundaryLimits, OriginalBoundaryOptions, OriginalBoundaryQuery,
-    OriginalBoundaryResource, OriginalBoundaryService, OriginalBoundaryTask, OriginalNetworkLimits,
-    OriginalNetworkMoment, OriginalNetworkOptions, OriginalNetworkProbability,
-    OriginalNetworkResource, OriginalPreparedTrace, OriginalPreparedTraceResult,
-    OriginalRecordEvent, OriginalRecordLayout, OriginalRecordParity, OriginalRecordProbabilities,
-    OriginalStaticTrace, OriginalTraceAssignment, OriginalTraceOptions,
-    OriginalTracePreparationLimits, OriginalTraceResult, OriginalTraceView,
-    PreparedOriginalNetworkRecords, UniformOriginalRecords,
+    OriginalBoundaryResource, OriginalBoundaryService, OriginalBoundaryTask,
+    OriginalDeclaredTraceLimits, OriginalNetworkLimits, OriginalNetworkMoment,
+    OriginalNetworkOptions, OriginalNetworkProbability, OriginalNetworkResource,
+    OriginalPreparedTrace, OriginalPreparedTraceResult, OriginalRecordEvent, OriginalRecordLayout,
+    OriginalRecordParity, OriginalRecordProbabilities, OriginalStaticTrace,
+    OriginalTraceAssignment, OriginalTraceOptions, OriginalTracePreparationLimits,
+    OriginalTraceResult, OriginalTraceView, PreparedOriginalNetworkRecords, UniformOriginalRecords,
 };
 
 #[path = "original_source_certificate.rs"]
@@ -298,6 +309,10 @@ pub enum OriginalError {
     },
     OutputMismatch,
     DimensionMismatch,
+    DeclaredControl {
+        operation: String,
+        error: ControlRuleError,
+    },
     Callback {
         operation: String,
         error: OriginalCallbackError,
@@ -355,6 +370,7 @@ pub struct OriginalInstrument {
     initial: AffineKet,
     operations: Vec<OriginalOperation>,
     controls: BTreeMap<String, OriginalControl>,
+    declarations: BTreeMap<String, Arc<ControlRule>>,
     records: Vec<String>,
     limits: OriginalLimits,
 }
@@ -463,9 +479,40 @@ impl OriginalInstrument {
             initial,
             operations,
             controls: control_map,
+            declarations: BTreeMap::new(),
             records,
             limits,
         })
+    }
+    /// Construct authoritative owned rule callbacks while retaining their
+    /// immutable declarations. Existing opaque controls remain available through
+    /// `new`; they are never probed or inferred as declarations.
+    pub fn new_with_declared_controls(
+        inputs: Vec<OriginalWire>,
+        outputs: Vec<OriginalWire>,
+        initial: AffineKet,
+        operations: Vec<OriginalOperation>,
+        declarations: Vec<OriginalDeclaredControl>,
+        limits: OriginalLimits,
+        arithmetic: &ScalarArithmetic,
+    ) -> Result<Self, OriginalError> {
+        let controls = declarations
+            .iter()
+            .map(OriginalDeclaredControl::callback)
+            .collect();
+        let mut instrument = Self::new(
+            inputs, outputs, initial, operations, controls, limits, arithmetic,
+        )?;
+        instrument.declarations = declarations
+            .into_iter()
+            .map(|c| (c.operation, c.rule))
+            .collect();
+        Ok(instrument)
+    }
+    /// Present only for a rule-backed authoritative callback. Opaque callbacks
+    /// return None, and this lookup never invokes a callback.
+    pub fn control_rule(&self, operation: &str) -> Option<&ControlRule> {
+        self.declarations.get(operation).map(Arc::as_ref)
     }
     pub fn compile(
         &self,
@@ -1067,3 +1114,6 @@ impl OriginalBranch {
             .total(a)?)
     }
 }
+
+#[path = "original_affine_lower.rs"]
+mod affine_lower;
