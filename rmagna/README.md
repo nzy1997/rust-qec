@@ -3195,6 +3195,70 @@ owned preparation, bounded record retention, callback/contraction/arithmetic
 failures, atomic statistics/efficiency alignment, zero/one completed draw,
 undefined metrics and finalization failure accounting.
 
+## Exclusive file calls and between-draw cancellation
+
+`CompiledFileTask::into_exclusive` consumes the shared compiled task and returns
+an `ExclusiveCompiledFileTask`. Its `run`, `inspect`, progress and cancellable
+methods reject simultaneous or reentrant use with the typed
+`ExclusiveFileTaskError::InUse`, before any new decoder or entropy work. A
+per-object nonblocking guard covers validation, callbacks, sampling and final
+metadata. RAII releases it after success, ordinary errors and unwinding caller
+panics. Distinct objects are independent. Owned report serialization happens
+after the call returns. The original immutable `CompiledFileTask` API continues
+to support safe concurrent calls with separate seeds, counters and reports.
+
+`CancellationToken` is sticky and shareable across threads. `cancel()` marks all
+clones; a new cancellation session uses a new token. TaskEvaluator's
+`run_batch_cancellable` and `run_batch_cancellable_with_progress`, the free
+`run_task_batch_cancellable`, and file/compiled/prepared/exclusive `run_cancellable`
+methods check it before each new draw. Their `_with_progress` variants use the
+same check even with a progress interval of ten million. Validation and owned
+preparation retain their ordinary error and resource-admission semantics.
+Cancelling does not change captured inputs, fingerprints or prepared resources.
+
+An observed cancellation returns `RunStatus::Cancelled` (`"cancelled"` in schema 2),
+with no invented failed draw or failure entry. Only committed rows contribute to
+`partial_statistics`, efficiency, records and completed-resource counters. Main
+statistics/estimates are absent. Counts still satisfy requested = completed +
+failed + not_attempted. A cancelled zero-row batch has no provisional estimates.
+Decoder/arithmetic/progress/finalization errors take the usual failure path. A
+last draw that completes the request returns Complete, even if its callback
+sets the token; no next draw exists to cancel. The engine consumes no new RNG
+word or decoder call after observing cancellation at the boundary.
+
+Polling cannot preempt a single long contraction or blocked user decoder. The
+responsiveness check uses the original ten-million-draw request in a bounded
+child process, and deterministic callback rendezvous tests prove exact zero/one
+completed prefixes. Python SIGALRM handler identity and exception delivery need
+a Python embedding. The Rust token does not verify that original assertion;
+its original method remains partial in the coverage ledger. The original native
+signal method is executed separately in an isolated reference process.
+
+```rust
+use std::{collections::BTreeMap, path::Path};
+use rmagna::circuit::{ParseOptions, parse_circuit};
+use rmagna::file_api::{FileTask, FileTaskOptions};
+use rmagna::noise::NoiseSampling;
+use rmagna::runtime::ControllerRegistry;
+use rmagna::task::{CancellationToken, RunStatus, TaskOptions, TaskRunOptions, parse_task};
+let parse = ParseOptions::default();
+let circuit = parse_circuit("H 0\nM 0", &parse)?;
+let modules = parse_task("{}", Path::new("."), &TaskOptions::default())?
+    .load_modules(&circuit, &parse)?;
+let file = FileTask::from_loaded(circuit, modules, &ControllerRegistry::default(),
+    NoiseSampling::Physical, FileTaskOptions::default(), BTreeMap::new())?;
+let exclusive = file.compile()?.into_exclusive();
+let token = CancellationToken::new();
+token.cancel();
+let report = exclusive.run_cancellable(&TaskRunOptions::default(), &token)?;
+assert_eq!(report.raw_result().status, RunStatus::Cancelled);
+assert_eq!(report.raw_result().completed, 0);
+assert!(report.to_json()?["estimates"].is_null());
+let completed = exclusive.run_cancellable(&TaskRunOptions::default(), &CancellationToken::new())?;
+assert_eq!(completed.raw_result().status, RunStatus::Complete);
+# Ok::<(), Box<dyn std::error::Error>>(())
+```
+
 ## Numerical batch-result payloads
 
 `task::export_batch_metrics` turns a typed batch result into JSON-compatible

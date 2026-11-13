@@ -1,6 +1,6 @@
 use rmagna::costs::ExecutionCosts;
 use rmagna::file_api::{FileEnumerationReport, FileRunReport};
-use rmagna::task::{BatchExportError, RunStatus};
+use rmagna::task::BatchExportError;
 use serde_json::{Value, json};
 use std::io::{self, Write};
 
@@ -13,10 +13,7 @@ pub fn export_failure(report: &FileRunReport, error: &BatchExportError) -> Value
     let raw = report.raw_result();
     let mut value = report.metadata().clone();
     value["status"] = json!("failed");
-    value["engine_status"] = json!(match raw.status {
-        RunStatus::Complete => "complete",
-        RunStatus::Failed => "failed",
-    });
+    value["engine_status"] = json!(raw.status.as_str());
     for (key, count) in [
         ("requested", raw.requested),
         ("completed", raw.completed),

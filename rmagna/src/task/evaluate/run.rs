@@ -1,5 +1,7 @@
 //! Seeded batches with exact statistics and explicit partial-failure accounting.
 use super::*;
+mod cancellation;
+pub use cancellation::CancellationToken;
 mod progress;
 mod stream;
 use crate::costs::{ExecutionCosts, ExecutionLimits};
@@ -15,6 +17,7 @@ pub use stream::{
 pub(crate) struct RunHooks<'run, 'callback, I> {
     pub inspect: I,
     pub progress: Option<&'run mut ProgressObserver<'callback>>,
+    pub cancellation: Option<&'run CancellationToken>,
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -64,6 +67,16 @@ impl TaskRunOptions {
 pub enum RunStatus {
     Complete,
     Failed,
+    Cancelled,
+}
+impl RunStatus {
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::Complete => "complete",
+            Self::Failed => "failed",
+            Self::Cancelled => "cancelled",
+        }
+    }
 }
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum RunPhase {
@@ -253,7 +266,7 @@ impl TaskEvaluator {
         options: &TaskRunOptions,
         meter: &ExecutionMeter,
     ) -> Result<TaskRunResult, TaskError> {
-        self.run_batch_monitored(options, meter, None)
+        self.run_batch_monitored(options, meter, None, None)
     }
     /// Observe a continuous seeded batch without storing progress events or
     /// changing its draw stream. Observer errors retain the committed prefix.
@@ -266,13 +279,53 @@ impl TaskEvaluator {
             options,
             &ExecutionMeter::new(options.execution_limits),
             Some(observer),
+            None,
+        )
+    }
+    /// Stop before the next draw once the token is observed. Completed rows are
+    /// retained only as provisional statistics; no failed draw is invented.
+    pub fn run_batch_cancellable(
+        &self,
+        options: &TaskRunOptions,
+        token: &CancellationToken,
+    ) -> Result<TaskRunResult, TaskError> {
+        self.run_batch_monitored(
+            options,
+            &ExecutionMeter::new(options.execution_limits),
+            None,
+            Some(token),
+        )
+    }
+    pub fn run_batch_cancellable_with_progress(
+        &self,
+        options: &TaskRunOptions,
+        token: &CancellationToken,
+        observer: &mut ProgressObserver<'_>,
+    ) -> Result<TaskRunResult, TaskError> {
+        self.run_batch_monitored(
+            options,
+            &ExecutionMeter::new(options.execution_limits),
+            Some(observer),
+            Some(token),
         )
     }
     fn run_batch_monitored(
         &self,
         options: &TaskRunOptions,
         meter: &ExecutionMeter,
+        observer: Option<&mut ProgressObserver<'_>>,
+        cancellation: Option<&CancellationToken>,
+    ) -> Result<TaskRunResult, TaskError> {
+        let mut random = SplitMix64::new(options.seed);
+        self.run_batch_with_rng(options, meter, observer, cancellation, &mut random)
+    }
+    fn run_batch_with_rng(
+        &self,
+        options: &TaskRunOptions,
+        meter: &ExecutionMeter,
         mut observer: Option<&mut ProgressObserver<'_>>,
+        cancellation: Option<&CancellationToken>,
+        random: &mut impl RandomSource,
     ) -> Result<TaskRunResult, TaskError> {
         let started = Instant::now();
         if let Some(observer) = observer.as_deref_mut() {
@@ -282,16 +335,20 @@ impl TaskEvaluator {
         let has_error = self.target.is_some() || self.error_parities.is_some();
         let mut accumulator = Accumulator::new(dimensions, has_error, options.statistics)?;
         let mut records = (!self.requested.is_empty()).then(Vec::new);
-        let mut random = SplitMix64::new(options.seed);
         let mut failures = Vec::new();
         let mut failed = 0;
         let mut sampling = Instant::now();
         let mut sampling_seconds = 0.0;
+        let mut cancelled = false;
         for shot in 0..options.shots {
+            if cancellation.is_some_and(CancellationToken::is_cancelled) {
+                cancelled = true;
+                break;
+            }
             let mut phase = RunPhase::Sampling;
             let committed_records = match sample_and_commit(
                 self,
-                &mut random,
+                random,
                 meter,
                 &mut accumulator,
                 &options.statistics.arithmetic,
@@ -366,10 +423,12 @@ impl TaskEvaluator {
             }
         };
         let completed = accumulator.statistics.count();
-        let status = if failures.is_empty() {
-            RunStatus::Complete
-        } else {
+        let status = if !failures.is_empty() {
             RunStatus::Failed
+        } else if cancelled {
+            RunStatus::Cancelled
+        } else {
+            RunStatus::Complete
         };
         let (statistics, partial_statistics) = if status == RunStatus::Complete {
             (statistics, None)
@@ -421,6 +480,34 @@ pub fn run_task_batch(
         RunHooks {
             inspect: |_: &TaskEvaluator, _: ExecutionCosts, _: f64| (),
             progress: None,
+            cancellation: None,
+        },
+    )
+    .map(|(result, _)| result)
+}
+
+/// Prepare once, then observe cancellation before each new draw. Preparation
+/// and invalid-input failures keep ordinary precedence and accounting.
+pub fn run_task_batch_cancellable(
+    physical: &Circuit,
+    modules: &LoadedModules,
+    registry: &ControllerRegistry,
+    evaluation: EvaluationOptions,
+    sampling: &NoiseSampling,
+    run: &TaskRunOptions,
+    token: &CancellationToken,
+) -> Result<TaskRunResult, TaskError> {
+    run_task_batch_inspected(
+        physical,
+        modules,
+        registry,
+        evaluation,
+        sampling,
+        run,
+        RunHooks {
+            inspect: |_: &TaskEvaluator, _: ExecutionCosts, _: f64| (),
+            progress: None,
+            cancellation: Some(token),
         },
     )
     .map(|(result, _)| result)
@@ -454,7 +541,8 @@ where
     match prepared {
         Ok(evaluator) => {
             let preparation_costs = meter.snapshot();
-            let mut result = evaluator.run_batch_monitored(run, &meter, hooks.progress)?;
+            let mut result =
+                evaluator.run_batch_monitored(run, &meter, hooks.progress, hooks.cancellation)?;
             result.timings.preparation_seconds = Some(preparation_seconds);
             result.timings.total_seconds = started.elapsed().as_secs_f64();
             let metadata = (hooks.inspect)(&evaluator, preparation_costs, preparation_seconds);

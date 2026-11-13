@@ -260,6 +260,16 @@ fn validate(result: &TaskRunResult) -> Result<(), BatchExportError> {
                 "complete results require complete statistics and no failures or provisional statistics",
             ));
         }
+    } else if result.status == RunStatus::Cancelled {
+        if result.statistics.is_some()
+            || result.failed != 0
+            || result.not_attempted == 0
+            || !result.failures.is_empty()
+        {
+            return Err(invalid(
+                "cancelled results require unattempted draws, absent main statistics and no failed draw or failure entry",
+            ));
+        }
     } else if result.statistics.is_some() || result.failures.is_empty() {
         return Err(invalid(
             "failed results require failures and absent main statistics",
@@ -287,6 +297,7 @@ fn validate(result: &TaskRunResult) -> Result<(), BatchExportError> {
     } else {
         if result.failed == 0
             && result.not_attempted != 0
+            && result.status != RunStatus::Cancelled
             && !result
                 .failures
                 .iter()
@@ -510,7 +521,7 @@ pub fn export_batch_metrics(
             output.insert(name.to_owned(), Value::Null);
         }
     }
-    if result.status == RunStatus::Failed {
+    if result.status != RunStatus::Complete {
         let partial = result
             .partial_statistics
             .as_ref()
@@ -539,13 +550,7 @@ pub fn export_batch_metrics(
         .transpose()?
         .unwrap_or(Value::Null);
     output.insert("weights".to_owned(), weights);
-    output.insert(
-        "status".to_owned(),
-        json!(match result.status {
-            RunStatus::Complete => "complete",
-            RunStatus::Failed => "failed",
-        }),
-    );
+    output.insert("status".to_owned(), json!(result.status.as_str()));
     for (name, count) in [
         ("requested", result.requested),
         ("completed", result.completed),

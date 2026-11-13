@@ -31,10 +31,10 @@ pub use enumeration::{
     TaskWeightSector,
 };
 pub use run::{
-    BatchProgress, ProgressObserver, ProgressReceipt, RunFailure, RunPhase, RunStatus, RunTimings,
-    StreamRecordRetention, TaskRunOptions, TaskRunResult, TaskRunStatistics, TaskStream,
-    TaskStreamIdentity, TaskStreamOptions, TaskStreamReport, TaskStreamStatus, TaskVariances,
-    run_task_batch,
+    BatchProgress, CancellationToken, ProgressObserver, ProgressReceipt, RunFailure, RunPhase,
+    RunStatus, RunTimings, StreamRecordRetention, TaskRunOptions, TaskRunResult, TaskRunStatistics,
+    TaskStream, TaskStreamIdentity, TaskStreamOptions, TaskStreamReport, TaskStreamStatus,
+    TaskVariances, run_task_batch, run_task_batch_cancellable,
 };
 pub(crate) use run::{RunHooks, run_task_batch_inspected};
 

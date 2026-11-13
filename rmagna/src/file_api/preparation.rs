@@ -51,19 +51,36 @@ impl PreparedFileTask {
     /// Prior compilation and query preparation remain outside this batch's
     /// quota, RNG, statistics and sampling time. The saved receipt stays visible.
     pub fn run(&self, run: &TaskRunOptions) -> Result<FileRunReport, FileApiError> {
-        self.run_observed(run, None)
+        self.run_observed(run, None, None)
     }
     pub fn run_with_progress(
         &self,
         run: &TaskRunOptions,
         observer: &mut ProgressObserver<'_>,
     ) -> Result<FileRunReport, FileApiError> {
-        self.run_observed(run, Some(observer))
+        self.run_observed(run, Some(observer), None)
+    }
+    /// Cancel between draws independently of the progress interval.
+    pub fn run_cancellable(
+        &self,
+        run: &TaskRunOptions,
+        token: &CancellationToken,
+    ) -> Result<FileRunReport, FileApiError> {
+        self.run_observed(run, None, Some(token))
+    }
+    pub fn run_cancellable_with_progress(
+        &self,
+        run: &TaskRunOptions,
+        token: &CancellationToken,
+        observer: &mut ProgressObserver<'_>,
+    ) -> Result<FileRunReport, FileApiError> {
+        self.run_observed(run, Some(observer), Some(token))
     }
     fn run_observed(
         &self,
         run: &TaskRunOptions,
         mut observer: Option<&mut ProgressObserver<'_>>,
+        cancellation: Option<&CancellationToken>,
     ) -> Result<FileRunReport, FileApiError> {
         if let Some(observer) = observer.as_deref_mut() {
             observer.reset();
@@ -75,10 +92,7 @@ impl PreparedFileTask {
             .task
             .preparation_descriptor(&self.report.options, Some(run), interval)
             .map_err(|(_, error)| error)?;
-        let mut report = match observer {
-            Some(observer) => compiled.run_with_progress(run, observer)?,
-            None => compiled.run(run)?,
-        };
+        let mut report = compiled.run_observed(run, observer, cancellation)?;
         report
             .metadata
             .as_object_mut()
