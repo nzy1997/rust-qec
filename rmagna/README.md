@@ -6419,3 +6419,57 @@ the same mean error, and omitting only the X physical guard fails the shared-con
 history assertion. The independent models separately show physical error one
 for that omitted-guard input. All three compile, with test exits 0/101/101. The owning Rust
 test carries MPL-2.0 attribution. No full parity or performance claim is made.
+
+## Source-resource certificates for owned original branches
+
+`OriginalBranch::compile_before_projection` admits a resource for the complete
+coherent source, then applies the collected true-record projections. Each call
+takes explicit immutable `OriginalSourceCertificateOptions`: a quotient-rank
+ceiling, resource policy and optional catalogue, phase-term cap, raw-path and
+projection-row limits, conservative geometry budget and completed pair limits.
+The returned certificate exposes the actual source resource, owned projected
+states, probability and observed pair work. Retained source storage, allocator
+overhead and scalar limbs are outside its geometry accounting.
+
+A tighter source-rank budget is checked even when record projection could later
+remove that phase direction. `compile_after_absorption` provides the separate
+record-first absorbed-branch certificate described above. Choose the admission
+scope needed by the caller. Errors leave the branch and earlier certificates
+usable; Native selection errors never select a fiber strategy automatically.
+
+```rust
+use rmagna::{clifford::CliffordCircuit, gf2::BitVector,
+    instrument::{OriginalAssignment, OriginalError, OriginalGate as G,
+        OriginalInstrument, OriginalLimits, OriginalNetworkResource,
+        OriginalOperation, OriginalSourceCertificateOptions, ReadoutBasis},
+    phase::NativePhaseOptions, scalar::ScalarArithmetic,
+    unitary::CompilerStrategy};
+let a = ScalarArithmetic::default();
+let operations = vec![
+    OriginalOperation { id: "h".into(), gate: G::H(0) },
+    OriginalOperation { id: "t".into(), gate: G::Phase { wires: vec![0], turns: 1 } },
+    OriginalOperation { id: "m".into(), gate: G::Destructive {
+        wire: 0, basis: ReadoutBasis::X, record: "m".into() } },
+];
+let instrument = OriginalInstrument::new(vec![0], vec![],
+    CliffordCircuit::computational(BitVector::zeros(1)?)?, operations,
+    vec![], OriginalLimits::default(), &a)?;
+let branch = instrument.compile(&OriginalAssignment {
+    true_values: vec![("m".into(), false)], ..Default::default()
+}, CompilerStrategy::ParityCopies, &a)?;
+let options = OriginalSourceCertificateOptions {
+    resource: OriginalNetworkResource::Native(NativePhaseOptions::default()),
+    max_quotient_rank: 1, max_terms: 2, ..Default::default()
+};
+let certificate = branch.compile_before_projection(&options, &a)?;
+assert_eq!(certificate.statistics().quotient_rank, 1);
+let refused = OriginalSourceCertificateOptions { max_quotient_rank: 0, ..options };
+assert!(matches!(branch.compile_before_projection(&refused, &a),
+    Err(OriginalError::ResourceLimit { option: "source.max_quotient_rank", .. })));
+assert!(!certificate.probability().is_zero());
+# Ok::<(), Box<dyn std::error::Error>>(())
+```
+
+This explicit source admission replaces the original mutable simulator option
+change for this finite contract. It does not establish Python cache identity,
+Native object layout, a performance result or complete original API coverage.

@@ -55,6 +55,13 @@ pub use trace::{
     PreparedOriginalNetworkRecords, UniformOriginalRecords,
 };
 
+#[path = "original_source_certificate.rs"]
+mod source_certificate;
+pub use source_certificate::{
+    OriginalSourceCertificate, OriginalSourceCertificateOptions,
+    OriginalSourceCertificateStatistics,
+};
+
 #[path = "original_certificate.rs"]
 mod certificate;
 pub use certificate::{
@@ -912,23 +919,32 @@ impl OriginalBranch {
         let mut terms = Vec::new();
         for k in expansion.entries() {
             self.geometry(k.width(), k.columns().len(), self.fixed.len())?;
-            let mut rows = Vec::with_capacity(self.fixed.len());
-            let mut rhs = BitVector::zeros(self.fixed.len())?;
-            for (i, &(q, b)) in self.fixed.iter().enumerate() {
-                let mut row = BitVector::zeros(k.columns().len())?;
-                for (j, c) in k.columns().iter().enumerate() {
-                    row.set(j, c.get(q)?)?;
-                }
-                rows.push(row);
-                rhs.set(i, k.offset().get(q)? ^ b)?;
-            }
-            if let Some(k) = k.constrain_paths(&rows, &rhs)?
-                && let Some(k) = k.retain_boundary(&self.keep)?.contract(a)?
-            {
+            if let Some(k) = self.project_entry(k, a)? {
                 terms.push(k);
             }
         }
         Ok(terms)
+    }
+    // Shared record equations preserve source-selection order in both routes.
+    fn project_entry(
+        &self,
+        k: &AffineKet,
+        a: &ScalarArithmetic,
+    ) -> Result<Option<AffineKet>, OriginalError> {
+        let mut rows = Vec::with_capacity(self.fixed.len());
+        let mut rhs = BitVector::zeros(self.fixed.len())?;
+        for (i, &(q, b)) in self.fixed.iter().enumerate() {
+            let mut row = BitVector::zeros(k.columns().len())?;
+            for (j, c) in k.columns().iter().enumerate() {
+                row.set(j, c.get(q)?)?;
+            }
+            rows.push(row);
+            rhs.set(i, k.offset().get(q)? ^ b)?;
+        }
+        match k.constrain_paths(&rows, &rhs)? {
+            Some(k) => Ok(k.retain_boundary(&self.keep)?.contract(a)?),
+            None => Ok(None),
+        }
     }
     fn geometry(&self, width: usize, paths: usize, rows: usize) -> Result<(), OriginalError> {
         admit(

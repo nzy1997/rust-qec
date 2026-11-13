@@ -7,9 +7,9 @@ implement a simulator or claim reproduction of the paper's precision curves.
 
 ## Current coverage
 
-The source-bound ledger currently has 195 verified, 2 partial and 155 unmapped
+The source-bound ledger currently has 214 verified, 2 partial and 136 unmapped
 original methods, with zero architecture-specific core exclusions. It requires
-219 distinct Rust witnesses from 221 declarations across 90 targets. Strict
+238 distinct Rust witnesses from 240 declarations across 99 targets. Strict
 complete parity intentionally exits 2. The detailed per-change sections below
 retain their historical inventory snapshots; `coverage.json` is authoritative.
 
@@ -3196,6 +3196,57 @@ suffix layers, readout ancillas, private construction counters and internal
 layouts describe different scopes. Actual Rust construction/query accounting,
 stable warm families and bounded resources establish the behavioral counterpart.
 These finite correctness witnesses do not establish Monte Carlo precision or
-paper performance. Current coverage is 195 verified, 2 partial and 155 unmapped,
+paper performance. At this batch snapshot, coverage was 195 verified, 2 partial
+and 155 unmapped,
 with zero architecture exclusions, 219 distinct witnesses, 221 declarations and
 90 mapped targets. Complete parity and paper experiments remain incomplete.
+
+
+## Original affine histories, owned branches and repeated noise laws
+
+Nineteen complete original methods have owning tests in one ordered batch:
+
+```sh
+cargo test --locked -p rmagna --test original_capped_affine --test original_unified_core
+cargo test --locked -p rmagna --test original_unified_admission --test original_unified_networks
+cargo test --locked -p rmagna --test original_packed_guards --test original_noise_laws
+cargo test --locked -p rmagna --test original_packed_distribution --test original_literal_ids
+cargo test --locked -p rmagna --test original_resource_revalidation
+```
+
+The affine-history tests preserve the original finite draw counts, biased exact
+weights, all Walsh interference zeros and adaptive conditional proposals. Eight
+82-record draws retain a support of size 2^81 without enumerating it. All eight
+supplied-noise assignments retain likelihood 3/2 and independently recover physical
+acceptance 19/28 and target success 3/14. Rust's doubled probability support and
+Native's mother-term counters have different scopes; fixed resources and actual
+warm compilations provide explicit Rust observations.
+
+Literal Gaussian path sums cover 140 cases, while 60 small noncommuting networks
+retain every complex amplitude, initial phase, measurement projection and
+chronological reset environment. Fixed input, positive/negative Y faults, CCZ
+certificates, invalid path/arity/lifetime boundaries and literal slash IDs have
+independent exact checks. Typed gate arity and immutable collected branches
+replace the corresponding dynamically typed and private cache interfaces.
+
+Repeated noise laws retain exact source categories, guards, rational survival,
+importance products and 19+18 resumed entropy continuity. All 131 quarter-noise
+locations and 4096 draws pass strict marginal and joint integer bounds across
+64-bit boundaries. Canonical commuting Pauli-factor order, immutable Rust plans
+and Rust entropy are documented substitutions for Native tuple/cache/packed
+interfaces. These are finite law and correctness witnesses, without throughput
+or cross-language RNG claims.
+
+The new source-resource certificate admits the complete coherent source before
+record projection, with explicit Native selection and resource limits. Rank-zero
+recompilation and Native-policy errors cannot reuse a stale result or select a
+fiber fallback. Earlier certificates remain usable; observed projected side work
+is distinguished from source term counts. The API and a compiling example are
+in the rmagna README.
+
+Current coverage is 214 verified, 2 partial and 136 unmapped, with zero architecture
+exclusions: 238 distinct witnesses from 240 declarations across 99 mapped targets.
+Remaining original methods, full public compatibility, Monte Carlo precision and
+paper-scale performance remain incomplete. Complete-parity exit 2 is intentional;
+actual fresh report creation and current source/ledger/execution bindings must
+still validate independently.
