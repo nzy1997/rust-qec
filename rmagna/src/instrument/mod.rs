@@ -904,3 +904,18 @@ mod original_selection_contracts;
 
 #[cfg(test)]
 mod original_zero_projection;
+
+#[cfg(test)]
+mod original_feedback_support;
+
+#[cfg(test)]
+mod original_virtual_clifford_contracts;
+
+#[cfg(test)]
+mod original_virtual_trace_contracts;
+
+#[cfg(test)]
+mod original_terminal_virtual_contracts;
+
+#[cfg(test)]
+mod original_pauli_reuse_contracts;

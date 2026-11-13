@@ -1,0 +1,4866 @@
+{
+  "provenance": {
+    "upstream_commit": "56847478c840395735146ef1e1ccdc3d8aedc10f",
+    "sources": {
+      "tests/core/test_pauli_feedback_reuse.py": "ccd1476bda7dbdd7786d18d8defbabc7eb66d07f322571ce1564f4ea5b90fc4d",
+      "tests/core/test_virtual_clifford_feedback.py": "775bd9cfeb488d5824b1fcfd39904170e7f63148064b5ca147956d5cc3c2f059"
+    },
+    "binaries": {
+      "_native.cpython-312-darwin.so": "8764804ce11a1ef0ce4ab7df71d72811d1ad6d693b55c564e3c777a65bfcc9e2",
+      "_native_testing.cpython-312-darwin.so": "1d9e0fa8bcaf7d165fe30669eea53c93ce2fa935904dc31b93cb0a4b086207f5"
+    }
+  },
+  "original_method_ast_sha256": "5a5a13eddf0ff230fdfa3c3de569284ee7957925d70a4fce080d573f0881ce7a",
+  "capture_ast_sha256": "8ac49d99bcbdd8f0bc8c9700fc82c024d2a06f5aefc943b87fce47da2a269ee8",
+  "cases": [
+    {
+      "seed": 0,
+      "noise_gates": {},
+      "report_flips": [
+        "m0"
+      ],
+      "likelihood_ratio": "(1, 1)",
+      "callback_inputs": [
+        [
+          0,
+          0
+        ],
+        [
+          1
+        ],
+        [
+          1
+        ]
+      ],
+      "draw": {
+        "acceptance": 0.2928932188134525,
+        "error": 0.042893218813452476,
+        "moments": [
+          0.0,
+          0.0,
+          0.2928932188134525
+        ],
+        "scientific": [
+          [
+            0.585786437626905,
+            -1
+          ],
+          [
+            0.6862915010152396,
+            -4
+          ],
+          [
+            0.0,
+            0
+          ],
+          [
+            0.0,
+            0
+          ],
+          [
+            0.585786437626905,
+            -1
+          ]
+        ],
+        "underflow_columns": [],
+        "overflow_columns": [],
+        "weight_scientific": [
+          0.585786437626905,
+          -1
+        ],
+        "noise_weight_scientific": [
+          0.5,
+          1
+        ],
+        "sampled_records": [
+          0,
+          0,
+          1
+        ],
+        "decoder_calls": 2,
+        "recovery_decoder_calls": 1,
+        "sampled_parities": 4,
+        "exact": {
+          "history_mass": {
+            "coefficients": [
+              2,
+              -1,
+              0,
+              1
+            ],
+            "power": -5
+          },
+          "acceptance": {
+            "coefficients": [
+              2,
+              -1,
+              0,
+              1
+            ],
+            "power": -5
+          },
+          "error": {
+            "coefficients": [
+              3,
+              -2,
+              0,
+              2
+            ],
+            "power": -6
+          },
+          "moments": [
+            {
+              "coefficients": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "power": 0
+            },
+            {
+              "coefficients": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "power": 0
+            },
+            {
+              "coefficients": [
+                2,
+                -1,
+                0,
+                1
+              ],
+              "power": -5
+            }
+          ],
+          "target_success": {
+            "coefficients": [
+              1,
+              0,
+              0,
+              0
+            ],
+            "power": -6
+          },
+          "noise_likelihood_ratio_hex": [
+            "0x1",
+            "0x1"
+          ],
+          "proposal_probability": {
+            "numerator": 1,
+            "denominator": 16
+          }
+        }
+      },
+      "literal_raw": [
+        {
+          "coefficients": [
+            2,
+            -1,
+            0,
+            1
+          ],
+          "power": -5
+        },
+        {
+          "coefficients": [
+            2,
+            -1,
+            0,
+            1
+          ],
+          "power": -5
+        },
+        {
+          "coefficients": [
+            3,
+            -2,
+            0,
+            2
+          ],
+          "power": -6
+        },
+        {
+          "coefficients": [
+            0,
+            0,
+            0,
+            0
+          ],
+          "power": 0
+        },
+        {
+          "coefficients": [
+            0,
+            0,
+            0,
+            0
+          ],
+          "power": 0
+        },
+        {
+          "coefficients": [
+            2,
+            -1,
+            0,
+            1
+          ],
+          "power": -5
+        }
+      ]
+    },
+    {
+      "seed": 1,
+      "noise_gates": {},
+      "report_flips": [],
+      "likelihood_ratio": "(1, 1)",
+      "callback_inputs": [
+        [
+          1,
+          1
+        ],
+        [
+          0
+        ],
+        [
+          0
+        ]
+      ],
+      "draw": {
+        "acceptance": 0.0,
+        "error": 0.0,
+        "moments": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scientific": [
+          [
+            0.0,
+            0
+          ],
+          [
+            0.0,
+            0
+          ],
+          [
+            0.0,
+            0
+          ],
+          [
+            0.0,
+            0
+          ],
+          [
+            0.0,
+            0
+          ]
+        ],
+        "underflow_columns": [],
+        "overflow_columns": [],
+        "weight_scientific": [
+          0.585786437626905,
+          -1
+        ],
+        "noise_weight_scientific": [
+          0.5,
+          1
+        ],
+        "sampled_records": [
+          1,
+          1,
+          0
+        ],
+        "decoder_calls": 2,
+        "recovery_decoder_calls": 1,
+        "sampled_parities": 4,
+        "exact": {
+          "history_mass": {
+            "coefficients": [
+              2,
+              -1,
+              0,
+              1
+            ],
+            "power": -5
+          },
+          "acceptance": {
+            "coefficients": [
+              0,
+              0,
+              0,
+              0
+            ],
+            "power": 0
+          },
+          "error": {
+            "coefficients": [
+              0,
+              0,
+              0,
+              0
+            ],
+            "power": 0
+          },
+          "moments": [
+            {
+              "coefficients": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "power": 0
+            },
+            {
+              "coefficients": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "power": 0
+            },
+            {
+              "coefficients": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "power": 0
+            }
+          ],
+          "target_success": {
+            "coefficients": [
+              0,
+              0,
+              0,
+              0
+            ],
+            "power": 0
+          },
+          "noise_likelihood_ratio_hex": [
+            "0x1",
+            "0x1"
+          ],
+          "proposal_probability": {
+            "numerator": 1,
+            "denominator": 16
+          }
+        }
+      },
+      "literal_raw": [
+        {
+          "coefficients": [
+            2,
+            -1,
+            0,
+            1
+          ],
+          "power": -5
+        },
+        {
+          "coefficients": [
+            0,
+            0,
+            0,
+            0
+          ],
+          "power": 0
+        },
+        {
+          "coefficients": [
+            0,
+            0,
+            0,
+            0
+          ],
+          "power": 0
+        },
+        {
+          "coefficients": [
+            0,
+            0,
+            0,
+            0
+          ],
+          "power": 0
+        },
+        {
+          "coefficients": [
+            0,
+            0,
+            0,
+            0
+          ],
+          "power": 0
+        },
+        {
+          "coefficients": [
+            0,
+            0,
+            0,
+            0
+          ],
+          "power": 0
+        }
+      ]
+    },
+    {
+      "seed": 2,
+      "noise_gates": {
+        "op7": [
+          {
+            "kind": "X",
+            "qubits": [
+              2
+            ]
+          }
+        ]
+      },
+      "report_flips": [],
+      "likelihood_ratio": "(1, 1)",
+      "callback_inputs": [
+        [
+          1,
+          1
+        ],
+        [
+          1
+        ],
+        [
+          0
+        ]
+      ],
+      "draw": {
+        "acceptance": 0.0,
+        "error": 0.0,
+        "moments": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scientific": [
+          [
+            0.0,
+            0
+          ],
+          [
+            0.0,
+            0
+          ],
+          [
+            0.0,
+            0
+          ],
+          [
+            0.0,
+            0
+          ],
+          [
+            0.0,
+            0
+          ]
+        ],
+        "underflow_columns": [],
+        "overflow_columns": [],
+        "weight_scientific": [
+          0.8535533905932737,
+          1
+        ],
+        "noise_weight_scientific": [
+          0.5,
+          1
+        ],
+        "sampled_records": [
+          1,
+          1,
+          1
+        ],
+        "decoder_calls": 2,
+        "recovery_decoder_calls": 1,
+        "sampled_parities": 4,
+        "exact": {
+          "history_mass": {
+            "coefficients": [
+              2,
+              1,
+              0,
+              -1
+            ],
+            "power": -5
+          },
+          "acceptance": {
+            "coefficients": [
+              0,
+              0,
+              0,
+              0
+            ],
+            "power": 0
+          },
+          "error": {
+            "coefficients": [
+              0,
+              0,
+              0,
+              0
+            ],
+            "power": 0
+          },
+          "moments": [
+            {
+              "coefficients": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "power": 0
+            },
+            {
+              "coefficients": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "power": 0
+            },
+            {
+              "coefficients": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "power": 0
+            }
+          ],
+          "target_success": {
+            "coefficients": [
+              0,
+              0,
+              0,
+              0
+            ],
+            "power": 0
+          },
+          "noise_likelihood_ratio_hex": [
+            "0x1",
+            "0x1"
+          ],
+          "proposal_probability": {
+            "numerator": 1,
+            "denominator": 16
+          }
+        }
+      },
+      "literal_raw": [
+        {
+          "coefficients": [
+            2,
+            1,
+            0,
+            -1
+          ],
+          "power": -5
+        },
+        {
+          "coefficients": [
+            0,
+            0,
+            0,
+            0
+          ],
+          "power": 0
+        },
+        {
+          "coefficients": [
+            0,
+            0,
+            0,
+            0
+          ],
+          "power": 0
+        },
+        {
+          "coefficients": [
+            0,
+            0,
+            0,
+            0
+          ],
+          "power": 0
+        },
+        {
+          "coefficients": [
+            0,
+            0,
+            0,
+            0
+          ],
+          "power": 0
+        },
+        {
+          "coefficients": [
+            0,
+            0,
+            0,
+            0
+          ],
+          "power": 0
+        }
+      ]
+    },
+    {
+      "seed": 3,
+      "noise_gates": {},
+      "report_flips": [],
+      "likelihood_ratio": "(1, 1)",
+      "callback_inputs": [
+        [
+          1,
+          1
+        ],
+        [
+          1
+        ],
+        [
+          0
+        ]
+      ],
+      "draw": {
+        "acceptance": 0.0,
+        "error": 0.0,
+        "moments": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scientific": [
+          [
+            0.0,
+            0
+          ],
+          [
+            0.0,
+            0
+          ],
+          [
+            0.0,
+            0
+          ],
+          [
+            0.0,
+            0
+          ],
+          [
+            0.0,
+            0
+          ]
+        ],
+        "underflow_columns": [],
+        "overflow_columns": [],
+        "weight_scientific": [
+          0.8535533905932737,
+          1
+        ],
+        "noise_weight_scientific": [
+          0.5,
+          1
+        ],
+        "sampled_records": [
+          1,
+          1,
+          1
+        ],
+        "decoder_calls": 2,
+        "recovery_decoder_calls": 1,
+        "sampled_parities": 4,
+        "exact": {
+          "history_mass": {
+            "coefficients": [
+              2,
+              1,
+              0,
+              -1
+            ],
+            "power": -5
+          },
+          "acceptance": {
+            "coefficients": [
+              0,
+              0,
+              0,
+              0
+            ],
+            "power": 0
+          },
+          "error": {
+            "coefficients": [
+              0,
+              0,
+              0,
+              0
+            ],
+            "power": 0
+          },
+          "moments": [
+            {
+              "coefficients": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "power": 0
+            },
+            {
+              "coefficients": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "power": 0
+            },
+            {
+              "coefficients": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "power": 0
+            }
+          ],
+          "target_success": {
+            "coefficients": [
+              0,
+              0,
+              0,
+              0
+            ],
+            "power": 0
+          },
+          "noise_likelihood_ratio_hex": [
+            "0x1",
+            "0x1"
+          ],
+          "proposal_probability": {
+            "numerator": 1,
+            "denominator": 16
+          }
+        }
+      },
+      "literal_raw": [
+        {
+          "coefficients": [
+            2,
+            1,
+            0,
+            -1
+          ],
+          "power": -5
+        },
+        {
+          "coefficients": [
+            0,
+            0,
+            0,
+            0
+          ],
+          "power": 0
+        },
+        {
+          "coefficients": [
+            0,
+            0,
+            0,
+            0
+          ],
+          "power": 0
+        },
+        {
+          "coefficients": [
+            0,
+            0,
+            0,
+            0
+          ],
+          "power": 0
+        },
+        {
+          "coefficients": [
+            0,
+            0,
+            0,
+            0
+          ],
+          "power": 0
+        },
+        {
+          "coefficients": [
+            0,
+            0,
+            0,
+            0
+          ],
+          "power": 0
+        }
+      ]
+    },
+    {
+      "seed": 4,
+      "noise_gates": {},
+      "report_flips": [],
+      "likelihood_ratio": "(1, 1)",
+      "callback_inputs": [
+        [
+          1,
+          0
+        ],
+        [
+          0
+        ],
+        [
+          1
+        ]
+      ],
+      "draw": {
+        "acceptance": 0.0,
+        "error": 0.0,
+        "moments": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scientific": [
+          [
+            0.0,
+            0
+          ],
+          [
+            0.0,
+            0
+          ],
+          [
+            0.0,
+            0
+          ],
+          [
+            0.0,
+            0
+          ],
+          [
+            0.0,
+            0
+          ]
+        ],
+        "underflow_columns": [],
+        "overflow_columns": [],
+        "weight_scientific": [
+          0.8535533905932737,
+          1
+        ],
+        "noise_weight_scientific": [
+          0.5,
+          1
+        ],
+        "sampled_records": [
+          1,
+          0,
+          0
+        ],
+        "decoder_calls": 2,
+        "recovery_decoder_calls": 1,
+        "sampled_parities": 4,
+        "exact": {
+          "history_mass": {
+            "coefficients": [
+              2,
+              1,
+              0,
+              -1
+            ],
+            "power": -5
+          },
+          "acceptance": {
+            "coefficients": [
+              0,
+              0,
+              0,
+              0
+            ],
+            "power": 0
+          },
+          "error": {
+            "coefficients": [
+              0,
+              0,
+              0,
+              0
+            ],
+            "power": 0
+          },
+          "moments": [
+            {
+              "coefficients": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "power": 0
+            },
+            {
+              "coefficients": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "power": 0
+            },
+            {
+              "coefficients": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "power": 0
+            }
+          ],
+          "target_success": {
+            "coefficients": [
+              0,
+              0,
+              0,
+              0
+            ],
+            "power": 0
+          },
+          "noise_likelihood_ratio_hex": [
+            "0x1",
+            "0x1"
+          ],
+          "proposal_probability": {
+            "numerator": 1,
+            "denominator": 16
+          }
+        }
+      },
+      "literal_raw": [
+        {
+          "coefficients": [
+            2,
+            1,
+            0,
+            -1
+          ],
+          "power": -5
+        },
+        {
+          "coefficients": [
+            0,
+            0,
+            0,
+            0
+          ],
+          "power": 0
+        },
+        {
+          "coefficients": [
+            0,
+            0,
+            0,
+            0
+          ],
+          "power": 0
+        },
+        {
+          "coefficients": [
+            0,
+            0,
+            0,
+            0
+          ],
+          "power": 0
+        },
+        {
+          "coefficients": [
+            0,
+            0,
+            0,
+            0
+          ],
+          "power": 0
+        },
+        {
+          "coefficients": [
+            0,
+            0,
+            0,
+            0
+          ],
+          "power": 0
+        }
+      ]
+    },
+    {
+      "seed": 5,
+      "noise_gates": {},
+      "report_flips": [],
+      "likelihood_ratio": "(1, 1)",
+      "callback_inputs": [
+        [
+          1,
+          0
+        ],
+        [
+          0
+        ],
+        [
+          0
+        ]
+      ],
+      "draw": {
+        "acceptance": 0.0,
+        "error": 0.0,
+        "moments": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scientific": [
+          [
+            0.0,
+            0
+          ],
+          [
+            0.0,
+            0
+          ],
+          [
+            0.0,
+            0
+          ],
+          [
+            0.0,
+            0
+          ],
+          [
+            0.0,
+            0
+          ]
+        ],
+        "underflow_columns": [],
+        "overflow_columns": [],
+        "weight_scientific": [
+          0.8535533905932737,
+          1
+        ],
+        "noise_weight_scientific": [
+          0.5,
+          1
+        ],
+        "sampled_records": [
+          1,
+          0,
+          0
+        ],
+        "decoder_calls": 2,
+        "recovery_decoder_calls": 1,
+        "sampled_parities": 4,
+        "exact": {
+          "history_mass": {
+            "coefficients": [
+              2,
+              1,
+              0,
+              -1
+            ],
+            "power": -5
+          },
+          "acceptance": {
+            "coefficients": [
+              0,
+              0,
+              0,
+              0
+            ],
+            "power": 0
+          },
+          "error": {
+            "coefficients": [
+              0,
+              0,
+              0,
+              0
+            ],
+            "power": 0
+          },
+          "moments": [
+            {
+              "coefficients": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "power": 0
+            },
+            {
+              "coefficients": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "power": 0
+            },
+            {
+              "coefficients": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "power": 0
+            }
+          ],
+          "target_success": {
+            "coefficients": [
+              0,
+              0,
+              0,
+              0
+            ],
+            "power": 0
+          },
+          "noise_likelihood_ratio_hex": [
+            "0x1",
+            "0x1"
+          ],
+          "proposal_probability": {
+            "numerator": 1,
+            "denominator": 16
+          }
+        }
+      },
+      "literal_raw": [
+        {
+          "coefficients": [
+            2,
+            1,
+            0,
+            -1
+          ],
+          "power": -5
+        },
+        {
+          "coefficients": [
+            0,
+            0,
+            0,
+            0
+          ],
+          "power": 0
+        },
+        {
+          "coefficients": [
+            0,
+            0,
+            0,
+            0
+          ],
+          "power": 0
+        },
+        {
+          "coefficients": [
+            0,
+            0,
+            0,
+            0
+          ],
+          "power": 0
+        },
+        {
+          "coefficients": [
+            0,
+            0,
+            0,
+            0
+          ],
+          "power": 0
+        },
+        {
+          "coefficients": [
+            0,
+            0,
+            0,
+            0
+          ],
+          "power": 0
+        }
+      ]
+    },
+    {
+      "seed": 6,
+      "noise_gates": {},
+      "report_flips": [
+        "m0"
+      ],
+      "likelihood_ratio": "(1, 1)",
+      "callback_inputs": [
+        [
+          1,
+          1
+        ],
+        [
+          1
+        ],
+        [
+          0
+        ]
+      ],
+      "draw": {
+        "acceptance": 0.0,
+        "error": 0.0,
+        "moments": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scientific": [
+          [
+            0.0,
+            0
+          ],
+          [
+            0.0,
+            0
+          ],
+          [
+            0.0,
+            0
+          ],
+          [
+            0.0,
+            0
+          ],
+          [
+            0.0,
+            0
+          ]
+        ],
+        "underflow_columns": [],
+        "overflow_columns": [],
+        "weight_scientific": [
+          0.8535533905932737,
+          1
+        ],
+        "noise_weight_scientific": [
+          0.5,
+          1
+        ],
+        "sampled_records": [
+          1,
+          1,
+          1
+        ],
+        "decoder_calls": 2,
+        "recovery_decoder_calls": 1,
+        "sampled_parities": 4,
+        "exact": {
+          "history_mass": {
+            "coefficients": [
+              2,
+              1,
+              0,
+              -1
+            ],
+            "power": -5
+          },
+          "acceptance": {
+            "coefficients": [
+              0,
+              0,
+              0,
+              0
+            ],
+            "power": 0
+          },
+          "error": {
+            "coefficients": [
+              0,
+              0,
+              0,
+              0
+            ],
+            "power": 0
+          },
+          "moments": [
+            {
+              "coefficients": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "power": 0
+            },
+            {
+              "coefficients": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "power": 0
+            },
+            {
+              "coefficients": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "power": 0
+            }
+          ],
+          "target_success": {
+            "coefficients": [
+              0,
+              0,
+              0,
+              0
+            ],
+            "power": 0
+          },
+          "noise_likelihood_ratio_hex": [
+            "0x1",
+            "0x1"
+          ],
+          "proposal_probability": {
+            "numerator": 1,
+            "denominator": 16
+          }
+        }
+      },
+      "literal_raw": [
+        {
+          "coefficients": [
+            2,
+            1,
+            0,
+            -1
+          ],
+          "power": -5
+        },
+        {
+          "coefficients": [
+            0,
+            0,
+            0,
+            0
+          ],
+          "power": 0
+        },
+        {
+          "coefficients": [
+            0,
+            0,
+            0,
+            0
+          ],
+          "power": 0
+        },
+        {
+          "coefficients": [
+            0,
+            0,
+            0,
+            0
+          ],
+          "power": 0
+        },
+        {
+          "coefficients": [
+            0,
+            0,
+            0,
+            0
+          ],
+          "power": 0
+        },
+        {
+          "coefficients": [
+            0,
+            0,
+            0,
+            0
+          ],
+          "power": 0
+        }
+      ]
+    },
+    {
+      "seed": 7,
+      "noise_gates": {},
+      "report_flips": [
+        "m0"
+      ],
+      "likelihood_ratio": "(1, 1)",
+      "callback_inputs": [
+        [
+          1,
+          1
+        ],
+        [
+          0
+        ],
+        [
+          0
+        ]
+      ],
+      "draw": {
+        "acceptance": 0.0,
+        "error": 0.0,
+        "moments": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scientific": [
+          [
+            0.0,
+            0
+          ],
+          [
+            0.0,
+            0
+          ],
+          [
+            0.0,
+            0
+          ],
+          [
+            0.0,
+            0
+          ],
+          [
+            0.0,
+            0
+          ]
+        ],
+        "underflow_columns": [],
+        "overflow_columns": [],
+        "weight_scientific": [
+          0.585786437626905,
+          -1
+        ],
+        "noise_weight_scientific": [
+          0.5,
+          1
+        ],
+        "sampled_records": [
+          1,
+          1,
+          0
+        ],
+        "decoder_calls": 2,
+        "recovery_decoder_calls": 1,
+        "sampled_parities": 4,
+        "exact": {
+          "history_mass": {
+            "coefficients": [
+              2,
+              -1,
+              0,
+              1
+            ],
+            "power": -5
+          },
+          "acceptance": {
+            "coefficients": [
+              0,
+              0,
+              0,
+              0
+            ],
+            "power": 0
+          },
+          "error": {
+            "coefficients": [
+              0,
+              0,
+              0,
+              0
+            ],
+            "power": 0
+          },
+          "moments": [
+            {
+              "coefficients": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "power": 0
+            },
+            {
+              "coefficients": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "power": 0
+            },
+            {
+              "coefficients": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "power": 0
+            }
+          ],
+          "target_success": {
+            "coefficients": [
+              0,
+              0,
+              0,
+              0
+            ],
+            "power": 0
+          },
+          "noise_likelihood_ratio_hex": [
+            "0x1",
+            "0x1"
+          ],
+          "proposal_probability": {
+            "numerator": 1,
+            "denominator": 16
+          }
+        }
+      },
+      "literal_raw": [
+        {
+          "coefficients": [
+            2,
+            -1,
+            0,
+            1
+          ],
+          "power": -5
+        },
+        {
+          "coefficients": [
+            0,
+            0,
+            0,
+            0
+          ],
+          "power": 0
+        },
+        {
+          "coefficients": [
+            0,
+            0,
+            0,
+            0
+          ],
+          "power": 0
+        },
+        {
+          "coefficients": [
+            0,
+            0,
+            0,
+            0
+          ],
+          "power": 0
+        },
+        {
+          "coefficients": [
+            0,
+            0,
+            0,
+            0
+          ],
+          "power": 0
+        },
+        {
+          "coefficients": [
+            0,
+            0,
+            0,
+            0
+          ],
+          "power": 0
+        }
+      ]
+    },
+    {
+      "seed": 8,
+      "noise_gates": {
+        "op7": [
+          {
+            "kind": "X",
+            "qubits": [
+              2
+            ]
+          }
+        ]
+      },
+      "report_flips": [],
+      "likelihood_ratio": "(1, 1)",
+      "callback_inputs": [
+        [
+          1,
+          0
+        ],
+        [
+          1
+        ],
+        [
+          1
+        ]
+      ],
+      "draw": {
+        "acceptance": 0.0,
+        "error": 0.0,
+        "moments": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scientific": [
+          [
+            0.0,
+            0
+          ],
+          [
+            0.0,
+            0
+          ],
+          [
+            0.0,
+            0
+          ],
+          [
+            0.0,
+            0
+          ],
+          [
+            0.0,
+            0
+          ]
+        ],
+        "underflow_columns": [],
+        "overflow_columns": [],
+        "weight_scientific": [
+          0.585786437626905,
+          -1
+        ],
+        "noise_weight_scientific": [
+          0.5,
+          1
+        ],
+        "sampled_records": [
+          1,
+          0,
+          1
+        ],
+        "decoder_calls": 2,
+        "recovery_decoder_calls": 1,
+        "sampled_parities": 4,
+        "exact": {
+          "history_mass": {
+            "coefficients": [
+              2,
+              -1,
+              0,
+              1
+            ],
+            "power": -5
+          },
+          "acceptance": {
+            "coefficients": [
+              0,
+              0,
+              0,
+              0
+            ],
+            "power": 0
+          },
+          "error": {
+            "coefficients": [
+              0,
+              0,
+              0,
+              0
+            ],
+            "power": 0
+          },
+          "moments": [
+            {
+              "coefficients": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "power": 0
+            },
+            {
+              "coefficients": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "power": 0
+            },
+            {
+              "coefficients": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "power": 0
+            }
+          ],
+          "target_success": {
+            "coefficients": [
+              0,
+              0,
+              0,
+              0
+            ],
+            "power": 0
+          },
+          "noise_likelihood_ratio_hex": [
+            "0x1",
+            "0x1"
+          ],
+          "proposal_probability": {
+            "numerator": 1,
+            "denominator": 16
+          }
+        }
+      },
+      "literal_raw": [
+        {
+          "coefficients": [
+            2,
+            -1,
+            0,
+            1
+          ],
+          "power": -5
+        },
+        {
+          "coefficients": [
+            0,
+            0,
+            0,
+            0
+          ],
+          "power": 0
+        },
+        {
+          "coefficients": [
+            0,
+            0,
+            0,
+            0
+          ],
+          "power": 0
+        },
+        {
+          "coefficients": [
+            0,
+            0,
+            0,
+            0
+          ],
+          "power": 0
+        },
+        {
+          "coefficients": [
+            0,
+            0,
+            0,
+            0
+          ],
+          "power": 0
+        },
+        {
+          "coefficients": [
+            0,
+            0,
+            0,
+            0
+          ],
+          "power": 0
+        }
+      ]
+    },
+    {
+      "seed": 9,
+      "noise_gates": {},
+      "report_flips": [
+        "m0"
+      ],
+      "likelihood_ratio": "(1, 1)",
+      "callback_inputs": [
+        [
+          1,
+          0
+        ],
+        [
+          1
+        ],
+        [
+          1
+        ]
+      ],
+      "draw": {
+        "acceptance": 0.0,
+        "error": 0.0,
+        "moments": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scientific": [
+          [
+            0.0,
+            0
+          ],
+          [
+            0.0,
+            0
+          ],
+          [
+            0.0,
+            0
+          ],
+          [
+            0.0,
+            0
+          ],
+          [
+            0.0,
+            0
+          ]
+        ],
+        "underflow_columns": [],
+        "overflow_columns": [],
+        "weight_scientific": [
+          0.585786437626905,
+          -1
+        ],
+        "noise_weight_scientific": [
+          0.5,
+          1
+        ],
+        "sampled_records": [
+          1,
+          0,
+          1
+        ],
+        "decoder_calls": 2,
+        "recovery_decoder_calls": 1,
+        "sampled_parities": 4,
+        "exact": {
+          "history_mass": {
+            "coefficients": [
+              2,
+              -1,
+              0,
+              1
+            ],
+            "power": -5
+          },
+          "acceptance": {
+            "coefficients": [
+              0,
+              0,
+              0,
+              0
+            ],
+            "power": 0
+          },
+          "error": {
+            "coefficients": [
+              0,
+              0,
+              0,
+              0
+            ],
+            "power": 0
+          },
+          "moments": [
+            {
+              "coefficients": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "power": 0
+            },
+            {
+              "coefficients": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "power": 0
+            },
+            {
+              "coefficients": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "power": 0
+            }
+          ],
+          "target_success": {
+            "coefficients": [
+              0,
+              0,
+              0,
+              0
+            ],
+            "power": 0
+          },
+          "noise_likelihood_ratio_hex": [
+            "0x1",
+            "0x1"
+          ],
+          "proposal_probability": {
+            "numerator": 1,
+            "denominator": 16
+          }
+        }
+      },
+      "literal_raw": [
+        {
+          "coefficients": [
+            2,
+            -1,
+            0,
+            1
+          ],
+          "power": -5
+        },
+        {
+          "coefficients": [
+            0,
+            0,
+            0,
+            0
+          ],
+          "power": 0
+        },
+        {
+          "coefficients": [
+            0,
+            0,
+            0,
+            0
+          ],
+          "power": 0
+        },
+        {
+          "coefficients": [
+            0,
+            0,
+            0,
+            0
+          ],
+          "power": 0
+        },
+        {
+          "coefficients": [
+            0,
+            0,
+            0,
+            0
+          ],
+          "power": 0
+        },
+        {
+          "coefficients": [
+            0,
+            0,
+            0,
+            0
+          ],
+          "power": 0
+        }
+      ]
+    },
+    {
+      "seed": 10,
+      "noise_gates": {
+        "op7": [
+          {
+            "kind": "X",
+            "qubits": [
+              2
+            ]
+          }
+        ]
+      },
+      "report_flips": [
+        "m0",
+        "m1"
+      ],
+      "likelihood_ratio": "(1, 1)",
+      "callback_inputs": [
+        [
+          0,
+          1
+        ],
+        [
+          0
+        ],
+        [
+          0
+        ]
+      ],
+      "draw": {
+        "acceptance": 1.7071067811865475,
+        "error": 0.25,
+        "moments": [
+          0.0,
+          0.0,
+          1.7071067811865475
+        ],
+        "scientific": [
+          [
+            0.8535533905932737,
+            1
+          ],
+          [
+            0.5,
+            -1
+          ],
+          [
+            0.0,
+            0
+          ],
+          [
+            0.0,
+            0
+          ],
+          [
+            0.8535533905932737,
+            1
+          ]
+        ],
+        "underflow_columns": [],
+        "overflow_columns": [],
+        "weight_scientific": [
+          0.8535533905932737,
+          1
+        ],
+        "noise_weight_scientific": [
+          0.5,
+          1
+        ],
+        "sampled_records": [
+          0,
+          1,
+          0
+        ],
+        "decoder_calls": 2,
+        "recovery_decoder_calls": 1,
+        "sampled_parities": 4,
+        "exact": {
+          "history_mass": {
+            "coefficients": [
+              2,
+              1,
+              0,
+              -1
+            ],
+            "power": -5
+          },
+          "acceptance": {
+            "coefficients": [
+              2,
+              1,
+              0,
+              -1
+            ],
+            "power": -5
+          },
+          "error": {
+            "coefficients": [
+              1,
+              0,
+              0,
+              0
+            ],
+            "power": -6
+          },
+          "moments": [
+            {
+              "coefficients": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "power": 0
+            },
+            {
+              "coefficients": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "power": 0
+            },
+            {
+              "coefficients": [
+                2,
+                1,
+                0,
+                -1
+              ],
+              "power": -5
+            }
+          ],
+          "target_success": {
+            "coefficients": [
+              3,
+              2,
+              0,
+              -2
+            ],
+            "power": -6
+          },
+          "noise_likelihood_ratio_hex": [
+            "0x1",
+            "0x1"
+          ],
+          "proposal_probability": {
+            "numerator": 1,
+            "denominator": 16
+          }
+        }
+      },
+      "literal_raw": [
+        {
+          "coefficients": [
+            2,
+            1,
+            0,
+            -1
+          ],
+          "power": -5
+        },
+        {
+          "coefficients": [
+            2,
+            1,
+            0,
+            -1
+          ],
+          "power": -5
+        },
+        {
+          "coefficients": [
+            1,
+            0,
+            0,
+            0
+          ],
+          "power": -6
+        },
+        {
+          "coefficients": [
+            0,
+            0,
+            0,
+            0
+          ],
+          "power": 0
+        },
+        {
+          "coefficients": [
+            0,
+            0,
+            0,
+            0
+          ],
+          "power": 0
+        },
+        {
+          "coefficients": [
+            2,
+            1,
+            0,
+            -1
+          ],
+          "power": -5
+        }
+      ]
+    },
+    {
+      "seed": 11,
+      "noise_gates": {},
+      "report_flips": [],
+      "likelihood_ratio": "(1, 1)",
+      "callback_inputs": [
+        [
+          0,
+          1
+        ],
+        [
+          1
+        ],
+        [
+          1
+        ]
+      ],
+      "draw": {
+        "acceptance": 0.2928932188134525,
+        "error": 0.042893218813452476,
+        "moments": [
+          0.0,
+          0.0,
+          0.2928932188134525
+        ],
+        "scientific": [
+          [
+            0.585786437626905,
+            -1
+          ],
+          [
+            0.6862915010152396,
+            -4
+          ],
+          [
+            0.0,
+            0
+          ],
+          [
+            0.0,
+            0
+          ],
+          [
+            0.585786437626905,
+            -1
+          ]
+        ],
+        "underflow_columns": [],
+        "overflow_columns": [],
+        "weight_scientific": [
+          0.585786437626905,
+          -1
+        ],
+        "noise_weight_scientific": [
+          0.5,
+          1
+        ],
+        "sampled_records": [
+          0,
+          1,
+          1
+        ],
+        "decoder_calls": 2,
+        "recovery_decoder_calls": 1,
+        "sampled_parities": 4,
+        "exact": {
+          "history_mass": {
+            "coefficients": [
+              2,
+              -1,
+              0,
+              1
+            ],
+            "power": -5
+          },
+          "acceptance": {
+            "coefficients": [
+              2,
+              -1,
+              0,
+              1
+            ],
+            "power": -5
+          },
+          "error": {
+            "coefficients": [
+              3,
+              -2,
+              0,
+              2
+            ],
+            "power": -6
+          },
+          "moments": [
+            {
+              "coefficients": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "power": 0
+            },
+            {
+              "coefficients": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "power": 0
+            },
+            {
+              "coefficients": [
+                2,
+                -1,
+                0,
+                1
+              ],
+              "power": -5
+            }
+          ],
+          "target_success": {
+            "coefficients": [
+              1,
+              0,
+              0,
+              0
+            ],
+            "power": -6
+          },
+          "noise_likelihood_ratio_hex": [
+            "0x1",
+            "0x1"
+          ],
+          "proposal_probability": {
+            "numerator": 1,
+            "denominator": 16
+          }
+        }
+      },
+      "literal_raw": [
+        {
+          "coefficients": [
+            2,
+            -1,
+            0,
+            1
+          ],
+          "power": -5
+        },
+        {
+          "coefficients": [
+            2,
+            -1,
+            0,
+            1
+          ],
+          "power": -5
+        },
+        {
+          "coefficients": [
+            3,
+            -2,
+            0,
+            2
+          ],
+          "power": -6
+        },
+        {
+          "coefficients": [
+            0,
+            0,
+            0,
+            0
+          ],
+          "power": 0
+        },
+        {
+          "coefficients": [
+            0,
+            0,
+            0,
+            0
+          ],
+          "power": 0
+        },
+        {
+          "coefficients": [
+            2,
+            -1,
+            0,
+            1
+          ],
+          "power": -5
+        }
+      ]
+    },
+    {
+      "seed": 12,
+      "noise_gates": {},
+      "report_flips": [
+        "m1"
+      ],
+      "likelihood_ratio": "(1, 1)",
+      "callback_inputs": [
+        [
+          1,
+          0
+        ],
+        [
+          1
+        ],
+        [
+          0
+        ]
+      ],
+      "draw": {
+        "acceptance": 0.0,
+        "error": 0.0,
+        "moments": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scientific": [
+          [
+            0.0,
+            0
+          ],
+          [
+            0.0,
+            0
+          ],
+          [
+            0.0,
+            0
+          ],
+          [
+            0.0,
+            0
+          ],
+          [
+            0.0,
+            0
+          ]
+        ],
+        "underflow_columns": [],
+        "overflow_columns": [],
+        "weight_scientific": [
+          0.585786437626905,
+          -1
+        ],
+        "noise_weight_scientific": [
+          0.5,
+          1
+        ],
+        "sampled_records": [
+          1,
+          0,
+          1
+        ],
+        "decoder_calls": 2,
+        "recovery_decoder_calls": 1,
+        "sampled_parities": 4,
+        "exact": {
+          "history_mass": {
+            "coefficients": [
+              2,
+              -1,
+              0,
+              1
+            ],
+            "power": -5
+          },
+          "acceptance": {
+            "coefficients": [
+              0,
+              0,
+              0,
+              0
+            ],
+            "power": 0
+          },
+          "error": {
+            "coefficients": [
+              0,
+              0,
+              0,
+              0
+            ],
+            "power": 0
+          },
+          "moments": [
+            {
+              "coefficients": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "power": 0
+            },
+            {
+              "coefficients": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "power": 0
+            },
+            {
+              "coefficients": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "power": 0
+            }
+          ],
+          "target_success": {
+            "coefficients": [
+              0,
+              0,
+              0,
+              0
+            ],
+            "power": 0
+          },
+          "noise_likelihood_ratio_hex": [
+            "0x1",
+            "0x1"
+          ],
+          "proposal_probability": {
+            "numerator": 1,
+            "denominator": 16
+          }
+        }
+      },
+      "literal_raw": [
+        {
+          "coefficients": [
+            2,
+            -1,
+            0,
+            1
+          ],
+          "power": -5
+        },
+        {
+          "coefficients": [
+            0,
+            0,
+            0,
+            0
+          ],
+          "power": 0
+        },
+        {
+          "coefficients": [
+            0,
+            0,
+            0,
+            0
+          ],
+          "power": 0
+        },
+        {
+          "coefficients": [
+            0,
+            0,
+            0,
+            0
+          ],
+          "power": 0
+        },
+        {
+          "coefficients": [
+            0,
+            0,
+            0,
+            0
+          ],
+          "power": 0
+        },
+        {
+          "coefficients": [
+            0,
+            0,
+            0,
+            0
+          ],
+          "power": 0
+        }
+      ]
+    },
+    {
+      "seed": 13,
+      "noise_gates": {
+        "op7": [
+          {
+            "kind": "X",
+            "qubits": [
+              2
+            ]
+          }
+        ]
+      },
+      "report_flips": [],
+      "likelihood_ratio": "(1, 1)",
+      "callback_inputs": [
+        [
+          0,
+          1
+        ],
+        [
+          0
+        ],
+        [
+          0
+        ]
+      ],
+      "draw": {
+        "acceptance": 1.7071067811865475,
+        "error": 0.25,
+        "moments": [
+          0.0,
+          0.0,
+          1.7071067811865475
+        ],
+        "scientific": [
+          [
+            0.8535533905932737,
+            1
+          ],
+          [
+            0.5,
+            -1
+          ],
+          [
+            0.0,
+            0
+          ],
+          [
+            0.0,
+            0
+          ],
+          [
+            0.8535533905932737,
+            1
+          ]
+        ],
+        "underflow_columns": [],
+        "overflow_columns": [],
+        "weight_scientific": [
+          0.8535533905932737,
+          1
+        ],
+        "noise_weight_scientific": [
+          0.5,
+          1
+        ],
+        "sampled_records": [
+          0,
+          1,
+          0
+        ],
+        "decoder_calls": 2,
+        "recovery_decoder_calls": 1,
+        "sampled_parities": 4,
+        "exact": {
+          "history_mass": {
+            "coefficients": [
+              2,
+              1,
+              0,
+              -1
+            ],
+            "power": -5
+          },
+          "acceptance": {
+            "coefficients": [
+              2,
+              1,
+              0,
+              -1
+            ],
+            "power": -5
+          },
+          "error": {
+            "coefficients": [
+              1,
+              0,
+              0,
+              0
+            ],
+            "power": -6
+          },
+          "moments": [
+            {
+              "coefficients": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "power": 0
+            },
+            {
+              "coefficients": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "power": 0
+            },
+            {
+              "coefficients": [
+                2,
+                1,
+                0,
+                -1
+              ],
+              "power": -5
+            }
+          ],
+          "target_success": {
+            "coefficients": [
+              3,
+              2,
+              0,
+              -2
+            ],
+            "power": -6
+          },
+          "noise_likelihood_ratio_hex": [
+            "0x1",
+            "0x1"
+          ],
+          "proposal_probability": {
+            "numerator": 1,
+            "denominator": 16
+          }
+        }
+      },
+      "literal_raw": [
+        {
+          "coefficients": [
+            2,
+            1,
+            0,
+            -1
+          ],
+          "power": -5
+        },
+        {
+          "coefficients": [
+            2,
+            1,
+            0,
+            -1
+          ],
+          "power": -5
+        },
+        {
+          "coefficients": [
+            1,
+            0,
+            0,
+            0
+          ],
+          "power": -6
+        },
+        {
+          "coefficients": [
+            0,
+            0,
+            0,
+            0
+          ],
+          "power": 0
+        },
+        {
+          "coefficients": [
+            0,
+            0,
+            0,
+            0
+          ],
+          "power": 0
+        },
+        {
+          "coefficients": [
+            2,
+            1,
+            0,
+            -1
+          ],
+          "power": -5
+        }
+      ]
+    },
+    {
+      "seed": 14,
+      "noise_gates": {},
+      "report_flips": [
+        "m1"
+      ],
+      "likelihood_ratio": "(1, 1)",
+      "callback_inputs": [
+        [
+          1,
+          0
+        ],
+        [
+          1
+        ],
+        [
+          0
+        ]
+      ],
+      "draw": {
+        "acceptance": 0.0,
+        "error": 0.0,
+        "moments": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scientific": [
+          [
+            0.0,
+            0
+          ],
+          [
+            0.0,
+            0
+          ],
+          [
+            0.0,
+            0
+          ],
+          [
+            0.0,
+            0
+          ],
+          [
+            0.0,
+            0
+          ]
+        ],
+        "underflow_columns": [],
+        "overflow_columns": [],
+        "weight_scientific": [
+          0.585786437626905,
+          -1
+        ],
+        "noise_weight_scientific": [
+          0.5,
+          1
+        ],
+        "sampled_records": [
+          1,
+          0,
+          1
+        ],
+        "decoder_calls": 2,
+        "recovery_decoder_calls": 1,
+        "sampled_parities": 4,
+        "exact": {
+          "history_mass": {
+            "coefficients": [
+              2,
+              -1,
+              0,
+              1
+            ],
+            "power": -5
+          },
+          "acceptance": {
+            "coefficients": [
+              0,
+              0,
+              0,
+              0
+            ],
+            "power": 0
+          },
+          "error": {
+            "coefficients": [
+              0,
+              0,
+              0,
+              0
+            ],
+            "power": 0
+          },
+          "moments": [
+            {
+              "coefficients": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "power": 0
+            },
+            {
+              "coefficients": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "power": 0
+            },
+            {
+              "coefficients": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "power": 0
+            }
+          ],
+          "target_success": {
+            "coefficients": [
+              0,
+              0,
+              0,
+              0
+            ],
+            "power": 0
+          },
+          "noise_likelihood_ratio_hex": [
+            "0x1",
+            "0x1"
+          ],
+          "proposal_probability": {
+            "numerator": 1,
+            "denominator": 16
+          }
+        }
+      },
+      "literal_raw": [
+        {
+          "coefficients": [
+            2,
+            -1,
+            0,
+            1
+          ],
+          "power": -5
+        },
+        {
+          "coefficients": [
+            0,
+            0,
+            0,
+            0
+          ],
+          "power": 0
+        },
+        {
+          "coefficients": [
+            0,
+            0,
+            0,
+            0
+          ],
+          "power": 0
+        },
+        {
+          "coefficients": [
+            0,
+            0,
+            0,
+            0
+          ],
+          "power": 0
+        },
+        {
+          "coefficients": [
+            0,
+            0,
+            0,
+            0
+          ],
+          "power": 0
+        },
+        {
+          "coefficients": [
+            0,
+            0,
+            0,
+            0
+          ],
+          "power": 0
+        }
+      ]
+    },
+    {
+      "seed": 15,
+      "noise_gates": {},
+      "report_flips": [
+        "m1"
+      ],
+      "likelihood_ratio": "(1, 1)",
+      "callback_inputs": [
+        [
+          0,
+          0
+        ],
+        [
+          1
+        ],
+        [
+          1
+        ]
+      ],
+      "draw": {
+        "acceptance": 0.2928932188134525,
+        "error": 0.042893218813452476,
+        "moments": [
+          0.0,
+          0.0,
+          0.2928932188134525
+        ],
+        "scientific": [
+          [
+            0.585786437626905,
+            -1
+          ],
+          [
+            0.6862915010152396,
+            -4
+          ],
+          [
+            0.0,
+            0
+          ],
+          [
+            0.0,
+            0
+          ],
+          [
+            0.585786437626905,
+            -1
+          ]
+        ],
+        "underflow_columns": [],
+        "overflow_columns": [],
+        "weight_scientific": [
+          0.585786437626905,
+          -1
+        ],
+        "noise_weight_scientific": [
+          0.5,
+          1
+        ],
+        "sampled_records": [
+          0,
+          0,
+          1
+        ],
+        "decoder_calls": 2,
+        "recovery_decoder_calls": 1,
+        "sampled_parities": 4,
+        "exact": {
+          "history_mass": {
+            "coefficients": [
+              2,
+              -1,
+              0,
+              1
+            ],
+            "power": -5
+          },
+          "acceptance": {
+            "coefficients": [
+              2,
+              -1,
+              0,
+              1
+            ],
+            "power": -5
+          },
+          "error": {
+            "coefficients": [
+              3,
+              -2,
+              0,
+              2
+            ],
+            "power": -6
+          },
+          "moments": [
+            {
+              "coefficients": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "power": 0
+            },
+            {
+              "coefficients": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "power": 0
+            },
+            {
+              "coefficients": [
+                2,
+                -1,
+                0,
+                1
+              ],
+              "power": -5
+            }
+          ],
+          "target_success": {
+            "coefficients": [
+              1,
+              0,
+              0,
+              0
+            ],
+            "power": -6
+          },
+          "noise_likelihood_ratio_hex": [
+            "0x1",
+            "0x1"
+          ],
+          "proposal_probability": {
+            "numerator": 1,
+            "denominator": 16
+          }
+        }
+      },
+      "literal_raw": [
+        {
+          "coefficients": [
+            2,
+            -1,
+            0,
+            1
+          ],
+          "power": -5
+        },
+        {
+          "coefficients": [
+            2,
+            -1,
+            0,
+            1
+          ],
+          "power": -5
+        },
+        {
+          "coefficients": [
+            3,
+            -2,
+            0,
+            2
+          ],
+          "power": -6
+        },
+        {
+          "coefficients": [
+            0,
+            0,
+            0,
+            0
+          ],
+          "power": 0
+        },
+        {
+          "coefficients": [
+            0,
+            0,
+            0,
+            0
+          ],
+          "power": 0
+        },
+        {
+          "coefficients": [
+            2,
+            -1,
+            0,
+            1
+          ],
+          "power": -5
+        }
+      ]
+    },
+    {
+      "seed": 16,
+      "noise_gates": {
+        "op7": [
+          {
+            "kind": "X",
+            "qubits": [
+              2
+            ]
+          }
+        ]
+      },
+      "report_flips": [
+        "m1"
+      ],
+      "likelihood_ratio": "(1, 1)",
+      "callback_inputs": [
+        [
+          0,
+          1
+        ],
+        [
+          0
+        ],
+        [
+          1
+        ]
+      ],
+      "draw": {
+        "acceptance": 1.7071067811865475,
+        "error": 1.4571067811865475,
+        "moments": [
+          0.0,
+          0.0,
+          -1.7071067811865475
+        ],
+        "scientific": [
+          [
+            0.8535533905932737,
+            1
+          ],
+          [
+            0.7285533905932737,
+            1
+          ],
+          [
+            0.0,
+            0
+          ],
+          [
+            0.0,
+            0
+          ],
+          [
+            -0.8535533905932737,
+            1
+          ]
+        ],
+        "underflow_columns": [],
+        "overflow_columns": [],
+        "weight_scientific": [
+          0.8535533905932737,
+          1
+        ],
+        "noise_weight_scientific": [
+          0.5,
+          1
+        ],
+        "sampled_records": [
+          0,
+          1,
+          0
+        ],
+        "decoder_calls": 2,
+        "recovery_decoder_calls": 1,
+        "sampled_parities": 4,
+        "exact": {
+          "history_mass": {
+            "coefficients": [
+              2,
+              1,
+              0,
+              -1
+            ],
+            "power": -5
+          },
+          "acceptance": {
+            "coefficients": [
+              2,
+              1,
+              0,
+              -1
+            ],
+            "power": -5
+          },
+          "error": {
+            "coefficients": [
+              3,
+              2,
+              0,
+              -2
+            ],
+            "power": -6
+          },
+          "moments": [
+            {
+              "coefficients": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "power": 0
+            },
+            {
+              "coefficients": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "power": 0
+            },
+            {
+              "coefficients": [
+                -2,
+                -1,
+                0,
+                1
+              ],
+              "power": -5
+            }
+          ],
+          "target_success": {
+            "coefficients": [
+              1,
+              0,
+              0,
+              0
+            ],
+            "power": -6
+          },
+          "noise_likelihood_ratio_hex": [
+            "0x1",
+            "0x1"
+          ],
+          "proposal_probability": {
+            "numerator": 1,
+            "denominator": 16
+          }
+        }
+      },
+      "literal_raw": [
+        {
+          "coefficients": [
+            2,
+            1,
+            0,
+            -1
+          ],
+          "power": -5
+        },
+        {
+          "coefficients": [
+            2,
+            1,
+            0,
+            -1
+          ],
+          "power": -5
+        },
+        {
+          "coefficients": [
+            3,
+            2,
+            0,
+            -2
+          ],
+          "power": -6
+        },
+        {
+          "coefficients": [
+            0,
+            0,
+            0,
+            0
+          ],
+          "power": 0
+        },
+        {
+          "coefficients": [
+            0,
+            0,
+            0,
+            0
+          ],
+          "power": 0
+        },
+        {
+          "coefficients": [
+            -2,
+            -1,
+            0,
+            1
+          ],
+          "power": -5
+        }
+      ]
+    },
+    {
+      "seed": 17,
+      "noise_gates": {
+        "op7": [
+          {
+            "kind": "X",
+            "qubits": [
+              2
+            ]
+          }
+        ]
+      },
+      "report_flips": [],
+      "likelihood_ratio": "(1, 1)",
+      "callback_inputs": [
+        [
+          1,
+          0
+        ],
+        [
+          1
+        ],
+        [
+          0
+        ]
+      ],
+      "draw": {
+        "acceptance": 0.0,
+        "error": 0.0,
+        "moments": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scientific": [
+          [
+            0.0,
+            0
+          ],
+          [
+            0.0,
+            0
+          ],
+          [
+            0.0,
+            0
+          ],
+          [
+            0.0,
+            0
+          ],
+          [
+            0.0,
+            0
+          ]
+        ],
+        "underflow_columns": [],
+        "overflow_columns": [],
+        "weight_scientific": [
+          0.585786437626905,
+          -1
+        ],
+        "noise_weight_scientific": [
+          0.5,
+          1
+        ],
+        "sampled_records": [
+          1,
+          0,
+          1
+        ],
+        "decoder_calls": 2,
+        "recovery_decoder_calls": 1,
+        "sampled_parities": 4,
+        "exact": {
+          "history_mass": {
+            "coefficients": [
+              2,
+              -1,
+              0,
+              1
+            ],
+            "power": -5
+          },
+          "acceptance": {
+            "coefficients": [
+              0,
+              0,
+              0,
+              0
+            ],
+            "power": 0
+          },
+          "error": {
+            "coefficients": [
+              0,
+              0,
+              0,
+              0
+            ],
+            "power": 0
+          },
+          "moments": [
+            {
+              "coefficients": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "power": 0
+            },
+            {
+              "coefficients": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "power": 0
+            },
+            {
+              "coefficients": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "power": 0
+            }
+          ],
+          "target_success": {
+            "coefficients": [
+              0,
+              0,
+              0,
+              0
+            ],
+            "power": 0
+          },
+          "noise_likelihood_ratio_hex": [
+            "0x1",
+            "0x1"
+          ],
+          "proposal_probability": {
+            "numerator": 1,
+            "denominator": 16
+          }
+        }
+      },
+      "literal_raw": [
+        {
+          "coefficients": [
+            2,
+            -1,
+            0,
+            1
+          ],
+          "power": -5
+        },
+        {
+          "coefficients": [
+            0,
+            0,
+            0,
+            0
+          ],
+          "power": 0
+        },
+        {
+          "coefficients": [
+            0,
+            0,
+            0,
+            0
+          ],
+          "power": 0
+        },
+        {
+          "coefficients": [
+            0,
+            0,
+            0,
+            0
+          ],
+          "power": 0
+        },
+        {
+          "coefficients": [
+            0,
+            0,
+            0,
+            0
+          ],
+          "power": 0
+        },
+        {
+          "coefficients": [
+            0,
+            0,
+            0,
+            0
+          ],
+          "power": 0
+        }
+      ]
+    },
+    {
+      "seed": 18,
+      "noise_gates": {},
+      "report_flips": [],
+      "likelihood_ratio": "(1, 1)",
+      "callback_inputs": [
+        [
+          0,
+          0
+        ],
+        [
+          1
+        ],
+        [
+          0
+        ]
+      ],
+      "draw": {
+        "acceptance": 0.2928932188134525,
+        "error": 0.25,
+        "moments": [
+          0.0,
+          0.0,
+          -0.2928932188134525
+        ],
+        "scientific": [
+          [
+            0.585786437626905,
+            -1
+          ],
+          [
+            0.5,
+            -1
+          ],
+          [
+            0.0,
+            0
+          ],
+          [
+            0.0,
+            0
+          ],
+          [
+            -0.585786437626905,
+            -1
+          ]
+        ],
+        "underflow_columns": [],
+        "overflow_columns": [],
+        "weight_scientific": [
+          0.585786437626905,
+          -1
+        ],
+        "noise_weight_scientific": [
+          0.5,
+          1
+        ],
+        "sampled_records": [
+          0,
+          0,
+          1
+        ],
+        "decoder_calls": 2,
+        "recovery_decoder_calls": 1,
+        "sampled_parities": 4,
+        "exact": {
+          "history_mass": {
+            "coefficients": [
+              2,
+              -1,
+              0,
+              1
+            ],
+            "power": -5
+          },
+          "acceptance": {
+            "coefficients": [
+              2,
+              -1,
+              0,
+              1
+            ],
+            "power": -5
+          },
+          "error": {
+            "coefficients": [
+              1,
+              0,
+              0,
+              0
+            ],
+            "power": -6
+          },
+          "moments": [
+            {
+              "coefficients": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "power": 0
+            },
+            {
+              "coefficients": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "power": 0
+            },
+            {
+              "coefficients": [
+                -2,
+                1,
+                0,
+                -1
+              ],
+              "power": -5
+            }
+          ],
+          "target_success": {
+            "coefficients": [
+              3,
+              -2,
+              0,
+              2
+            ],
+            "power": -6
+          },
+          "noise_likelihood_ratio_hex": [
+            "0x1",
+            "0x1"
+          ],
+          "proposal_probability": {
+            "numerator": 1,
+            "denominator": 16
+          }
+        }
+      },
+      "literal_raw": [
+        {
+          "coefficients": [
+            2,
+            -1,
+            0,
+            1
+          ],
+          "power": -5
+        },
+        {
+          "coefficients": [
+            2,
+            -1,
+            0,
+            1
+          ],
+          "power": -5
+        },
+        {
+          "coefficients": [
+            1,
+            0,
+            0,
+            0
+          ],
+          "power": -6
+        },
+        {
+          "coefficients": [
+            0,
+            0,
+            0,
+            0
+          ],
+          "power": 0
+        },
+        {
+          "coefficients": [
+            0,
+            0,
+            0,
+            0
+          ],
+          "power": 0
+        },
+        {
+          "coefficients": [
+            -2,
+            1,
+            0,
+            -1
+          ],
+          "power": -5
+        }
+      ]
+    },
+    {
+      "seed": 19,
+      "noise_gates": {
+        "op7": [
+          {
+            "kind": "X",
+            "qubits": [
+              2
+            ]
+          }
+        ]
+      },
+      "report_flips": [],
+      "likelihood_ratio": "(1, 1)",
+      "callback_inputs": [
+        [
+          0,
+          0
+        ],
+        [
+          1
+        ],
+        [
+          0
+        ]
+      ],
+      "draw": {
+        "acceptance": 0.2928932188134525,
+        "error": 0.25,
+        "moments": [
+          0.0,
+          0.0,
+          -0.2928932188134525
+        ],
+        "scientific": [
+          [
+            0.585786437626905,
+            -1
+          ],
+          [
+            0.5,
+            -1
+          ],
+          [
+            0.0,
+            0
+          ],
+          [
+            0.0,
+            0
+          ],
+          [
+            -0.585786437626905,
+            -1
+          ]
+        ],
+        "underflow_columns": [],
+        "overflow_columns": [],
+        "weight_scientific": [
+          0.585786437626905,
+          -1
+        ],
+        "noise_weight_scientific": [
+          0.5,
+          1
+        ],
+        "sampled_records": [
+          0,
+          0,
+          1
+        ],
+        "decoder_calls": 2,
+        "recovery_decoder_calls": 1,
+        "sampled_parities": 4,
+        "exact": {
+          "history_mass": {
+            "coefficients": [
+              2,
+              -1,
+              0,
+              1
+            ],
+            "power": -5
+          },
+          "acceptance": {
+            "coefficients": [
+              2,
+              -1,
+              0,
+              1
+            ],
+            "power": -5
+          },
+          "error": {
+            "coefficients": [
+              1,
+              0,
+              0,
+              0
+            ],
+            "power": -6
+          },
+          "moments": [
+            {
+              "coefficients": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "power": 0
+            },
+            {
+              "coefficients": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "power": 0
+            },
+            {
+              "coefficients": [
+                -2,
+                1,
+                0,
+                -1
+              ],
+              "power": -5
+            }
+          ],
+          "target_success": {
+            "coefficients": [
+              3,
+              -2,
+              0,
+              2
+            ],
+            "power": -6
+          },
+          "noise_likelihood_ratio_hex": [
+            "0x1",
+            "0x1"
+          ],
+          "proposal_probability": {
+            "numerator": 1,
+            "denominator": 16
+          }
+        }
+      },
+      "literal_raw": [
+        {
+          "coefficients": [
+            2,
+            -1,
+            0,
+            1
+          ],
+          "power": -5
+        },
+        {
+          "coefficients": [
+            2,
+            -1,
+            0,
+            1
+          ],
+          "power": -5
+        },
+        {
+          "coefficients": [
+            1,
+            0,
+            0,
+            0
+          ],
+          "power": -6
+        },
+        {
+          "coefficients": [
+            0,
+            0,
+            0,
+            0
+          ],
+          "power": 0
+        },
+        {
+          "coefficients": [
+            0,
+            0,
+            0,
+            0
+          ],
+          "power": 0
+        },
+        {
+          "coefficients": [
+            -2,
+            1,
+            0,
+            -1
+          ],
+          "power": -5
+        }
+      ]
+    },
+    {
+      "seed": 20,
+      "noise_gates": {},
+      "report_flips": [],
+      "likelihood_ratio": "(1, 1)",
+      "callback_inputs": [
+        [
+          1,
+          0
+        ],
+        [
+          0
+        ],
+        [
+          1
+        ]
+      ],
+      "draw": {
+        "acceptance": 0.0,
+        "error": 0.0,
+        "moments": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scientific": [
+          [
+            0.0,
+            0
+          ],
+          [
+            0.0,
+            0
+          ],
+          [
+            0.0,
+            0
+          ],
+          [
+            0.0,
+            0
+          ],
+          [
+            0.0,
+            0
+          ]
+        ],
+        "underflow_columns": [],
+        "overflow_columns": [],
+        "weight_scientific": [
+          0.8535533905932737,
+          1
+        ],
+        "noise_weight_scientific": [
+          0.5,
+          1
+        ],
+        "sampled_records": [
+          1,
+          0,
+          0
+        ],
+        "decoder_calls": 2,
+        "recovery_decoder_calls": 1,
+        "sampled_parities": 4,
+        "exact": {
+          "history_mass": {
+            "coefficients": [
+              2,
+              1,
+              0,
+              -1
+            ],
+            "power": -5
+          },
+          "acceptance": {
+            "coefficients": [
+              0,
+              0,
+              0,
+              0
+            ],
+            "power": 0
+          },
+          "error": {
+            "coefficients": [
+              0,
+              0,
+              0,
+              0
+            ],
+            "power": 0
+          },
+          "moments": [
+            {
+              "coefficients": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "power": 0
+            },
+            {
+              "coefficients": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "power": 0
+            },
+            {
+              "coefficients": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "power": 0
+            }
+          ],
+          "target_success": {
+            "coefficients": [
+              0,
+              0,
+              0,
+              0
+            ],
+            "power": 0
+          },
+          "noise_likelihood_ratio_hex": [
+            "0x1",
+            "0x1"
+          ],
+          "proposal_probability": {
+            "numerator": 1,
+            "denominator": 16
+          }
+        }
+      },
+      "literal_raw": [
+        {
+          "coefficients": [
+            2,
+            1,
+            0,
+            -1
+          ],
+          "power": -5
+        },
+        {
+          "coefficients": [
+            0,
+            0,
+            0,
+            0
+          ],
+          "power": 0
+        },
+        {
+          "coefficients": [
+            0,
+            0,
+            0,
+            0
+          ],
+          "power": 0
+        },
+        {
+          "coefficients": [
+            0,
+            0,
+            0,
+            0
+          ],
+          "power": 0
+        },
+        {
+          "coefficients": [
+            0,
+            0,
+            0,
+            0
+          ],
+          "power": 0
+        },
+        {
+          "coefficients": [
+            0,
+            0,
+            0,
+            0
+          ],
+          "power": 0
+        }
+      ]
+    },
+    {
+      "seed": 21,
+      "noise_gates": {
+        "op7": [
+          {
+            "kind": "X",
+            "qubits": [
+              2
+            ]
+          }
+        ]
+      },
+      "report_flips": [
+        "m0"
+      ],
+      "likelihood_ratio": "(1, 1)",
+      "callback_inputs": [
+        [
+          1,
+          1
+        ],
+        [
+          1
+        ],
+        [
+          0
+        ]
+      ],
+      "draw": {
+        "acceptance": 0.0,
+        "error": 0.0,
+        "moments": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scientific": [
+          [
+            0.0,
+            0
+          ],
+          [
+            0.0,
+            0
+          ],
+          [
+            0.0,
+            0
+          ],
+          [
+            0.0,
+            0
+          ],
+          [
+            0.0,
+            0
+          ]
+        ],
+        "underflow_columns": [],
+        "overflow_columns": [],
+        "weight_scientific": [
+          0.8535533905932737,
+          1
+        ],
+        "noise_weight_scientific": [
+          0.5,
+          1
+        ],
+        "sampled_records": [
+          1,
+          1,
+          1
+        ],
+        "decoder_calls": 2,
+        "recovery_decoder_calls": 1,
+        "sampled_parities": 4,
+        "exact": {
+          "history_mass": {
+            "coefficients": [
+              2,
+              1,
+              0,
+              -1
+            ],
+            "power": -5
+          },
+          "acceptance": {
+            "coefficients": [
+              0,
+              0,
+              0,
+              0
+            ],
+            "power": 0
+          },
+          "error": {
+            "coefficients": [
+              0,
+              0,
+              0,
+              0
+            ],
+            "power": 0
+          },
+          "moments": [
+            {
+              "coefficients": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "power": 0
+            },
+            {
+              "coefficients": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "power": 0
+            },
+            {
+              "coefficients": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "power": 0
+            }
+          ],
+          "target_success": {
+            "coefficients": [
+              0,
+              0,
+              0,
+              0
+            ],
+            "power": 0
+          },
+          "noise_likelihood_ratio_hex": [
+            "0x1",
+            "0x1"
+          ],
+          "proposal_probability": {
+            "numerator": 1,
+            "denominator": 16
+          }
+        }
+      },
+      "literal_raw": [
+        {
+          "coefficients": [
+            2,
+            1,
+            0,
+            -1
+          ],
+          "power": -5
+        },
+        {
+          "coefficients": [
+            0,
+            0,
+            0,
+            0
+          ],
+          "power": 0
+        },
+        {
+          "coefficients": [
+            0,
+            0,
+            0,
+            0
+          ],
+          "power": 0
+        },
+        {
+          "coefficients": [
+            0,
+            0,
+            0,
+            0
+          ],
+          "power": 0
+        },
+        {
+          "coefficients": [
+            0,
+            0,
+            0,
+            0
+          ],
+          "power": 0
+        },
+        {
+          "coefficients": [
+            0,
+            0,
+            0,
+            0
+          ],
+          "power": 0
+        }
+      ]
+    },
+    {
+      "seed": 22,
+      "noise_gates": {},
+      "report_flips": [
+        "m1"
+      ],
+      "likelihood_ratio": "(1, 1)",
+      "callback_inputs": [
+        [
+          0,
+          1
+        ],
+        [
+          1
+        ],
+        [
+          0
+        ]
+      ],
+      "draw": {
+        "acceptance": 0.2928932188134525,
+        "error": 0.25,
+        "moments": [
+          0.0,
+          0.0,
+          -0.2928932188134525
+        ],
+        "scientific": [
+          [
+            0.585786437626905,
+            -1
+          ],
+          [
+            0.5,
+            -1
+          ],
+          [
+            0.0,
+            0
+          ],
+          [
+            0.0,
+            0
+          ],
+          [
+            -0.585786437626905,
+            -1
+          ]
+        ],
+        "underflow_columns": [],
+        "overflow_columns": [],
+        "weight_scientific": [
+          0.585786437626905,
+          -1
+        ],
+        "noise_weight_scientific": [
+          0.5,
+          1
+        ],
+        "sampled_records": [
+          0,
+          1,
+          1
+        ],
+        "decoder_calls": 2,
+        "recovery_decoder_calls": 1,
+        "sampled_parities": 4,
+        "exact": {
+          "history_mass": {
+            "coefficients": [
+              2,
+              -1,
+              0,
+              1
+            ],
+            "power": -5
+          },
+          "acceptance": {
+            "coefficients": [
+              2,
+              -1,
+              0,
+              1
+            ],
+            "power": -5
+          },
+          "error": {
+            "coefficients": [
+              1,
+              0,
+              0,
+              0
+            ],
+            "power": -6
+          },
+          "moments": [
+            {
+              "coefficients": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "power": 0
+            },
+            {
+              "coefficients": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "power": 0
+            },
+            {
+              "coefficients": [
+                -2,
+                1,
+                0,
+                -1
+              ],
+              "power": -5
+            }
+          ],
+          "target_success": {
+            "coefficients": [
+              3,
+              -2,
+              0,
+              2
+            ],
+            "power": -6
+          },
+          "noise_likelihood_ratio_hex": [
+            "0x1",
+            "0x1"
+          ],
+          "proposal_probability": {
+            "numerator": 1,
+            "denominator": 16
+          }
+        }
+      },
+      "literal_raw": [
+        {
+          "coefficients": [
+            2,
+            -1,
+            0,
+            1
+          ],
+          "power": -5
+        },
+        {
+          "coefficients": [
+            2,
+            -1,
+            0,
+            1
+          ],
+          "power": -5
+        },
+        {
+          "coefficients": [
+            1,
+            0,
+            0,
+            0
+          ],
+          "power": -6
+        },
+        {
+          "coefficients": [
+            0,
+            0,
+            0,
+            0
+          ],
+          "power": 0
+        },
+        {
+          "coefficients": [
+            0,
+            0,
+            0,
+            0
+          ],
+          "power": 0
+        },
+        {
+          "coefficients": [
+            -2,
+            1,
+            0,
+            -1
+          ],
+          "power": -5
+        }
+      ]
+    },
+    {
+      "seed": 23,
+      "noise_gates": {},
+      "report_flips": [
+        "m0"
+      ],
+      "likelihood_ratio": "(1, 1)",
+      "callback_inputs": [
+        [
+          0,
+          1
+        ],
+        [
+          0
+        ],
+        [
+          0
+        ]
+      ],
+      "draw": {
+        "acceptance": 1.7071067811865475,
+        "error": 0.25,
+        "moments": [
+          0.0,
+          0.0,
+          1.7071067811865475
+        ],
+        "scientific": [
+          [
+            0.8535533905932737,
+            1
+          ],
+          [
+            0.5,
+            -1
+          ],
+          [
+            0.0,
+            0
+          ],
+          [
+            0.0,
+            0
+          ],
+          [
+            0.8535533905932737,
+            1
+          ]
+        ],
+        "underflow_columns": [],
+        "overflow_columns": [],
+        "weight_scientific": [
+          0.8535533905932737,
+          1
+        ],
+        "noise_weight_scientific": [
+          0.5,
+          1
+        ],
+        "sampled_records": [
+          0,
+          1,
+          0
+        ],
+        "decoder_calls": 2,
+        "recovery_decoder_calls": 1,
+        "sampled_parities": 4,
+        "exact": {
+          "history_mass": {
+            "coefficients": [
+              2,
+              1,
+              0,
+              -1
+            ],
+            "power": -5
+          },
+          "acceptance": {
+            "coefficients": [
+              2,
+              1,
+              0,
+              -1
+            ],
+            "power": -5
+          },
+          "error": {
+            "coefficients": [
+              1,
+              0,
+              0,
+              0
+            ],
+            "power": -6
+          },
+          "moments": [
+            {
+              "coefficients": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "power": 0
+            },
+            {
+              "coefficients": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "power": 0
+            },
+            {
+              "coefficients": [
+                2,
+                1,
+                0,
+                -1
+              ],
+              "power": -5
+            }
+          ],
+          "target_success": {
+            "coefficients": [
+              3,
+              2,
+              0,
+              -2
+            ],
+            "power": -6
+          },
+          "noise_likelihood_ratio_hex": [
+            "0x1",
+            "0x1"
+          ],
+          "proposal_probability": {
+            "numerator": 1,
+            "denominator": 16
+          }
+        }
+      },
+      "literal_raw": [
+        {
+          "coefficients": [
+            2,
+            1,
+            0,
+            -1
+          ],
+          "power": -5
+        },
+        {
+          "coefficients": [
+            2,
+            1,
+            0,
+            -1
+          ],
+          "power": -5
+        },
+        {
+          "coefficients": [
+            1,
+            0,
+            0,
+            0
+          ],
+          "power": -6
+        },
+        {
+          "coefficients": [
+            0,
+            0,
+            0,
+            0
+          ],
+          "power": 0
+        },
+        {
+          "coefficients": [
+            0,
+            0,
+            0,
+            0
+          ],
+          "power": 0
+        },
+        {
+          "coefficients": [
+            2,
+            1,
+            0,
+            -1
+          ],
+          "power": -5
+        }
+      ]
+    }
+  ]
+}

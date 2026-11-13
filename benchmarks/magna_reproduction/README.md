@@ -7,9 +7,9 @@ implement a simulator or claim reproduction of the paper's precision curves.
 
 ## Current coverage
 
-The source-bound ledger currently has 164 verified, 2 partial and 186 unmapped
+The source-bound ledger currently has 178 verified, 2 partial and 172 unmapped
 original methods, with zero architecture-specific core exclusions. It requires
-188 distinct Rust witnesses from 190 declarations across 80 targets. Strict
+202 distinct Rust witnesses from 204 declarations across 86 targets. Strict
 complete parity intentionally exits 2. The detailed per-change sections below
 retain their historical inventory snapshots; `coverage.json` is authoritative.
 
@@ -3117,10 +3117,51 @@ loader; task declarations retain their task-directory origin and explicit relati
 paths use caller CWD. Existing loading signatures and file report schemas remain
 available. See the crate README for both public APIs and resource/failure scope.
 
-Current coverage is 164 verified, 2 partial and 186 unmapped original methods,
-with 188 distinct witnesses from 190 declarations across 80 mapped targets and
+At the full-record/terminal-module batch, coverage was 164 verified, 2 partial
+and 186 unmapped original methods, with 188 distinct witnesses from 190 declarations
+across 80 mapped targets and
 zero architecture exclusions. Strict complete parity intentionally remains exit 2.
 Other original contracts, existing SIGALRM/numerical partial gaps, M6 compatibility
 and M7 paper-scale measurements retain their existing incomplete status. These
 finite correctness contracts do not establish cross-language RNG/ABI or throughput
 identity.
+
+## Controlled feedback, terminal boundaries and owned runtimes
+
+Fourteen complete original methods have owning regressions in one ordered batch:
+
+```sh
+cargo test --locked -p rmagna --test original_clifford_feedback_enumeration --test original_inactive_guard
+cargo test --locked -p rmagna --lib original_virtual_clifford_contracts
+cargo test --locked -p rmagna --lib original_virtual_trace_contracts
+cargo test --locked -p rmagna --lib original_terminal_virtual_contracts
+cargo test --locked -p rmagna --lib original_pauli_reuse_contracts
+cargo test --locked -p rmagna --test original_pauli_terminal --test original_reentrant_callbacks
+cargo test --locked -p rmagna --test original_owner_lifetimes --test original_scalar_thread_safety
+```
+
+Exact literal matrix and independently expanded circuit oracles retain original
+controlled-Clifford decisions, register overwrites, all Pauli axes, reported-record
+conditions, reset, fault order and earlier marginal completion. Real immutable
+program and moment-cache ownership is checked inside test-only child modules.
+Public coherent routing, exact physical-history enumeration, false guarded noise,
+warm preparation, callback reentry/error recovery, detached owner lifetimes and
+concurrent probability queries retain complete exact results and RNG state where
+the contract calls for them. These are finite correctness and ownership checks.
+
+Two intentionally vendored offline fixtures retain 24 original terminal callback
+cases and 128 protocol/recovery/target stage vectors, with pinned original source,
+AST where applicable, Native and protected-helper binary hashes. Capture reused
+the retained source and binaries after complete 475-source validation and checked
+original/literal equality. Rust execution requires no Native or Python process.
+Target-stage unconditional moments uncompute and trace deferred target readouts;
+the separate target-overlap metric conditions on the target boundary. Prescribed
+impossible report flips remain conditional diagnostics. Native and Rust query,
+construction, proposal, private-object and random-stream scopes stay explicit.
+
+Current coverage is 178 verified, 2 partial and 172 unmapped, with zero architecture
+exclusions; 202 distinct witnesses from 204 declarations span 86 mapped targets.
+Existing partial
+gaps, remaining original contracts, full compatibility and paper-scale experiments
+remain incomplete. Strict complete-parity exit 2 remains intentional; successful
+report creation and current source/ledger/manifest bindings are checked separately.
