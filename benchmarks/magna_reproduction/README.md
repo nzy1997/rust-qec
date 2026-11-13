@@ -7,9 +7,9 @@ implement a simulator or claim reproduction of the paper's precision curves.
 
 ## Current coverage
 
-The source-bound ledger currently has 178 verified, 2 partial and 172 unmapped
+The source-bound ledger currently has 195 verified, 2 partial and 155 unmapped
 original methods, with zero architecture-specific core exclusions. It requires
-202 distinct Rust witnesses from 204 declarations across 86 targets. Strict
+219 distinct Rust witnesses from 221 declarations across 90 targets. Strict
 complete parity intentionally exits 2. The detailed per-change sections below
 retain their historical inventory snapshots; `coverage.json` is authoritative.
 
@@ -3159,9 +3159,43 @@ the separate target-overlap metric conditions on the target boundary. Prescribed
 impossible report flips remain conditional diagnostics. Native and Rust query,
 construction, proposal, private-object and random-stream scopes stay explicit.
 
-Current coverage is 178 verified, 2 partial and 172 unmapped, with zero architecture
-exclusions; 202 distinct witnesses from 204 declarations span 86 mapped targets.
-Existing partial
-gaps, remaining original contracts, full compatibility and paper-scale experiments
+At this preceding batch snapshot, coverage was 178 verified, 2 partial and
+172 unmapped, with zero architecture exclusions; 202 distinct witnesses from
+204 declarations span 86 mapped targets. Existing partial gaps, remaining
+original contracts, full compatibility and paper-scale experiments
 remain incomplete. Strict complete-parity exit 2 remains intentional; successful
 report creation and current source/ledger/manifest bindings are checked separately.
+
+## Original reference layers and target networks
+
+Seventeen complete original methods now have independent owning regressions:
+
+```sh
+cargo test --locked -p rmagna --test original_reference_layer --test original_reference_target
+cargo test --locked -p rmagna --test original_target_preparation --test original_target_networks
+```
+
+The reference-layer tests preserve exact complex amplitudes, the initial global
+omega cubed, all original fault locations and six ordered suffix assignments.
+Independent dense matrices retain opposite signs for equal-location X/Y order.
+A bounded offline fixture preserves all 24 original Random(260930) schedules,
+with pinned source and original-method AST hashes. No Native process runs in
+owning Rust tests, and no cross-language random-stream identity is assumed.
+
+Target tests preserve quadratic auxiliary projections with norms 5/8 and 3/8,
+every supported basis mass, Bell partial traces and encoded output order. Full
+and truncated physical-noise sectors retain separate acceptance, target response,
+error and rigorous omitted-sector bounds. Cancelled T/CS/CCZ and identical T
+outputs at widths 1, 4, 16 and 64 use actual rank-zero, one-term contractions;
+no exponential large-output enumeration is performed. Terminal AND callbacks
+select the composed causal route without being executed during preparation.
+Selected outputs and all original invalid modules remain explicit boundaries.
+
+Rust prepares pure targets and reusable doubled-density overlaps. Native target
+suffix layers, readout ancillas, private construction counters and internal
+layouts describe different scopes. Actual Rust construction/query accounting,
+stable warm families and bounded resources establish the behavioral counterpart.
+These finite correctness witnesses do not establish Monte Carlo precision or
+paper performance. Current coverage is 195 verified, 2 partial and 155 unmapped,
+with zero architecture exclusions, 219 distinct witnesses, 221 declarations and
+90 mapped targets. Complete parity and paper experiments remain incomplete.

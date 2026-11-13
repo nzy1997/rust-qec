@@ -2508,33 +2508,81 @@
     },
     {
       "id": "test_reference_layer_compiler.ReferenceLayerCompilerTests.test_clifford_parent_can_select_first_target_layer",
-      "status": "unmapped",
-      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+      "status": "verified",
+      "contract": "Complete Clifford H parent against H/T has exact target success (2+sqrt(2))/4, complementary error, unit target norm/history/physical mass and no records/controllers. Both compilers and cold/fixed preparation retain bare protocol diagnostics, actual construction/query counts, eight repeat-equal finite samples and stable warm overlap statistics. Pure-target/doubled-density preparation is an explicit Rust counterpart, not equal Native target-prefix counters.",
+      "rust_tests": [
+        {
+          "package": "rmagna",
+          "target": "original_reference_target",
+          "test": "original_clifford_parent_retains_reference_with_first_target_layer",
+          "source_sha256": "e805bba30622eed480cce9ab62f78b858a1c800219aca64e16fa56eb798f4924"
+        }
+      ]
     },
     {
       "id": "test_reference_layer_compiler.ReferenceLayerCompilerTests.test_compact_suffix_preserves_ordered_fault_phases",
-      "status": "unmapped",
-      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+      "status": "verified",
+      "contract": "All six original compact-suffix multi-fault assignments preserve parity, Y, CNOT, CZ and temporal anchors under both compilers. Complete complex amplitude vectors equal independently evolved literal matrices. X then Y versus Y then X at the same original anchor gives nonzero vectors with opposite exact common signs, detecting phase errors hidden by probabilities.",
+      "rust_tests": [
+        {
+          "package": "rmagna",
+          "target": "original_reference_layer",
+          "test": "original_compact_suffix_preserves_ordered_fault_phases",
+          "source_sha256": "f317b64d7484b24c05ae73e8c837545a4ddaecfd728ee602d63a93852af27884"
+        }
+      ]
     },
     {
       "id": "test_reference_layer_compiler.ReferenceLayerCompilerTests.test_dependent_constant_inverse_and_ccz_phases",
-      "status": "unmapped",
-      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+      "status": "verified",
+      "contract": "Complete original inverse and dependent parity rotations, CCZ on three plus wires and constant Clifford phase scenarios agree pointwise with independent literal amplitudes under both compilers, including all original single-fault choices and first/final pair. Shared extra phase ancillas are zero and specified coordinate/layer bounds retained. Independent matrices retain global omega^3 and exact Y signs.",
+      "rust_tests": [
+        {
+          "package": "rmagna",
+          "target": "original_reference_layer",
+          "test": "original_dependent_constant_inverse_and_ccz_phases",
+          "source_sha256": "f317b64d7484b24c05ae73e8c837545a4ddaecfd728ee602d63a93852af27884"
+        }
+      ]
     },
     {
       "id": "test_reference_layer_compiler.ReferenceLayerCompilerTests.test_first_middle_last_and_tie_layers",
-      "status": "unmapped",
-      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+      "status": "verified",
+      "contract": "All four original first/middle/last/tie scenarios retain the initial global omega^3 phase, every original location/wire/X-Y-Z fault and the first/final two-fault assignment. Both compilers agree with independent literal full-state matrices. Shared compiler reference-layer selection, layer count, retained slots and extra ancillas are asserted exactly; fault anchors translate to the end of each complete parity/Y lowering.",
+      "rust_tests": [
+        {
+          "package": "rmagna",
+          "target": "original_reference_layer",
+          "test": "original_first_middle_last_and_tie_reference_layers",
+          "source_sha256": "f317b64d7484b24c05ae73e8c837545a4ddaecfd728ee602d63a93852af27884"
+        }
+      ]
     },
     {
       "id": "test_reference_layer_compiler.ReferenceLayerCompilerTests.test_small_ordered_random_circuits",
-      "status": "unmapped",
-      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+      "status": "verified",
+      "contract": "All 24 original Random(260930) eight-operation two-qubit schedules are intentionally retained in a finite pinned-source fixture. Both compilers and every original fault location/wire/Pauli plus first/final pair match literal cyclotomic matrices; the oracle uses no compiled Clifford, phase network or RNG identity substitution. Fixture/source/method AST hashes bind the captured immutable schedules.",
+      "rust_tests": [
+        {
+          "package": "rmagna",
+          "target": "original_reference_layer",
+          "test": "original_small_ordered_random_reference_circuits",
+          "source_sha256": "f317b64d7484b24c05ae73e8c837545a4ddaecfd728ee602d63a93852af27884"
+        }
+      ]
     },
     {
       "id": "test_reference_layer_compiler.ReferenceLayerCompilerTests.test_target_suffix_preserves_parent_layer_and_prefix",
-      "status": "unmapped",
-      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+      "status": "verified",
+      "contract": "Original H/T/X_ERROR(1/4) against H/T/T/H retains exact target responses (2-sqrt(2))/4 without fault and (2+sqrt(2))/4 with fault, independent accepted/error/raw/normalized/history/noise masses, protocol reference diagnostics and immutable warm overlap families. Both compilers and cold/fixed preparation execute both prescribed choices and eight reproducible seeded draws. Actual Rust construction2 and normalization/query1+16 counts replace different Native appended-target layer/ancilla scopes; no RNG or private-layout identity claimed.",
+      "rust_tests": [
+        {
+          "package": "rmagna",
+          "target": "original_reference_target",
+          "test": "original_target_suffix_preserves_protocol_reference_and_reusable_overlap",
+          "source_sha256": "e805bba30622eed480cce9ab62f78b858a1c800219aca64e16fa56eb798f4924"
+        }
+      ]
     },
     {
       "id": "test_reference_networks.ReferenceNetworkTests.test_affine_batch_reuses_protocol_assignment_without_sampling_parent",
@@ -2875,58 +2923,146 @@
     },
     {
       "id": "test_target_network.TargetNetworkTests.test_linear_scalar_target_prepares_b_and_c",
-      "status": "unmapped",
-      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+      "status": "verified",
+      "contract": "Original H/T/depolarizing1(1/3), independent M(1/4) postselection/feedback and S recovery against H/T exhaust all eight Pauli/report-flip assignments with independent physical masses, raw acceptance1/2 and exact separate target/error responses. Twenty samples match same-Rust-stream prescribed evaluations/RNG and actual construction2/query41 accounting. Added weight-zero/full cutoffs retain covered/omitted1/2 and exact sector/full masses. Both compilers and cold/fixed preparation reuse stable families.",
+      "rust_tests": [
+        {
+          "package": "rmagna",
+          "target": "original_target_networks",
+          "test": "original_linear_scalar_target_retains_separate_acceptance_and_recovery_response",
+          "source_sha256": "bbe60c2c2d07fb1db8382074d9717cb2950537c11befb8c104b6bc53fcfdbc0f"
+        }
+      ]
     },
     {
       "id": "test_target_network.TargetNetworkTests.test_many_outputs_trace_before_any_resource_expansion",
-      "status": "unmapped",
-      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+      "status": "verified",
+      "contract": "All original widths1,4,16,64 retain identical H/T physical/target outputs, independent H/M postselection and both prescribed Z fault choices. Acceptance1/2 and exact success/error0 or1/2 are checked for four seeds under both compilers and cold/fixed modes, with hard one-term budget and actual rank0. Warm compilation is zero and resources stable. Scalar tracing never enumerates 2^64 amplitudes.",
+      "rust_tests": [
+        {
+          "package": "rmagna",
+          "target": "original_target_networks",
+          "test": "original_many_outputs_trace_before_one_term_contraction",
+          "source_sha256": "bbe60c2c2d07fb1db8382074d9717cb2950537c11befb8c104b6bc53fcfdbc0f"
+        }
+      ]
     },
     {
       "id": "test_target_network.TargetNetworkTests.test_unit_target_resource_omits_unpaired_construction",
-      "status": "unmapped",
-      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+      "status": "verified",
+      "contract": "The complete original identical physical/target H/T scenario uses public arbitrary Pauli insertions and a single reusable PreparedDensityOverlap per compiler/cold-or-fixed mode. All one-sided I/X/Y/Z responses equal [1,1/2,1/2,0], with hard max_terms1, actual quotient rank0 and at most one term. Fixed resource identity/statistics remain unchanged; Rust doubled-density resource observations replace Native unpaired-construction counters.",
+      "rust_tests": [
+        {
+          "package": "rmagna",
+          "target": "original_target_networks",
+          "test": "original_unit_target_reuses_one_overlap_family_for_all_physical_paulis",
+          "source_sha256": "bbe60c2c2d07fb1db8382074d9717cb2950537c11befb8c104b6bc53fcfdbc0f"
+        }
+      ]
     },
     {
       "id": "test_target_network.WholeTaskRouteTests.test_target_is_unitary_on_selected_outputs_only",
-      "status": "unmapped",
-      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+      "status": "verified",
+      "contract": "Original selected physical outputs[4,2] and H/T/CX target give unit exact target response under both compilers and cold/fixed modes. An asymmetric I4/X2 versus I0/X1 witness has error0 in declared order and error1 when reversed. All four original invalid target modules reject; no target operation may silently act on other physical outputs. Pure-target preparation replaces private appended-readout representation.",
+      "rust_tests": [
+        {
+          "package": "rmagna",
+          "target": "original_target_networks",
+          "test": "original_target_unitary_acts_only_on_selected_outputs_in_declared_order",
+          "source_sha256": "bbe60c2c2d07fb1db8382074d9717cb2950537c11befb8c104b6bc53fcfdbc0f"
+        }
+      ]
     },
     {
       "id": "test_target_network.WholeTaskRouteTests.test_terminal_decoder_selects_nonlinear_route",
-      "status": "unmapped",
-      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+      "status": "verified",
+      "contract": "Original terminal AND recovery changes the composed task to a causal route while preparation executes zero decoder callbacks. Sixteen compiler/query/causal/history configurations retain four actual seeded callbacks, full assignments and exact four-history enumeration with error1/4 and success3/4, acceptance/covered1 and omitted0. Both decoder inputs occur and the actual histories, zero fixed draw compilation and warm observations remain explicit.",
+      "rust_tests": [
+        {
+          "package": "rmagna",
+          "target": "original_target_networks",
+          "test": "original_terminal_and_decoder_selects_composed_causal_route_without_preparation_calls",
+          "source_sha256": "bbe60c2c2d07fb1db8382074d9717cb2950537c11befb8c104b6bc53fcfdbc0f"
+        }
+      ]
     },
     {
       "id": "test_target_preparation.TargetPreparationTests.test_cancelled_magic_keeps_one_sided_pauli_updates",
-      "status": "unmapped",
-      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+      "status": "verified",
+      "contract": "All original cancelled T/CS/CCZ states preserve one-sided I/X/Y/Z overlap tables [1,1/2,1/2,0], [1,1/4,1/4,0] and [1,1/4,0,0], including optional requested history. Both compilers, cold/fixed queries and exact/affine history samplers retain a hard one-term contraction budget, actual quotient rank0, full norm1, stable cache families and zero warm recompilations over four seeds. No arbitrary Native counter equivalence is assumed.",
+      "rust_tests": [
+        {
+          "package": "rmagna",
+          "target": "original_target_preparation",
+          "test": "original_cancelled_magic_preserves_one_sided_pauli_updates_and_one_term_queries",
+          "source_sha256": "ce95d7544e3265049eecb54b53cea0582efd5bd5ae5424c5150b544a85d009a2"
+        }
+      ]
     },
     {
       "id": "test_target_preparation.TargetPreparationTests.test_encoded_target_includes_full_physical_output",
-      "status": "unmapped",
-      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+      "status": "verified",
+      "contract": "The complete Bell physical-output target and X noise cases retain exact full error1/4, the correct Z-pair response, unit target norm and declared output boundaries under both compilers and cold/fixed preparation. Unknown target_checks is explicitly rejected with its field named. Encoded targets trace only auxiliary target legs, preserving all physical outputs.",
+      "rust_tests": [
+        {
+          "package": "rmagna",
+          "target": "original_target_preparation",
+          "test": "original_encoded_target_retains_full_physical_output_and_rejects_target_checks",
+          "source_sha256": "ce95d7544e3265049eecb54b53cea0582efd5bd5ae5424c5150b544a85d009a2"
+        }
+      ]
     },
     {
       "id": "test_target_preparation.TargetPreparationTests.test_full_output_target_does_not_change_acceptance",
-      "status": "unmapped",
-      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+      "status": "verified",
+      "contract": "The complete five-physical-output/six-wire projected target retains norm5/8, acceptance1, error19/20 and success1/20. The original noisy four-output quadratic target gives full error37/40; its weight-zero sector retains physical mass3/4, omitted1/4, acceptance3/4, error27/40, success3/40 and rigorous full-error bounds27/40..37/40. Both compilers and cold/fixed modes preserve target-independent acceptance and all metadata.",
+      "rust_tests": [
+        {
+          "package": "rmagna",
+          "target": "original_target_preparation",
+          "test": "original_full_output_target_preserves_acceptance_and_omitted_sector_bounds",
+          "source_sha256": "ce95d7544e3265049eecb54b53cea0582efd5bd5ae5424c5150b544a85d009a2"
+        }
+      ]
     },
     {
       "id": "test_target_preparation.TargetPreparationTests.test_invalid_and_zero_target_boundaries",
-      "status": "unmapped",
-      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+      "status": "verified",
+      "contract": "All four original invalid/zero projected target scenarios fail explicitly under both compilers and cold/fixed preparation. Malformed boundaries and zero normalization remain errors rather than zero-success tasks; each valid evaluator uses real pure-target/protocol construction and normalization query observations. No Native runtime is needed by this owning witness.",
+      "rust_tests": [
+        {
+          "package": "rmagna",
+          "target": "original_target_preparation",
+          "test": "original_invalid_and_zero_target_boundaries_reject",
+          "source_sha256": "ce95d7544e3265049eecb54b53cea0582efd5bd5ae5424c5150b544a85d009a2"
+        }
+      ]
     },
     {
       "id": "test_target_preparation.TargetPreparationTests.test_quadratic_branches_against_basis_probabilities",
-      "status": "unmapped",
-      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+      "status": "verified",
+      "contract": "All 32 original five-wire quadratic target branch/basis cases are retained under both compilers and cold/fixed preparation. Literal x0*x3 XOR x1*x2 gives supports10/6 and projected norms5/8,3/8; every supported raw overlap1/16 becomes normalized1/10 or1/6, with complementary exact error. Actual construction2/normalization-query1 observations retain preparation behavior without Native private counters.",
+      "rust_tests": [
+        {
+          "package": "rmagna",
+          "target": "original_target_preparation",
+          "test": "original_quadratic_target_branches_match_all_basis_probabilities",
+          "source_sha256": "ce95d7544e3265049eecb54b53cea0582efd5bd5ae5424c5150b544a85d009a2"
+        }
+      ]
     },
     {
       "id": "test_target_preparation.TargetPreparationTests.test_trace_and_encoded_output_order",
-      "status": "unmapped",
-      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+      "status": "verified",
+      "contract": "Complete original partial Bell trace with I/X/H-T pure targets gives exact error1/2 and unit normalization; the encoded target preserves the declared output order and traced environment with target success1. Both compilers and cold/fixed modes compare exact raw/normalized responses and preparation observations; no full output-state enumeration is substituted for tracing.",
+      "rust_tests": [
+        {
+          "package": "rmagna",
+          "target": "original_target_preparation",
+          "test": "original_partial_trace_and_encoded_target_output_order",
+          "source_sha256": "ce95d7544e3265049eecb54b53cea0582efd5bd5ae5424c5150b544a85d009a2"
+        }
+      ]
     },
     {
       "id": "test_terminal_evaluation.TerminalEvaluationTests.test_affine_recovery_integrates_records_and_moments_before_target",
