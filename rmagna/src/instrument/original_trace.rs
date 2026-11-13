@@ -14,6 +14,7 @@ pub use boundary::{
     OriginalBoundaryDraw, OriginalBoundaryLimits, OriginalBoundaryOptions, OriginalBoundaryQuery,
     OriginalBoundaryResource, OriginalBoundaryService, OriginalBoundaryTask, OriginalRecordLayout,
 };
+pub(super) use network::admit_owned_geometry;
 pub use network::{
     OriginalNetworkLimits, OriginalNetworkMoment, OriginalNetworkOptions,
     OriginalNetworkProbability, OriginalNetworkResource, OriginalRecordProbabilities,
@@ -70,6 +71,27 @@ impl<T> OriginalTraceResult<T> {
         "inherited-product"
     }
 }
+/// Admission for authoritative declared-affine preparation before any lowering.
+#[derive(Clone, Copy, Debug)]
+pub struct OriginalDeclaredTraceLimits {
+    pub max_gate_targets: usize,
+    pub max_target_occurrences: usize,
+    pub max_preparation_words: usize,
+}
+impl Default for OriginalDeclaredTraceLimits {
+    fn default() -> Self {
+        Self {
+            max_gate_targets: 65536,
+            max_target_occurrences: 1 << 20,
+            max_preparation_words: 1 << 24,
+        }
+    }
+}
+struct ControlTraceAnchor {
+    start: usize,
+    end: usize,
+    records: Vec<usize>,
+}
 struct Anchor {
     position: usize,
     gates: usize,
@@ -86,6 +108,10 @@ pub struct OriginalStaticTrace {
     record_indices: BTreeMap<String, usize>,
     record_slots: Vec<(usize, bool)>,
     anchors: BTreeMap<String, Anchor>,
+    controls: Vec<ControlTraceAnchor>,
+    declared_limits: OriginalDeclaredTraceLimits,
+    declared_targets: u128,
+    declared_preparation_words: u128,
     histories: BTreeMap<OriginalWire, Vec<(usize, Option<usize>)>>,
     limits: OriginalLimits,
 }
@@ -113,19 +139,63 @@ impl OriginalInstrument {
         strategy: CompilerStrategy,
         arithmetic: &ScalarArithmetic,
     ) -> Result<OriginalStaticTrace, OriginalError> {
-        if let Some(op) = self
-            .operations
-            .iter()
-            .find(|op| op.gate == OriginalGate::Control)
-        {
-            return Err(invalid("static trace requires resolved controls", &op.id));
+        self.compile_trace_with_declared_limits(
+            strategy,
+            OriginalDeclaredTraceLimits::default(),
+            arithmetic,
+        )
+    }
+    /// Lower owned affine declarations without invoking any callback. Opaque,
+    /// nonlinear and controlled odd-phase declarations are rejected explicitly.
+    pub fn compile_trace_with_declared_limits(
+        &self,
+        strategy: CompilerStrategy,
+        trace_limits: OriginalDeclaredTraceLimits,
+        arithmetic: &ScalarArithmetic,
+    ) -> Result<OriginalStaticTrace, OriginalError> {
+        let failure = |operation: &str, error| OriginalError::DeclaredControl {
+            operation: operation.into(),
+            error,
+        };
+        let mut source_targets = 0u128;
+        let mut preparation_words = 0u128;
+        for op in &self.operations {
+            if op.gate == OriginalGate::Control {
+                let rule = self
+                    .control_rule(&op.id)
+                    .ok_or_else(|| invalid("static trace requires resolved controls", &op.id))?;
+                source_targets += rule
+                    .affine_target_occurrences(trace_limits.max_gate_targets)
+                    .map_err(|e| failure(&op.id, e))? as u128;
+                preparation_words += rule
+                    .affine_preparation_words()
+                    .map_err(|e| failure(&op.id, e))? as u128;
+            } else {
+                source_targets += op.gate.wire_count() as u128;
+            }
+        }
+        admit(
+            "max_declared_target_occurrences",
+            trace_limits.max_target_occurrences,
+            source_targets,
+        )?;
+        admit(
+            "max_declared_preparation_words",
+            trace_limits.max_preparation_words,
+            preparation_words,
+        )?;
+        let mut plans = BTreeMap::new();
+        for op in &self.operations {
+            if let Some(rule) = self.control_rule(&op.id) {
+                plans.insert(
+                    op.id.clone(),
+                    rule.prepare_affine(trace_limits.max_preparation_words)
+                        .map_err(|e| failure(&op.id, e))?,
+                );
+            }
         }
         // Admission precedes sparse-history/anchor/record ownership allocations.
-        let occurrences = self
-            .operations
-            .iter()
-            .map(|op| op.gate.wire_count() as u128)
-            .sum::<u128>();
+        let occurrences = source_targets;
         admit(
             "max_metadata_bytes",
             self.limits.max_metadata_bytes,
@@ -147,8 +217,30 @@ impl OriginalInstrument {
             histories.insert(wire, vec![(0, Some(slot))]);
         }
         let mut anchors = BTreeMap::new();
+        let mut controls = Vec::with_capacity(plans.len());
         for (i, op) in self.operations.iter().enumerate() {
-            lower.gate(&op.gate, &OriginalOrigin::Operation(op.id.clone()), None)?;
+            let origin = OriginalOrigin::Operation(op.id.clone());
+            if let Some(plan) = plans.get(&op.id) {
+                let start = lower.gates.len();
+                lower.affine_control(plan, &self.records, &origin)?;
+                let records = plan
+                    .records
+                    .iter()
+                    .map(|name| {
+                        self.records
+                            .iter()
+                            .position(|r| r == name)
+                            .expect("declared source record")
+                    })
+                    .collect();
+                controls.push(ControlTraceAnchor {
+                    start,
+                    end: lower.gates.len(),
+                    records,
+                });
+            } else {
+                lower.gate(&op.gate, &origin, None)?;
+            }
             let position = i + 1;
             anchors.insert(
                 op.id.clone(),
@@ -201,6 +293,10 @@ impl OriginalInstrument {
                 .collect(),
             record_slots: lower.record_slots,
             anchors,
+            controls,
+            declared_limits: trace_limits,
+            declared_targets: source_targets,
+            declared_preparation_words: preparation_words,
             histories,
             limits: self.limits,
         })
@@ -242,6 +338,11 @@ impl OriginalStaticTrace {
             self.limits.max_faults,
             assignment.faults.len() as u128,
         )?;
+        admit(
+            "max_declared_target_occurrences",
+            self.declared_limits.max_target_occurrences,
+            self.declared_targets + assignment.faults.len() as u128,
+        )?;
         let bytes = assignment
             .faults
             .iter()
@@ -258,6 +359,13 @@ impl OriginalStaticTrace {
             self.limits.expansion.max_geometry_words,
             (self.physical_width() as u128).div_ceil(64) * 2 * assignment.faults.len() as u128
                 + 16 * assignment.faults.len() as u128
+                + (self.physical_width() as u128).div_ceil(64) * 4 * self.controls.len() as u128
+                + 32 * self.controls.len() as u128
+                + self
+                    .controls
+                    .iter()
+                    .map(|c| c.records.len() as u128)
+                    .sum::<u128>()
                 + self.record_names.len() as u128
                 + 128,
         )?;
@@ -269,6 +377,19 @@ impl OriginalStaticTrace {
                 .ok_or_else(|| invalid("unknown report flip", name))?;
             flips[j] = !flips[j];
         }
+        let affected = self
+            .controls
+            .iter()
+            .filter(|c| c.records.iter().any(|&j| flips[j]))
+            .count() as u128;
+        let packed = (self.physical_width() as u128).div_ceil(64);
+        admit(
+            "max_declared_preparation_words",
+            self.declared_limits.max_preparation_words,
+            self.declared_preparation_words
+                + (4 * packed + 32) * affected
+                + (2 * packed + 16) * assignment.faults.len() as u128,
+        )?;
         let mut resolved = Vec::with_capacity(assignment.faults.len());
         for (ordinal, fault) in assignment.faults.iter().enumerate() {
             let anchor = self
@@ -316,6 +437,34 @@ impl OriginalStaticTrace {
                 )?,
             });
         }
+        // Toggle report coordinates only around the complete controlled
+        // segment, then restore true record legs before final query relabeling.
+        // Equal positions retain stable order; paired X masks cancel for empty
+        // segments and remain before faults anchored after the whole control.
+        for control in &self.controls {
+            let slots = control
+                .records
+                .iter()
+                .filter(|&&j| flips[j])
+                .map(|&j| self.record_slots[j].0)
+                .collect::<Vec<_>>();
+            if !slots.is_empty() {
+                let word = PauliWord::new(
+                    BitVector::from_indices(self.physical_width(), slots)?,
+                    BitVector::zeros(self.physical_width())?,
+                    0,
+                )?;
+                insertions.push(PauliInsertion {
+                    before_gate: control.start,
+                    word: word.clone(),
+                });
+                insertions.push(PauliInsertion {
+                    before_gate: control.end,
+                    word,
+                });
+            }
+        }
+        insertions.sort_by_key(|i| i.before_gate);
         let unitary = self.reference.with_insertions(&insertions, arithmetic)?;
         Ok(OriginalTraceView {
             source: self,

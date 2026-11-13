@@ -168,10 +168,35 @@ pub(super) fn admit_geometry(
     occurrences: u128,
     options: &OriginalNetworkOptions<'_>,
 ) -> Result<u128, OriginalError> {
-    let limits = source.limits;
-    let (boundary, paths) = source.reference.scalar_query_shape();
+    let options = OriginalNetworkOptions {
+        limits: OriginalNetworkLimits {
+            max_geometry_words: options
+                .limits
+                .max_geometry_words
+                .min(source.limits.expansion.max_geometry_words),
+            ..options.limits
+        },
+        ..*options
+    };
+    admit_owned_geometry(&source.reference, event_count, occurrences, &options)
+}
+
+/// Shared actual scalar geometry admission for static and owned branch queries.
+/// Source-specific clamps remain in the callers, before allocating event rows.
+pub(in super::super) fn admit_owned_geometry(
+    reference: &CompiledUnitary,
+    event_count: usize,
+    occurrences: u128,
+    options: &OriginalNetworkOptions<'_>,
+) -> Result<u128, OriginalError> {
+    admit(
+        "max_record_occurrences",
+        options.max_record_occurrences,
+        occurrences,
+    )?;
+    let (boundary, paths) = reference.scalar_query_shape();
     let (n, w, p, e) = (
-        source.physical_width() as u128,
+        reference.width() as u128,
         2 * boundary as u128,
         2 * paths as u128,
         event_count as u128,
@@ -191,10 +216,7 @@ pub(super) fn admit_geometry(
     );
     admit(
         "max_network_geometry_words",
-        options
-            .limits
-            .max_geometry_words
-            .min(limits.expansion.max_geometry_words),
+        options.limits.max_geometry_words,
         words,
     )?;
     Ok(words)
@@ -274,13 +296,27 @@ impl OriginalStaticTrace {
         options: &OriginalNetworkOptions<'_>,
         a: &ScalarArithmetic,
     ) -> Result<OriginalNetworkMoment<'_>, OriginalError> {
+        self.validate_moment_word(word)?;
+        let (layout, rows) = layout(self, events, options)?;
+        self.prepare_moment_layout(word, layout, rows, options, a)
+    }
+    fn validate_moment_word(&self, word: &PauliWord) -> Result<(), OriginalError> {
         if word.width() != self.network_width() {
             return Err(OriginalError::DimensionMismatch);
         }
         if word.phase() & 3 != 2 * u8::from(word.x().dot(word.z())?) {
             return Err(CompletedRecordError::NonHermitianPauli.into());
         }
-        let (layout, rows) = layout(self, events, options)?;
+        Ok(())
+    }
+    fn prepare_moment_layout<'a>(
+        &'a self,
+        word: &PauliWord,
+        layout: Layout<'a>,
+        rows: Vec<BitVector>,
+        options: &OriginalNetworkOptions<'_>,
+        a: &ScalarArithmetic,
+    ) -> Result<OriginalNetworkMoment<'a>, OriginalError> {
         let output_count = self.outputs.len();
         let slot = |j: usize| {
             if j < output_count {
@@ -335,6 +371,12 @@ impl OriginalNetworkProbability<'_> {
     pub fn geometry_words(&self) -> u128 {
         self.layout.geometry_words
     }
+    /// Resource selected explicitly for this final scalar family.
+    pub fn resource(&self) -> &crate::phase::PreparedPhaseResource {
+        self.query
+            .fixed_phase_resource()
+            .expect("explicit scalar resource preparation")
+    }
     pub fn evaluate(
         &self,
         view: &OriginalTraceView<'_>,
@@ -350,6 +392,12 @@ impl OriginalNetworkProbability<'_> {
 impl OriginalNetworkMoment<'_> {
     pub fn geometry_words(&self) -> u128 {
         self.layout.geometry_words
+    }
+    /// Resource selected explicitly for this final scalar family.
+    pub fn resource(&self) -> &crate::phase::PreparedPhaseResource {
+        self.query
+            .fixed_phase_resource()
+            .expect("explicit scalar resource preparation")
     }
     pub fn evaluate(
         &self,
@@ -469,3 +517,6 @@ mod tests {
         }
     }
 }
+
+#[path = "original_boundary_events.rs"]
+mod boundary_events;

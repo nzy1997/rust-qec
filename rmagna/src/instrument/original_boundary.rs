@@ -279,8 +279,9 @@ pub struct OriginalBoundaryService<'a> {
     geometry_words: u128,
 }
 impl OriginalStaticTrace {
-    /// Retain an exact direct static boundary task. Opaque/structured controllers
-    /// must already have been rejected by `compile_trace`; no callback is called.
+    /// Retain an exact direct boundary task. `compile_trace` accepts supported
+    /// declared-affine rules and rejects opaque or unsupported controllers.
+    /// This preparation never calls a callback.
     /// Native two-term catalogue behavior requires an explicitly supplied database.
     ///
     /// ```
