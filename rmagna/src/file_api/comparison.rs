@@ -142,7 +142,7 @@ impl FileSamplerPilot {
                 .is_some_and(|r| r.status == crate::task::RunStatus::Complete)
     }
     pub fn to_json(&self) -> Value {
-        let receipt = self.raw_result().map(|r|json!({"status":if r.status==crate::task::RunStatus::Complete{"complete"}else{"failed"},
+        let receipt = self.raw_result().map(|r|json!({"status":r.status.as_str(),
             "requested":r.requested,"completed":r.completed,"failed":r.failed,"not_attempted":r.not_attempted,"seed":r.seed,
             "execution_costs":costs_json(r.execution_costs),"sampling_seconds":r.timings.sampling_seconds,
             "estimates_persisted":self.exported_batch.is_some()}));

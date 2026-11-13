@@ -7,9 +7,9 @@ implement a simulator or claim reproduction of the paper's precision curves.
 
 ## Current coverage
 
-The source-bound ledger currently has 134 verified, 1 partial and 217 unmapped
+The source-bound ledger currently has 139 verified, 2 partial and 211 unmapped
 original methods, with zero architecture-specific core exclusions. It requires
-156 distinct Rust witnesses from 158 declarations across 67 targets. Strict
+163 distinct Rust witnesses from 165 declarations across 69 targets. Strict
 complete parity intentionally exits 2. The detailed per-change sections below
 retain their historical inventory snapshots; `coverage.json` is authoritative.
 
@@ -34,6 +34,35 @@ The [paper data deposit](https://doi.org/10.5281/zenodo.23386778) records an old
 development kernel, `853fa2369817e1be65a710b42ff80606e219e464`. Its `.stimx` inputs
 were converted to the public `.magna` files. Historical and public input hashes
 are different; do not claim byte-identical replay of the historical kernel.
+
+## File runtime control, original batches and reuse
+
+`file_runtime_control` ports the original hold-decoder event ordering through
+an explicit exclusive facade while retaining the safe concurrent immutable Rust
+API. Busy guards cover complete active calls and release on success, error and
+unwind. Shared-API rejection differences remain recorded as expected diagnostic
+failures. Sticky batch cancellation is independent of progress intervals and
+retains zero/one-row provisional prefixes without extra RNG or decoder work.
+The original ten-million request/progress interval runs in a bounded Rust child.
+The unchanged native signal method runs in a separate Python process; Rust
+cancellation does not establish Python SIGALRM exception identity. That complete
+original method is partial with an explicit Rust/Python architecture distinction and remaining gap.
+No core exclusion is widened.
+
+`original_file_batches_and_reuse` owns both original NativeBatch methods and
+two FileReuse methods. The 79-draw seed391 H/T/Z-error/MX method runs all16
+compiler/causal/history/noise configurations and preserves per-draw reported-MX
+anchors and all record rows. Independent exact full-list centering checks paired
+ratio variance, complete-weight ESS/mean and actual versus L/W-corrected residual
+coefficients. Ordinary/scientific JSON estimates and standard errors use an
+independent coefficient evaluation and1e-11 absolute-plus-relative tolerance.
+Budget11/20draw/seed99 comparisons include real preparation-normalization work
+in the same query collector as sampling, retain only committed rows and check
+the first failed attempt. Reuse methods keep the fourth-callback failure in
+70draw/seed8 runs, explicit10000/two-query budgets, and the original20draw/seed4
+two-compilation preparation boundary. Actual re-preparation controls detect
+additional work. These are finite contracts, with independent Rust RNG semantics,
+not native cache-object identity, peak-memory or paper-throughput equivalence.
 
 ## Original file decoder moments and XOR marginalization
 

@@ -1,9 +1,11 @@
 //! Owned file-task snapshots, reusable compilation, and schema-2 run reports.
 mod comparison;
+mod exclusive;
 pub use comparison::{
     FileSamplerComparison, FileSamplerComparisonOptions, FileSamplerPilot, SamplerComparisonStatus,
     SamplerDecision,
 };
+pub use exclusive::{ExclusiveCompiledFileTask, ExclusiveFileTaskError};
 mod progress;
 pub use progress::export_progress;
 mod enumeration;
@@ -16,11 +18,11 @@ use crate::noise::NoiseSampling;
 use crate::numeric::NumericOptions;
 use crate::runtime::ControllerRegistry;
 use crate::task::{
-    BatchExportError, ContentFingerprints, EvaluationOptions, FingerprintError, FingerprintInputs,
-    FingerprintOptions, LoadedModules, ProgressObserver, RunHooks, TaskError, TaskEvaluator,
-    TaskOptions, TaskRunOptions, TaskRunResult, export_batch_metrics, fingerprint_content,
-    parse_task, resolved_options, run_task_batch_inspected, sampling_configuration,
-    validate_snapshot_fingerprints,
+    BatchExportError, CancellationToken, ContentFingerprints, EvaluationOptions, FingerprintError,
+    FingerprintInputs, FingerprintOptions, LoadedModules, ProgressObserver, RunHooks, TaskError,
+    TaskEvaluator, TaskOptions, TaskRunOptions, TaskRunResult, export_batch_metrics,
+    fingerprint_content, parse_task, resolved_options, run_task_batch_inspected,
+    sampling_configuration, validate_snapshot_fingerprints,
 };
 pub use enumeration::{FileEnumerationOptions, FileEnumerationReport};
 pub use preparation::{FilePreparationOptions, FilePreparationReport, PreparedFileTask};
@@ -307,19 +309,36 @@ impl FileTask {
     /// Fresh preparation shares the run quota/deadline; ordinary preparation
     /// failures produce failed reports with zero attempted draws.
     pub fn run(&self, run: &TaskRunOptions) -> Result<FileRunReport, FileApiError> {
-        self.run_observed(run, None)
+        self.run_observed(run, None, None)
     }
     pub fn run_with_progress(
         &self,
         run: &TaskRunOptions,
         observer: &mut ProgressObserver<'_>,
     ) -> Result<FileRunReport, FileApiError> {
-        self.run_observed(run, Some(observer))
+        self.run_observed(run, Some(observer), None)
+    }
+    /// Cancel between draws independently of the progress interval.
+    pub fn run_cancellable(
+        &self,
+        run: &TaskRunOptions,
+        token: &CancellationToken,
+    ) -> Result<FileRunReport, FileApiError> {
+        self.run_observed(run, None, Some(token))
+    }
+    pub fn run_cancellable_with_progress(
+        &self,
+        run: &TaskRunOptions,
+        token: &CancellationToken,
+        observer: &mut ProgressObserver<'_>,
+    ) -> Result<FileRunReport, FileApiError> {
+        self.run_observed(run, Some(observer), Some(token))
     }
     fn run_observed(
         &self,
         run: &TaskRunOptions,
         mut observer: Option<&mut ProgressObserver<'_>>,
+        cancellation: Option<&CancellationToken>,
     ) -> Result<FileRunReport, FileApiError> {
         if let Some(observer) = observer.as_deref_mut() {
             observer.reset();
@@ -336,6 +355,7 @@ impl FileTask {
             run,
             RunHooks {
                 progress: observer.as_deref_mut(),
+                cancellation,
                 inspect: |evaluator: &TaskEvaluator, costs, seconds| {
                     compilation_snapshot(
                         evaluator,
@@ -409,28 +429,49 @@ impl CompiledFileTask {
         Ok(value)
     }
     pub fn run(&self, run: &TaskRunOptions) -> Result<FileRunReport, FileApiError> {
-        self.run_observed(run, None)
+        self.run_observed(run, None, None)
     }
     pub fn run_with_progress(
         &self,
         run: &TaskRunOptions,
         observer: &mut ProgressObserver<'_>,
     ) -> Result<FileRunReport, FileApiError> {
-        self.run_observed(run, Some(observer))
+        self.run_observed(run, Some(observer), None)
+    }
+    /// Cancel between draws independently of the progress interval.
+    pub fn run_cancellable(
+        &self,
+        run: &TaskRunOptions,
+        token: &CancellationToken,
+    ) -> Result<FileRunReport, FileApiError> {
+        self.run_observed(run, None, Some(token))
+    }
+    pub fn run_cancellable_with_progress(
+        &self,
+        run: &TaskRunOptions,
+        token: &CancellationToken,
+        observer: &mut ProgressObserver<'_>,
+    ) -> Result<FileRunReport, FileApiError> {
+        self.run_observed(run, Some(observer), Some(token))
     }
     fn run_observed(
         &self,
         run: &TaskRunOptions,
         mut observer: Option<&mut ProgressObserver<'_>>,
+        cancellation: Option<&CancellationToken>,
     ) -> Result<FileRunReport, FileApiError> {
         if let Some(observer) = observer.as_deref_mut() {
             observer.reset();
         }
         let interval = observer.as_ref().map(|o| o.receipt().every);
         let mut metadata = self.task.progress_descriptor(run, interval)?;
-        let result = match observer.as_deref_mut() {
-            Some(observer) => self.evaluator.run_batch_with_progress(run, observer)?,
-            None => self.evaluator.run_batch(run)?,
+        let result = match (observer.as_deref_mut(), cancellation) {
+            (Some(observer), Some(token)) => self
+                .evaluator
+                .run_batch_cancellable_with_progress(run, token, observer)?,
+            (Some(observer), None) => self.evaluator.run_batch_with_progress(run, observer)?,
+            (None, Some(token)) => self.evaluator.run_batch_cancellable(run, token)?,
+            (None, None) => self.evaluator.run_batch(run)?,
         };
         let snapshot = match compilation_snapshot(&self.evaluator, self.preparation, false) {
             Ok(snapshot) => snapshot,
