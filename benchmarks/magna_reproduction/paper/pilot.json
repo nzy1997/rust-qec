@@ -1,0 +1,27 @@
+{
+  "schema": "rmagna.paper-pilot-plan.v1",
+  "reference_sha256": "c49203a586f5a451e3183b435793df693dd486857356aed8826df5dc723e5454",
+  "upstream_commit": "56847478c840395735146ef1e1ccdc3d8aedc10f",
+  "paper": "2610.22315v1",
+  "output_contract": "integrated_joint_acceptance_error_masses",
+  "tasks": [
+    "bh2-T",
+    "bh2-S",
+    "bh10-T",
+    "color3",
+    "rp2-d3",
+    "dk",
+    "logical-distillation",
+    "tqd3"
+  ],
+  "required_completed": [
+    "bh2-T",
+    "bh2-S"
+  ],
+  "shots": 8,
+  "seed": 20261008,
+  "warm_replays": 2,
+  "timeout_seconds": 45,
+  "max_terms": 256,
+  "native_max_quotient_rank": 12
+}

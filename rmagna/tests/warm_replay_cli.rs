@@ -8,6 +8,49 @@ use std::path::PathBuf;
 use std::sync::atomic::{AtomicU64, Ordering};
 
 struct Fixture(PathBuf);
+
+#[test]
+fn bounded_pilot_draws_real_physical_noise_after_a_prescribed_no_fault_query() {
+    let fixture = Fixture::new(false);
+    fixture.put("physical.magna", "X_ERROR(1/2) 0\n");
+    fixture.put(
+        "task.json",
+        r#"{"outputs":[0],"ideal_state":"ideal.magna"}"#,
+    );
+    let result = fixture.success(&["--pilot-shots", "64", "--warm-replays", "2"]);
+    assert_eq!(
+        result["raw_error"]["coefficients"],
+        json!(["0", "0", "0", "0"])
+    );
+    let pilot = &result["pilot"];
+    assert_eq!(pilot["status"], "complete");
+    assert_eq!(
+        (pilot["completed"].as_u64(), pilot["failed"].as_u64()),
+        (Some(64), Some(0))
+    );
+    assert_eq!(pilot["metrics"]["estimates"]["acceptance"], 1.);
+    // The independent SplitMix64 seed-0 word list has 38 odd words in its
+    // first 64 entries. Each odd word selects X from this two-point law.
+    assert_eq!(pilot["metrics"]["estimates"]["error"], 38. / 64.);
+    assert!(fixture.calls().is_empty());
+}
+
+#[test]
+fn invalid_or_prescribed_pilot_options_fail_before_decoder_import() {
+    for flags in [
+        vec!["--pilot-shots", "0"],
+        vec!["--pilot-shots", "65"],
+        vec!["--pilot-shots", "8", "--pilot-shots", "8"],
+        vec!["--pilot-shots", "8", "--constant-word", "0"],
+        vec!["--pilot-shots", "8", "--history", "unused.json"],
+    ] {
+        let fixture = Fixture::new(false);
+        let (result, output) = fixture.execute(&flags);
+        assert!(result.is_err(), "{flags:?}");
+        assert!(output.is_empty());
+        assert!(!fixture.path("plugin.imported").exists());
+    }
+}
 impl Fixture {
     fn new(changing: bool) -> Self {
         static NEXT: AtomicU64 = AtomicU64::new(0);
