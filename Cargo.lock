@@ -1022,7 +1022,7 @@ dependencies = [
 
 [[package]]
 name = "qec-code"
-version = "0.3.0"
+version = "0.3.1"
 dependencies = [
  "clap",
  "qec-ilp-core",
@@ -1244,7 +1244,7 @@ dependencies = [
 
 [[package]]
 name = "rmatching"
-version = "0.3.0"
+version = "0.3.1"
 dependencies = [
  "rstim",
 ]
@@ -1263,7 +1263,7 @@ dependencies = [
 
 [[package]]
 name = "rsinter"
-version = "0.3.0"
+version = "0.3.1"
 dependencies = [
  "clap",
  "csv",
@@ -1285,7 +1285,7 @@ dependencies = [
 
 [[package]]
 name = "rstim"
-version = "0.3.0"
+version = "0.3.1"
 dependencies = [
  "clap",
  "csv",
