@@ -13,6 +13,80 @@ original methods, with zero architecture-specific core exclusions. It requires
 complete parity intentionally exits 2. The detailed per-change sections below
 retain their historical inventory snapshots; `coverage.json` is authoritative.
 
+## Outstanding requirements and the first paper pilot
+
+`remaining-contracts.json` catalogs all 130 outstanding original methods without
+promoting their parity status. It records the complete source-bound method,
+readable assertions and loops, module helper/import context, Rust owners and
+the linked issue DAG. The full pinned source manifest binds transitive helpers,
+including the native C++ suites; helper lists are not a minimal call graph.
+The five categories are next-work assessments: validation first (`V`), confirmed
+corresponding-service gaps (`G`), unestablished reuse/integration contracts (`P`),
+Rust contract adaptations (`E`), and aggregate tests needing decomposition (`U`).
+None is an architecture exclusion or an executable parity certificate.
+
+```sh
+python3 benchmarks/magna_reproduction/remaining_contracts.py check \
+  --upstream "$MAGNA_UPSTREAM"
+python3 -I -m unittest discover -s benchmarks/magna_reproduction -p test_remaining_contracts.py
+```
+
+The first command prints `PASS`, 130 requirements, the unchanged ledger counts,
+31 tasks, 435 paper files and 18 issue nodes. Without `--upstream`, it checks the
+catalog and local owners but explicitly reports `upstream_verified=false`.
+Changed source pins, missing methods, unsupported status promotions and cyclic
+dependencies are rejected. Reconcile this snapshot explicitly when later PRs
+close methods. The primary paper is v1, the public reference and historical
+deposit kernels are distinct, and v2 remains a separate, unassessed delta.
+
+`paper/pilot.json` selects eight representative tasks, eight physical-noise draws
+per engine/task, two same-assignment replays and a 45-second limit per child.
+It requires BH2-T and BH2-S to complete; every other selected negative outcome
+must still be retained. TQD requires the hash-pinned author decoder files before
+any task starts. Use the existing reference environment and original fetcher
+described below; do not rebuild or copy an environment merely for this pilot.
+
+Build `evaluate_task` once, or reuse an existing binary built from these sources:
+
+```sh
+cargo build --locked -p rmagna --example evaluate_task
+python3 benchmarks/magna_reproduction/paper_benchmark.py run \
+  --manifest benchmarks/magna_reproduction/paper/pilot.json \
+  --upstream "$MAGNA_UPSTREAM" --python "$MAGNA_PYTHON" \
+  --rust-example "$MAGNA_RUST_WORKER" --out "$MAGNA_NEW_OUT"
+python3 benchmarks/magna_reproduction/paper_benchmark.py check \
+  --manifest benchmarks/magna_reproduction/paper/pilot.json --results "$MAGNA_NEW_OUT"
+python3 -I -m unittest discover -s benchmarks/magna_reproduction -p test_paper_benchmark.py
+```
+
+`MAGNA_RUST_WORKER` is the absolute path to `evaluate_task`, and `MAGNA_NEW_OUT`
+must not exist. If `CARGO_TARGET_DIR` is set, reuse that target directory rather
+than creating a second build tree. On macOS, existing provenance tests require
+`TMPDIR` to name a physical scratch directory without symlink ancestors.
+
+Each task first compares exact no-fault masses and the complete decoder
+transcript against the original implementation, replaying its prescribed
+history in Rust. It then runs independent real-noise streams in both engines.
+Eight-draw means are not required to match across languages. The Rust worker's
+`--pilot-shots` accepts 2 through 64 and cannot be combined with a prescribed
+history or constant entropy. Its no-fault setup remains separate from its
+physical-noise batch. The evidence retains preparation, first-query and replay
+timings, decoder time, phase resource ranks/terms, cache and execution counts,
+input/decoder/runner/executable identities, process failures and partial runs.
+Replay timings reset the same assignment; they are not independent performance
+rounds. Cold compilation, first query and physical-noise sampling are distinct
+timer scopes and must not be added into a claimed warm throughput figure.
+
+The offline checker recomputes exact comparisons and outcomes, verifies selected
+cell coverage and artifact/input identities, and prints actual completed/negative
+counts. `PASS` means a valid bounded pilot with its required successes; it does
+not mean every selected task succeeded or that the paper is reproduced. The
+corruption tests reject altered inputs, omitted cells, mixed output contracts,
+wrong exact values/transcripts, dishonest counts and removed negative outcomes.
+No million-draw campaign runs in PR CI. The later BH/cultivation/decoder campaigns
+and publication evidence are separate issues in the catalog; #794 and #601
+provide related evidence conventions without becoming completed by this pilot.
+
 The capped-support witness generator captures complete small observation sets,
 not Monte Carlo precision estimates. Regenerate into a new path and compare the
 result with `rmagna/tests/data/capped-support-reference.json`:
