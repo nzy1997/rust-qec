@@ -1,0 +1,1814 @@
+{
+  "provenance": {
+    "upstream_commit": "56847478c840395735146ef1e1ccdc3d8aedc10f",
+    "sources": {
+      "tests/core/test_pauli_feedback_reuse.py": "ccd1476bda7dbdd7786d18d8defbabc7eb66d07f322571ce1564f4ea5b90fc4d",
+      "tests/core/test_virtual_clifford_feedback.py": "775bd9cfeb488d5824b1fcfd39904170e7f63148064b5ca147956d5cc3c2f059"
+    },
+    "binaries": {
+      "_native.cpython-312-darwin.so": "8764804ce11a1ef0ce4ab7df71d72811d1ad6d693b55c564e3c777a65bfcc9e2",
+      "_native_testing.cpython-312-darwin.so": "1d9e0fa8bcaf7d165fe30669eea53c93ce2fa935904dc31b93cb0a4b086207f5"
+    }
+  },
+  "physical": "H 0 1 2\nT 2\nM 1\nDETECTOR rec[-1]\nCONTROL[echo] det[-1] -> ctrl[0]\nCH ctrl[0] 2",
+  "recovery": "M 0\nDETECTOR rec[-1]\nCONTROL[echo] det[-1] -> ctrl[0]\nCS ctrl[0] 0\nCH ctrl[0] 0\nCCZ ctrl[0] 0 1\nCCX ctrl[0] 1 0",
+  "target": "H 0 1\nT 0",
+  "outputs": [
+    2,
+    0
+  ],
+  "cases": [
+    {
+      "protocol": 0,
+      "recovery": 0,
+      "stage": "recovery",
+      "x": 0,
+      "z": 0,
+      "coefficients": [
+        1,
+        0,
+        0,
+        0
+      ],
+      "power": 0
+    },
+    {
+      "protocol": 0,
+      "recovery": 0,
+      "stage": "recovery",
+      "x": 0,
+      "z": 1,
+      "coefficients": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "power": 0
+    },
+    {
+      "protocol": 0,
+      "recovery": 0,
+      "stage": "recovery",
+      "x": 0,
+      "z": 2,
+      "coefficients": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "power": 0
+    },
+    {
+      "protocol": 0,
+      "recovery": 0,
+      "stage": "recovery",
+      "x": 0,
+      "z": 3,
+      "coefficients": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "power": 0
+    },
+    {
+      "protocol": 0,
+      "recovery": 0,
+      "stage": "recovery",
+      "x": 1,
+      "z": 0,
+      "coefficients": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "power": 0
+    },
+    {
+      "protocol": 0,
+      "recovery": 0,
+      "stage": "recovery",
+      "x": 1,
+      "z": 1,
+      "coefficients": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "power": 0
+    },
+    {
+      "protocol": 0,
+      "recovery": 0,
+      "stage": "recovery",
+      "x": 1,
+      "z": 2,
+      "coefficients": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "power": 0
+    },
+    {
+      "protocol": 0,
+      "recovery": 0,
+      "stage": "recovery",
+      "x": 1,
+      "z": 3,
+      "coefficients": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "power": 0
+    },
+    {
+      "protocol": 0,
+      "recovery": 0,
+      "stage": "recovery",
+      "x": 2,
+      "z": 0,
+      "coefficients": [
+        1,
+        0,
+        0,
+        0
+      ],
+      "power": 0
+    },
+    {
+      "protocol": 0,
+      "recovery": 0,
+      "stage": "recovery",
+      "x": 2,
+      "z": 1,
+      "coefficients": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "power": 0
+    },
+    {
+      "protocol": 0,
+      "recovery": 0,
+      "stage": "recovery",
+      "x": 2,
+      "z": 2,
+      "coefficients": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "power": 0
+    },
+    {
+      "protocol": 0,
+      "recovery": 0,
+      "stage": "recovery",
+      "x": 2,
+      "z": 3,
+      "coefficients": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "power": 0
+    },
+    {
+      "protocol": 0,
+      "recovery": 0,
+      "stage": "recovery",
+      "x": 3,
+      "z": 0,
+      "coefficients": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "power": 0
+    },
+    {
+      "protocol": 0,
+      "recovery": 0,
+      "stage": "recovery",
+      "x": 3,
+      "z": 1,
+      "coefficients": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "power": 0
+    },
+    {
+      "protocol": 0,
+      "recovery": 0,
+      "stage": "recovery",
+      "x": 3,
+      "z": 2,
+      "coefficients": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "power": 0
+    },
+    {
+      "protocol": 0,
+      "recovery": 0,
+      "stage": "recovery",
+      "x": 3,
+      "z": 3,
+      "coefficients": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "power": 0
+    },
+    {
+      "protocol": 0,
+      "recovery": 0,
+      "stage": "target",
+      "x": 0,
+      "z": 0,
+      "coefficients": [
+        1,
+        0,
+        0,
+        0
+      ],
+      "power": 0
+    },
+    {
+      "protocol": 0,
+      "recovery": 0,
+      "stage": "target",
+      "x": 0,
+      "z": 1,
+      "coefficients": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "power": 0
+    },
+    {
+      "protocol": 0,
+      "recovery": 0,
+      "stage": "target",
+      "x": 0,
+      "z": 2,
+      "coefficients": [
+        1,
+        0,
+        0,
+        0
+      ],
+      "power": 0
+    },
+    {
+      "protocol": 0,
+      "recovery": 0,
+      "stage": "target",
+      "x": 0,
+      "z": 3,
+      "coefficients": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "power": 0
+    },
+    {
+      "protocol": 0,
+      "recovery": 0,
+      "stage": "target",
+      "x": 1,
+      "z": 0,
+      "coefficients": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "power": 0
+    },
+    {
+      "protocol": 0,
+      "recovery": 0,
+      "stage": "target",
+      "x": 1,
+      "z": 1,
+      "coefficients": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "power": 0
+    },
+    {
+      "protocol": 0,
+      "recovery": 0,
+      "stage": "target",
+      "x": 1,
+      "z": 2,
+      "coefficients": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "power": 0
+    },
+    {
+      "protocol": 0,
+      "recovery": 0,
+      "stage": "target",
+      "x": 1,
+      "z": 3,
+      "coefficients": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "power": 0
+    },
+    {
+      "protocol": 0,
+      "recovery": 0,
+      "stage": "target",
+      "x": 2,
+      "z": 0,
+      "coefficients": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "power": 0
+    },
+    {
+      "protocol": 0,
+      "recovery": 0,
+      "stage": "target",
+      "x": 2,
+      "z": 1,
+      "coefficients": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "power": 0
+    },
+    {
+      "protocol": 0,
+      "recovery": 0,
+      "stage": "target",
+      "x": 2,
+      "z": 2,
+      "coefficients": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "power": 0
+    },
+    {
+      "protocol": 0,
+      "recovery": 0,
+      "stage": "target",
+      "x": 2,
+      "z": 3,
+      "coefficients": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "power": 0
+    },
+    {
+      "protocol": 0,
+      "recovery": 0,
+      "stage": "target",
+      "x": 3,
+      "z": 0,
+      "coefficients": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "power": 0
+    },
+    {
+      "protocol": 0,
+      "recovery": 0,
+      "stage": "target",
+      "x": 3,
+      "z": 1,
+      "coefficients": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "power": 0
+    },
+    {
+      "protocol": 0,
+      "recovery": 0,
+      "stage": "target",
+      "x": 3,
+      "z": 2,
+      "coefficients": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "power": 0
+    },
+    {
+      "protocol": 0,
+      "recovery": 0,
+      "stage": "target",
+      "x": 3,
+      "z": 3,
+      "coefficients": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "power": 0
+    },
+    {
+      "protocol": 0,
+      "recovery": 1,
+      "stage": "recovery",
+      "x": 0,
+      "z": 0,
+      "coefficients": [
+        1,
+        0,
+        0,
+        0
+      ],
+      "power": 0
+    },
+    {
+      "protocol": 0,
+      "recovery": 1,
+      "stage": "recovery",
+      "x": 0,
+      "z": 1,
+      "coefficients": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "power": 0
+    },
+    {
+      "protocol": 0,
+      "recovery": 1,
+      "stage": "recovery",
+      "x": 0,
+      "z": 2,
+      "coefficients": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "power": 0
+    },
+    {
+      "protocol": 0,
+      "recovery": 1,
+      "stage": "recovery",
+      "x": 0,
+      "z": 3,
+      "coefficients": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "power": 0
+    },
+    {
+      "protocol": 0,
+      "recovery": 1,
+      "stage": "recovery",
+      "x": 1,
+      "z": 0,
+      "coefficients": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "power": 0
+    },
+    {
+      "protocol": 0,
+      "recovery": 1,
+      "stage": "recovery",
+      "x": 1,
+      "z": 1,
+      "coefficients": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "power": 0
+    },
+    {
+      "protocol": 0,
+      "recovery": 1,
+      "stage": "recovery",
+      "x": 1,
+      "z": 2,
+      "coefficients": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "power": 0
+    },
+    {
+      "protocol": 0,
+      "recovery": 1,
+      "stage": "recovery",
+      "x": 1,
+      "z": 3,
+      "coefficients": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "power": 0
+    },
+    {
+      "protocol": 0,
+      "recovery": 1,
+      "stage": "recovery",
+      "x": 2,
+      "z": 0,
+      "coefficients": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "power": 0
+    },
+    {
+      "protocol": 0,
+      "recovery": 1,
+      "stage": "recovery",
+      "x": 2,
+      "z": 1,
+      "coefficients": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "power": 0
+    },
+    {
+      "protocol": 0,
+      "recovery": 1,
+      "stage": "recovery",
+      "x": 2,
+      "z": 2,
+      "coefficients": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "power": 0
+    },
+    {
+      "protocol": 0,
+      "recovery": 1,
+      "stage": "recovery",
+      "x": 2,
+      "z": 3,
+      "coefficients": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "power": 0
+    },
+    {
+      "protocol": 0,
+      "recovery": 1,
+      "stage": "recovery",
+      "x": 3,
+      "z": 0,
+      "coefficients": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "power": 0
+    },
+    {
+      "protocol": 0,
+      "recovery": 1,
+      "stage": "recovery",
+      "x": 3,
+      "z": 1,
+      "coefficients": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "power": 0
+    },
+    {
+      "protocol": 0,
+      "recovery": 1,
+      "stage": "recovery",
+      "x": 3,
+      "z": 2,
+      "coefficients": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "power": 0
+    },
+    {
+      "protocol": 0,
+      "recovery": 1,
+      "stage": "recovery",
+      "x": 3,
+      "z": 3,
+      "coefficients": [
+        -1,
+        0,
+        0,
+        0
+      ],
+      "power": 0
+    },
+    {
+      "protocol": 0,
+      "recovery": 1,
+      "stage": "target",
+      "x": 0,
+      "z": 0,
+      "coefficients": [
+        1,
+        0,
+        0,
+        0
+      ],
+      "power": 0
+    },
+    {
+      "protocol": 0,
+      "recovery": 1,
+      "stage": "target",
+      "x": 0,
+      "z": 1,
+      "coefficients": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "power": 0
+    },
+    {
+      "protocol": 0,
+      "recovery": 1,
+      "stage": "target",
+      "x": 0,
+      "z": 2,
+      "coefficients": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "power": 0
+    },
+    {
+      "protocol": 0,
+      "recovery": 1,
+      "stage": "target",
+      "x": 0,
+      "z": 3,
+      "coefficients": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "power": 0
+    },
+    {
+      "protocol": 0,
+      "recovery": 1,
+      "stage": "target",
+      "x": 1,
+      "z": 0,
+      "coefficients": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "power": 0
+    },
+    {
+      "protocol": 0,
+      "recovery": 1,
+      "stage": "target",
+      "x": 1,
+      "z": 1,
+      "coefficients": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "power": 0
+    },
+    {
+      "protocol": 0,
+      "recovery": 1,
+      "stage": "target",
+      "x": 1,
+      "z": 2,
+      "coefficients": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "power": 0
+    },
+    {
+      "protocol": 0,
+      "recovery": 1,
+      "stage": "target",
+      "x": 1,
+      "z": 3,
+      "coefficients": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "power": 0
+    },
+    {
+      "protocol": 0,
+      "recovery": 1,
+      "stage": "target",
+      "x": 2,
+      "z": 0,
+      "coefficients": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "power": 0
+    },
+    {
+      "protocol": 0,
+      "recovery": 1,
+      "stage": "target",
+      "x": 2,
+      "z": 1,
+      "coefficients": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "power": 0
+    },
+    {
+      "protocol": 0,
+      "recovery": 1,
+      "stage": "target",
+      "x": 2,
+      "z": 2,
+      "coefficients": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "power": 0
+    },
+    {
+      "protocol": 0,
+      "recovery": 1,
+      "stage": "target",
+      "x": 2,
+      "z": 3,
+      "coefficients": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "power": 0
+    },
+    {
+      "protocol": 0,
+      "recovery": 1,
+      "stage": "target",
+      "x": 3,
+      "z": 0,
+      "coefficients": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "power": 0
+    },
+    {
+      "protocol": 0,
+      "recovery": 1,
+      "stage": "target",
+      "x": 3,
+      "z": 1,
+      "coefficients": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "power": 0
+    },
+    {
+      "protocol": 0,
+      "recovery": 1,
+      "stage": "target",
+      "x": 3,
+      "z": 2,
+      "coefficients": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "power": 0
+    },
+    {
+      "protocol": 0,
+      "recovery": 1,
+      "stage": "target",
+      "x": 3,
+      "z": 3,
+      "coefficients": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "power": 0
+    },
+    {
+      "protocol": 1,
+      "recovery": 0,
+      "stage": "recovery",
+      "x": 0,
+      "z": 0,
+      "coefficients": [
+        1,
+        0,
+        0,
+        0
+      ],
+      "power": 0
+    },
+    {
+      "protocol": 1,
+      "recovery": 0,
+      "stage": "recovery",
+      "x": 0,
+      "z": 1,
+      "coefficients": [
+        0,
+        1,
+        0,
+        -1
+      ],
+      "power": -1
+    },
+    {
+      "protocol": 1,
+      "recovery": 0,
+      "stage": "recovery",
+      "x": 0,
+      "z": 2,
+      "coefficients": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "power": 0
+    },
+    {
+      "protocol": 1,
+      "recovery": 0,
+      "stage": "recovery",
+      "x": 0,
+      "z": 3,
+      "coefficients": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "power": 0
+    },
+    {
+      "protocol": 1,
+      "recovery": 0,
+      "stage": "recovery",
+      "x": 1,
+      "z": 0,
+      "coefficients": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "power": 0
+    },
+    {
+      "protocol": 1,
+      "recovery": 0,
+      "stage": "recovery",
+      "x": 1,
+      "z": 1,
+      "coefficients": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "power": 0
+    },
+    {
+      "protocol": 1,
+      "recovery": 0,
+      "stage": "recovery",
+      "x": 1,
+      "z": 2,
+      "coefficients": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "power": 0
+    },
+    {
+      "protocol": 1,
+      "recovery": 0,
+      "stage": "recovery",
+      "x": 1,
+      "z": 3,
+      "coefficients": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "power": 0
+    },
+    {
+      "protocol": 1,
+      "recovery": 0,
+      "stage": "recovery",
+      "x": 2,
+      "z": 0,
+      "coefficients": [
+        1,
+        0,
+        0,
+        0
+      ],
+      "power": 0
+    },
+    {
+      "protocol": 1,
+      "recovery": 0,
+      "stage": "recovery",
+      "x": 2,
+      "z": 1,
+      "coefficients": [
+        0,
+        1,
+        0,
+        -1
+      ],
+      "power": -1
+    },
+    {
+      "protocol": 1,
+      "recovery": 0,
+      "stage": "recovery",
+      "x": 2,
+      "z": 2,
+      "coefficients": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "power": 0
+    },
+    {
+      "protocol": 1,
+      "recovery": 0,
+      "stage": "recovery",
+      "x": 2,
+      "z": 3,
+      "coefficients": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "power": 0
+    },
+    {
+      "protocol": 1,
+      "recovery": 0,
+      "stage": "recovery",
+      "x": 3,
+      "z": 0,
+      "coefficients": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "power": 0
+    },
+    {
+      "protocol": 1,
+      "recovery": 0,
+      "stage": "recovery",
+      "x": 3,
+      "z": 1,
+      "coefficients": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "power": 0
+    },
+    {
+      "protocol": 1,
+      "recovery": 0,
+      "stage": "recovery",
+      "x": 3,
+      "z": 2,
+      "coefficients": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "power": 0
+    },
+    {
+      "protocol": 1,
+      "recovery": 0,
+      "stage": "recovery",
+      "x": 3,
+      "z": 3,
+      "coefficients": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "power": 0
+    },
+    {
+      "protocol": 1,
+      "recovery": 0,
+      "stage": "target",
+      "x": 0,
+      "z": 0,
+      "coefficients": [
+        1,
+        0,
+        0,
+        0
+      ],
+      "power": 0
+    },
+    {
+      "protocol": 1,
+      "recovery": 0,
+      "stage": "target",
+      "x": 0,
+      "z": 1,
+      "coefficients": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "power": 0
+    },
+    {
+      "protocol": 1,
+      "recovery": 0,
+      "stage": "target",
+      "x": 0,
+      "z": 2,
+      "coefficients": [
+        1,
+        0,
+        0,
+        0
+      ],
+      "power": 0
+    },
+    {
+      "protocol": 1,
+      "recovery": 0,
+      "stage": "target",
+      "x": 0,
+      "z": 3,
+      "coefficients": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "power": 0
+    },
+    {
+      "protocol": 1,
+      "recovery": 0,
+      "stage": "target",
+      "x": 1,
+      "z": 0,
+      "coefficients": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "power": 0
+    },
+    {
+      "protocol": 1,
+      "recovery": 0,
+      "stage": "target",
+      "x": 1,
+      "z": 1,
+      "coefficients": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "power": 0
+    },
+    {
+      "protocol": 1,
+      "recovery": 0,
+      "stage": "target",
+      "x": 1,
+      "z": 2,
+      "coefficients": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "power": 0
+    },
+    {
+      "protocol": 1,
+      "recovery": 0,
+      "stage": "target",
+      "x": 1,
+      "z": 3,
+      "coefficients": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "power": 0
+    },
+    {
+      "protocol": 1,
+      "recovery": 0,
+      "stage": "target",
+      "x": 2,
+      "z": 0,
+      "coefficients": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "power": 0
+    },
+    {
+      "protocol": 1,
+      "recovery": 0,
+      "stage": "target",
+      "x": 2,
+      "z": 1,
+      "coefficients": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "power": 0
+    },
+    {
+      "protocol": 1,
+      "recovery": 0,
+      "stage": "target",
+      "x": 2,
+      "z": 2,
+      "coefficients": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "power": 0
+    },
+    {
+      "protocol": 1,
+      "recovery": 0,
+      "stage": "target",
+      "x": 2,
+      "z": 3,
+      "coefficients": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "power": 0
+    },
+    {
+      "protocol": 1,
+      "recovery": 0,
+      "stage": "target",
+      "x": 3,
+      "z": 0,
+      "coefficients": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "power": 0
+    },
+    {
+      "protocol": 1,
+      "recovery": 0,
+      "stage": "target",
+      "x": 3,
+      "z": 1,
+      "coefficients": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "power": 0
+    },
+    {
+      "protocol": 1,
+      "recovery": 0,
+      "stage": "target",
+      "x": 3,
+      "z": 2,
+      "coefficients": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "power": 0
+    },
+    {
+      "protocol": 1,
+      "recovery": 0,
+      "stage": "target",
+      "x": 3,
+      "z": 3,
+      "coefficients": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "power": 0
+    },
+    {
+      "protocol": 1,
+      "recovery": 1,
+      "stage": "recovery",
+      "x": 0,
+      "z": 0,
+      "coefficients": [
+        1,
+        0,
+        0,
+        0
+      ],
+      "power": 0
+    },
+    {
+      "protocol": 1,
+      "recovery": 1,
+      "stage": "recovery",
+      "x": 0,
+      "z": 1,
+      "coefficients": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "power": 0
+    },
+    {
+      "protocol": 1,
+      "recovery": 1,
+      "stage": "recovery",
+      "x": 0,
+      "z": 2,
+      "coefficients": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "power": 0
+    },
+    {
+      "protocol": 1,
+      "recovery": 1,
+      "stage": "recovery",
+      "x": 0,
+      "z": 3,
+      "coefficients": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "power": 0
+    },
+    {
+      "protocol": 1,
+      "recovery": 1,
+      "stage": "recovery",
+      "x": 1,
+      "z": 0,
+      "coefficients": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "power": 0
+    },
+    {
+      "protocol": 1,
+      "recovery": 1,
+      "stage": "recovery",
+      "x": 1,
+      "z": 1,
+      "coefficients": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "power": 0
+    },
+    {
+      "protocol": 1,
+      "recovery": 1,
+      "stage": "recovery",
+      "x": 1,
+      "z": 2,
+      "coefficients": [
+        0,
+        1,
+        0,
+        -1
+      ],
+      "power": -1
+    },
+    {
+      "protocol": 1,
+      "recovery": 1,
+      "stage": "recovery",
+      "x": 1,
+      "z": 3,
+      "coefficients": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "power": 0
+    },
+    {
+      "protocol": 1,
+      "recovery": 1,
+      "stage": "recovery",
+      "x": 2,
+      "z": 0,
+      "coefficients": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "power": 0
+    },
+    {
+      "protocol": 1,
+      "recovery": 1,
+      "stage": "recovery",
+      "x": 2,
+      "z": 1,
+      "coefficients": [
+        0,
+        -1,
+        0,
+        1
+      ],
+      "power": -1
+    },
+    {
+      "protocol": 1,
+      "recovery": 1,
+      "stage": "recovery",
+      "x": 2,
+      "z": 2,
+      "coefficients": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "power": 0
+    },
+    {
+      "protocol": 1,
+      "recovery": 1,
+      "stage": "recovery",
+      "x": 2,
+      "z": 3,
+      "coefficients": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "power": 0
+    },
+    {
+      "protocol": 1,
+      "recovery": 1,
+      "stage": "recovery",
+      "x": 3,
+      "z": 0,
+      "coefficients": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "power": 0
+    },
+    {
+      "protocol": 1,
+      "recovery": 1,
+      "stage": "recovery",
+      "x": 3,
+      "z": 1,
+      "coefficients": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "power": 0
+    },
+    {
+      "protocol": 1,
+      "recovery": 1,
+      "stage": "recovery",
+      "x": 3,
+      "z": 2,
+      "coefficients": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "power": 0
+    },
+    {
+      "protocol": 1,
+      "recovery": 1,
+      "stage": "recovery",
+      "x": 3,
+      "z": 3,
+      "coefficients": [
+        -1,
+        0,
+        0,
+        0
+      ],
+      "power": 0
+    },
+    {
+      "protocol": 1,
+      "recovery": 1,
+      "stage": "target",
+      "x": 0,
+      "z": 0,
+      "coefficients": [
+        1,
+        0,
+        0,
+        0
+      ],
+      "power": 0
+    },
+    {
+      "protocol": 1,
+      "recovery": 1,
+      "stage": "target",
+      "x": 0,
+      "z": 1,
+      "coefficients": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "power": 0
+    },
+    {
+      "protocol": 1,
+      "recovery": 1,
+      "stage": "target",
+      "x": 0,
+      "z": 2,
+      "coefficients": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "power": 0
+    },
+    {
+      "protocol": 1,
+      "recovery": 1,
+      "stage": "target",
+      "x": 0,
+      "z": 3,
+      "coefficients": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "power": 0
+    },
+    {
+      "protocol": 1,
+      "recovery": 1,
+      "stage": "target",
+      "x": 1,
+      "z": 0,
+      "coefficients": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "power": 0
+    },
+    {
+      "protocol": 1,
+      "recovery": 1,
+      "stage": "target",
+      "x": 1,
+      "z": 1,
+      "coefficients": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "power": 0
+    },
+    {
+      "protocol": 1,
+      "recovery": 1,
+      "stage": "target",
+      "x": 1,
+      "z": 2,
+      "coefficients": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "power": 0
+    },
+    {
+      "protocol": 1,
+      "recovery": 1,
+      "stage": "target",
+      "x": 1,
+      "z": 3,
+      "coefficients": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "power": 0
+    },
+    {
+      "protocol": 1,
+      "recovery": 1,
+      "stage": "target",
+      "x": 2,
+      "z": 0,
+      "coefficients": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "power": 0
+    },
+    {
+      "protocol": 1,
+      "recovery": 1,
+      "stage": "target",
+      "x": 2,
+      "z": 1,
+      "coefficients": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "power": 0
+    },
+    {
+      "protocol": 1,
+      "recovery": 1,
+      "stage": "target",
+      "x": 2,
+      "z": 2,
+      "coefficients": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "power": 0
+    },
+    {
+      "protocol": 1,
+      "recovery": 1,
+      "stage": "target",
+      "x": 2,
+      "z": 3,
+      "coefficients": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "power": 0
+    },
+    {
+      "protocol": 1,
+      "recovery": 1,
+      "stage": "target",
+      "x": 3,
+      "z": 0,
+      "coefficients": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "power": 0
+    },
+    {
+      "protocol": 1,
+      "recovery": 1,
+      "stage": "target",
+      "x": 3,
+      "z": 1,
+      "coefficients": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "power": 0
+    },
+    {
+      "protocol": 1,
+      "recovery": 1,
+      "stage": "target",
+      "x": 3,
+      "z": 2,
+      "coefficients": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "power": 0
+    },
+    {
+      "protocol": 1,
+      "recovery": 1,
+      "stage": "target",
+      "x": 3,
+      "z": 3,
+      "coefficients": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "power": 0
+    }
+  ]
+}

@@ -2254,23 +2254,55 @@
     },
     {
       "id": "test_pauli_feedback_reuse.PauliFeedbackReuseTests.test_all_paulis_mixed_affine_guards_and_original_faults_share_one_plan",
-      "status": "unmapped",
-      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+      "status": "verified",
+      "contract": "All eight original external words, empty/Y-plus-report-flip faults, eight full reported histories, four parity histories and four axes give 3072 exact comparisons under both compilers and cold/fixed-fiber modes. Independently expanded literal text agrees pointwise; full/parity identity masses each sum to 1. Additional 1536 nonidentity comparisons use the independently derived reset/optional-X/H/T state with signed X/Y sqrt(2)/2 and zeroZ times actual joint mass. Immutable branch programs/moment caches and fixed warm resources are shared. Native squared-overlap representation is translated to complete finite distribution equality; impossible flips remain conditional diagnostics.",
+      "rust_tests": [
+        {
+          "package": "rmagna",
+          "target": "lib",
+          "test": "instrument::original_pauli_reuse_contracts::original_all_paulis_mixed_guards_faults_and_record_distributions_share_one_plan",
+          "source_sha256": "963c8cf559e6824252d5a5129ec223e0fdbf3738463a5e551186753a950cf579"
+        }
+      ]
     },
     {
       "id": "test_pauli_feedback_reuse.PauliFeedbackReuseTests.test_no_decoder_value_cache_and_clifford_template_reuse",
-      "status": "unmapped",
-      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+      "status": "verified",
+      "contract": "The original 12 seeded count callback invocations execute for every compiler/cold-or-fixed-fiber configuration, retain both observed inputs, construction 1 and draw compilation 0. Both explicit mixed Clifford decisions and three nonidentity Pauli axes give 24 exact literal-text comparisons, preserving S then H order and actual branch program/cache sharing. This is observable Rust reuse, not Native plan-object or random-stream identity.",
+      "rust_tests": [
+        {
+          "package": "rmagna",
+          "target": "lib",
+          "test": "instrument::original_pauli_reuse_contracts::original_decoder_values_are_not_cached_and_mixed_cliffords_reuse_template",
+          "source_sha256": "963c8cf559e6824252d5a5129ec223e0fdbf3738463a5e551186753a950cf579"
+        }
+      ]
     },
     {
       "id": "test_pauli_feedback_reuse.PauliFeedbackReuseTests.test_physical_and_recovery_callbacks_match_literal_sampling",
-      "status": "unmapped",
-      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+      "status": "verified",
+      "contract": "All 24 original Native noise/callback cases replay three callback groups plus the explicit final requested-record group through public prescribed-history evaluation. Eight compiler/causal/history configurations give 1152 exact comparisons of physical history mass, raw acceptance/error and three moments to pinned original Native and independent ReferenceHistory literals. Target success/unit norm, physical path probabilities, unit declared likelihood, full requested records and callback identities/inputs/outputs/normalized contributions are retained. Eight ordinary seeds per configuration verify two protocol calls, one recovery call, learned rank 4 and fixed draw compilation 0. Offline fixture binds original source AST/source/helper/native binary provenance; Native proposal law is provenance, not a prescribed Rust proposal claim.",
+      "rust_tests": [
+        {
+          "package": "rmagna",
+          "target": "original_pauli_terminal",
+          "test": "original_physical_and_recovery_callback_masses_match_native_literal_vectors",
+          "source_sha256": "b5cb1301deb4f2d0a6f07f5b7f5a8528f9b1094b57e2ce5f235d42ce2fb48aed"
+        }
+      ]
     },
     {
       "id": "test_pauli_feedback_reuse.PauliFeedbackReuseTests.test_unreached_mixed_feedback_keeps_earlier_causal_marginal",
-      "status": "unmapped",
-      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+      "status": "verified",
+      "contract": "All three original unreached/assigned echo cases, both record 0 flip assignments, two outcomes, both compilers and cold/fixed-fiber modes give 48 exact earlier-marginal comparisons with independently expanded literal text. Every literal mass is 1/2 despite future mixed Pauli feedback; branches share actual immutable program/moment-cache pointers.",
+      "rust_tests": [
+        {
+          "package": "rmagna",
+          "target": "lib",
+          "test": "instrument::original_pauli_reuse_contracts::original_unreached_mixed_feedback_preserves_earlier_causal_marginals",
+          "source_sha256": "963c8cf559e6824252d5a5129ec223e0fdbf3738463a5e551186753a950cf579"
+        }
+      ]
     },
     {
       "id": "test_phase_injection.PhaseInjectionTests.test_exact_native_injection",
@@ -2566,18 +2598,42 @@
     },
     {
       "id": "test_runtime_ownership.RuntimeOwnershipTests.test_execution_and_noise_schedule_have_independent_owner_lifetimes",
-      "status": "unmapped",
-      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+      "status": "verified",
+      "contract": "The complete original H/Z_ERROR(1/7)/M common-scale 2 ownership method retains 12 execution seeds and 12 sequential noise draws from 391 before/after independent source/module/compiler/registry, execution and schedule owners drop in both orders. Whole exact task/noise rows, sparse assignments and final RNG states agree for 12 compiler/probability/insertion configurations. Forced identity/fault draws independently check physical 6/7, 1/7;proposal 5/7, 2/7;likelihood 6/5, 1/2 and exactly one entropy word. Separate public Rust owned models translate observable lifetime behavior without Native capsule/RNG identity.",
+      "rust_tests": [
+        {
+          "package": "rmagna",
+          "target": "original_owner_lifetimes",
+          "test": "original_execution_and_noise_schedule_have_independent_owner_lifetimes",
+          "source_sha256": "b7ad2eb981db685222dd107a77b10f030bb0129c1f0a662ce3f440acfe3d95a4"
+        }
+      ]
     },
     {
       "id": "test_runtime_ownership.RuntimeOwnershipTests.test_reentrant_callbacks_and_exception_leave_fresh_control_values",
-      "status": "unmapped",
-      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+      "status": "verified",
+      "contract": "The complete original same-evaluator recursive echo invocation uses outer/reference/failure/recovery seed 6 and nested/reference seed 19 across eight compiler/causal/history configurations. Complete TaskEvaluation rows and final RNG states agree; outer entropy is exactly one word, records agree, physical/accepted raw mass 1/2, normalized acceptance 1, error 0. All six original real callback invocations, declared exception, fresh retry and two supplementary prescribed branches are retained. The test explicitly breaks its callback/evaluator Arc cycle. No Native RNG or private-owner layout identity is claimed.",
+      "rust_tests": [
+        {
+          "package": "rmagna",
+          "target": "original_reentrant_callbacks",
+          "test": "original_reentrant_callbacks_and_exception_leave_fresh_control_values",
+          "source_sha256": "7aed7a943d775b4ce8945288d961cc354d1d5cde6579d0beb91fdafcf2279998"
+        }
+      ]
     },
     {
       "id": "test_runtime_ownership.RuntimeOwnershipTests.test_scalar_totals_are_thread_safe_and_reject_bad_outcomes",
-      "status": "unmapped",
-      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+      "status": "verified",
+      "contract": "The original H/M program and supplementary three-wire GHZ/reported-flip program run 24 compiler/probability/insertion configurations, each with warmed and unqueried shared instruments. Three workers collectively execute 24 queries per instrument:1152 exact results against literal half/zero with all labels and both fault assignments. Shared preparation retains zero cold or one warm family; wrong widths return dimension errors and invalid bit positions/nonzero padding reject without changing family statistics. Typed Rust outcomes translate original nonbinary argument validation without Native scalar-capsule identity.",
+      "rust_tests": [
+        {
+          "package": "rmagna",
+          "target": "original_scalar_thread_safety",
+          "test": "original_scalar_totals_are_thread_safe_and_reject_bad_outcomes",
+          "source_sha256": "8c90f589abba3b0432788298d69377a1deb1579fe3d45c4aa1408d66bff7f925"
+        }
+      ]
     },
     {
       "id": "test_runtime_ownership.RuntimeOwnershipTests.test_sparse_noise_equals_dense_categories_and_isolation",
@@ -3182,38 +3238,94 @@
     },
     {
       "id": "test_virtual_clifford_feedback.VirtualCliffordFeedbackTests.test_composed_control_simplification_and_versions_determine_route",
-      "status": "unmapped",
-      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+      "status": "verified",
+      "contract": "The complete original composed-control program retains duplicate cancellation, identity rewrites and affine overwrite. Six canonical XOR write expressions and their exact register versions are checked; Rust stores one external decision and composes affine work without claiming Native two-slot layout. Both decision bits, 16 axes, two compilers and cold/fixed-fiber modes give 128 exact comparisons against independently evolved projected dense branches, with actual shared program/cache ownership.",
+      "rust_tests": [
+        {
+          "package": "rmagna",
+          "target": "lib",
+          "test": "instrument::original_virtual_clifford_contracts::original_composed_control_simplification_and_versions_determine_route",
+          "source_sha256": "b627e82cb373e9b242e4f54277606385be4449d7e93b6c444af01a523ed80d0b"
+        }
+      ]
     },
     {
       "id": "test_virtual_clifford_feedback.VirtualCliffordFeedbackTests.test_direct_and_xor_cliffords_keep_one_template_and_match_dense_states",
-      "status": "unmapped",
-      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+      "status": "verified",
+      "contract": "All original CS, CS_DAG, CH direct/XOR programs, two decision bits, four reported outcomes and four Pauli axes give 768 exact comparisons under both compilers and cold/fixed-fiber modes against independent literal cyclotomic vectors. The original final T is retained. Branch programs/caches are shared and external decision wires remain outside physical outputs; record-pair mass is 1/4.",
+      "rust_tests": [
+        {
+          "package": "rmagna",
+          "target": "lib",
+          "test": "instrument::original_virtual_clifford_contracts::original_direct_and_xor_cliffords_keep_one_template_and_match_dense_states",
+          "source_sha256": "b627e82cb373e9b242e4f54277606385be4449d7e93b6c444af01a523ed80d0b"
+        }
+      ]
     },
     {
       "id": "test_virtual_clifford_feedback.VirtualCliffordFeedbackTests.test_guarded_pauli_noise_uses_causal_assignments_only",
-      "status": "unmapped",
-      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+      "status": "verified",
+      "contract": "The complete H/T, echo(reported) XOR reported guard, repeated depolarizing targets, supplied X/Z and impossible report flip are retained. Eight seeds across eight compiler/causal/history configurations compare whole candidate/flip-only TaskEvaluation rows and next RNG words; both outcomes occur, acceptance 1, moments[0, 0, -1], physical noise probability 0 and declared unit likelihood. Actual owning construction count is 1; fixed draws compile 0 newnetworks and warm repeats retain 4 exact-marginal or 1 affine probability families plus 3 moment families. Native preparation counters describe another scope; impossible draws are conditional diagnostics.",
+      "rust_tests": [
+        {
+          "package": "rmagna",
+          "target": "original_inactive_guard",
+          "test": "original_inactive_guard_discards_supplied_actions_and_reuses_preparation",
+          "source_sha256": "c0ae163bb0392550b39d443c26dd2c3dc0796b7a2f4b939b62336f34e90de5f1"
+        }
+      ]
     },
     {
       "id": "test_virtual_clifford_feedback.VirtualCliffordFeedbackTests.test_linear_clifford_feedback_stays_coherent_and_enumeration_preserves_mass",
-      "status": "unmapped",
-      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+      "status": "verified",
+      "contract": "Complete original coherent CS/CH circuit and all three nonlinear AND/XOR-controlled CS, CS_DAG, CH programs run under both compilers/causal strategies/history samplers. Public linear_affine routing replaces native virtual-object identity. Repeated complete exact enumerations retain one pattern, four physical histories, covered mass 1/omitted 0, error 1/8 and target 7/8. All four prescribed inputs verify activation only at(1, 0), physical mass 1/4 and conditional error 1/2. Supplementary coherent target error is 1/4. No native RNG/ABI or performance identity is claimed.",
+      "rust_tests": [
+        {
+          "package": "rmagna",
+          "target": "original_clifford_feedback_enumeration",
+          "test": "original_linear_feedback_is_coherent_and_enumeration_preserves_mass",
+          "source_sha256": "e6b460d665b1884a1e7e6e621d31328ee422856bf75b5fb5a853b3bbb69bf516"
+        }
+      ]
     },
     {
       "id": "test_virtual_clifford_feedback.VirtualCliffordFeedbackTests.test_protocol_and_terminal_virtual_wires_do_not_alias_outputs_or_each_other",
-      "status": "unmapped",
-      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+      "status": "verified",
+      "contract": "Ordered outputs(2, 0), protocol echo-H, recovery local measurement/echo/S/H/CZ/CX and H/H/T target retain all four independent decision words, 16 Pauli axes and recovery/target stages. Both compilers and cold/fixed-fiber modes give 512 exact comparisons to independent literal text and 128 offline original Native/literal vectors, including signed sqrt(2)/2. Target-stage unconditional moments uncompute then trace the original deferred target measurement records; no target-overlap substitution is made. Eight seeds per eight runtime configurations retain one actual callback in each namespace and fixed draw compilation 0. Rust pure-target/composed-template and Native boundary counters have different scopes.",
+      "rust_tests": [
+        {
+          "package": "rmagna",
+          "target": "lib",
+          "test": "instrument::original_terminal_virtual_contracts::original_protocol_and_terminal_virtual_wires_keep_independent_boundaries",
+          "source_sha256": "46cea39a84f644f8576e6391aebd1c2d3e0e1159965ff398182bd42547894b25"
+        }
+      ]
     },
     {
       "id": "test_virtual_clifford_feedback.VirtualCliffordFeedbackTests.test_two_qubit_clifford_controls_match_dense_states_and_reuse_template",
-      "status": "unmapped",
-      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+      "status": "verified",
+      "contract": "All original CCZ/CCX direct, XOR and linear controls, both decision bits, four reported outcomes and 16 Pauli axes give 3072 exact comparisons under both compilers and cold/fixed-fiber queries. Independent literal cyclotomic state vectors preserve CNOT order and Y phases; each record pair has mass 1/4. Branch views retain actual shared immutable program/moment-cache pointers and nonaliasing external decision wires.",
+      "rust_tests": [
+        {
+          "package": "rmagna",
+          "target": "lib",
+          "test": "instrument::original_virtual_clifford_contracts::original_two_qubit_clifford_controls_match_dense_states_and_reuse_template",
+          "source_sha256": "b627e82cb373e9b242e4f54277606385be4449d7e93b6c444af01a523ed80d0b"
+        }
+      ]
     },
     {
       "id": "test_virtual_clifford_feedback.VirtualCliffordFeedbackTests.test_virtual_trace_future_completion_reports_faults_and_reset_match_literal",
-      "status": "unmapped",
-      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+      "status": "verified",
+      "contract": "The complete original two-decision H/T program retains Y fault, record 0/2 flips, three full record conditions, reset and controlled Clifford order. Both compilers and cold/fixed-fiber modes compare 1024 full Pauli moments plus 96 future-prefix identity moments with independently expanded literal text; complete mass sums to 1 and each two-record prefix has mass 1/4. All branch views share actual compiled program/moment-cache pointers and nonaliasing decision wires. No physical weighting or native private ABI is inferred for prescribed impossible flips.",
+      "rust_tests": [
+        {
+          "package": "rmagna",
+          "target": "lib",
+          "test": "instrument::original_virtual_trace_contracts::original_virtual_trace_faults_reset_and_future_completion_match_literal",
+          "source_sha256": "badf1182792d63dabe34710bc39bf313bda4ec5f368534652d3a65b83d46947f"
+        }
+      ]
     },
     {
       "id": "test_weight_fast_paths.WeightFastPathTests.test_count_weights_match_independent_products_across_group_sizes",
