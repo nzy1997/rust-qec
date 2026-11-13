@@ -24,7 +24,7 @@ help:
 	@echo "  test-magna-catalogue-json - Check exact catalogue JSON across serde features"
 	@echo "  test-magna-checkpoint-json - Check statistics and task-stream checkpoints across serde features"
 	@echo "  check                - Run cargo check for the workspace"
-	@echo "  test-magna-task-json - Check strict task JSON types across serde feature combinations"
+	@echo "  test-magna-task-json - Check task and sampling JSON across serde feature combinations"
 	@echo "  test-magna-controller-json - Check strict controller wire types across serde features"
 	@echo "  build-site           - Build the benchmarked documentation site into _site"
 	@echo "  fetch-doc-artifacts  - Fetch the pinned generated docs and evidence artifacts"
@@ -50,9 +50,9 @@ test:
 	cargo test --locked --workspace --features rstim/ilp,rsinter/full,rstim/benchmark-tools,rstim/cli,rstim/codegen-css,rstim/shot-viewer,qec-code/cli,qec-ilp-core/highs
 
 test-magna-task-json:
-	cargo test --locked -p rmagna --test task
-	cargo test --locked -p rmagna --features serde_json/arbitrary_precision --test task
-	cargo test --locked -p rmagna --features serde_json/float_roundtrip --test task
+	cargo test --locked -p rmagna --test task --test sampling_declarations
+	cargo test --locked -p rmagna --features serde_json/arbitrary_precision --test task --test sampling_declarations
+	cargo test --locked -p rmagna --features serde_json/float_roundtrip --test task --test sampling_declarations
 
 test-magna-controller-json:
 	cargo test --locked -p rmagna --test controller_process

@@ -1,5 +1,10 @@
 //! Exact independent categorical noise and reproducible prescribed assignments.
 mod conditional;
+mod sampling;
+pub use sampling::{
+    SamplingDeclarationError, SamplingDeclarationOptions, load_sampling_declaration,
+    parse_sampling_declaration,
+};
 mod original;
 mod sequential;
 pub use conditional::{ConditionalLawError, ConditionalSiteLaw};
