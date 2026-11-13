@@ -50,19 +50,21 @@ original method is partial with an explicit Rust/Python architecture distinction
 No core exclusion is widened.
 
 `original_file_batches_and_reuse` owns both original NativeBatch methods and
-two FileReuse methods. The 79-draw seed391 H/T/Z-error/MX method runs all16
-compiler/causal/history/noise configurations and preserves per-draw reported-MX
-anchors and all record rows. Independent exact full-list centering checks paired
-ratio variance, complete-weight ESS/mean and actual versus L/W-corrected residual
-coefficients. Ordinary/scientific JSON estimates and standard errors use an
-independent coefficient evaluation and1e-11 absolute-plus-relative tolerance.
-Budget11/20draw/seed99 comparisons include real preparation-normalization work
-in the same query collector as sampling, retain only committed rows and check
-the first failed attempt. Reuse methods keep the fourth-callback failure in
-70draw/seed8 runs, explicit10000/two-query budgets, and the original20draw/seed4
-two-compilation preparation boundary. Actual re-preparation controls detect
-additional work. These are finite contracts, with independent Rust RNG semantics,
-not native cache-object identity, peak-memory or paper-throughput equivalence.
+two FileReuse methods. The 79-draw method with seed 391 and the H/T/Z-error/MX
+circuit runs all 16 compiler/causal/history/noise configurations and preserves
+per-draw reported-MX anchors and all record rows. Independent exact full-list
+centering checks paired ratio variance, complete-weight ESS/mean and actual
+versus L/W-corrected residual coefficients. Ordinary/scientific JSON estimates
+and standard errors use an independent coefficient evaluation and a 1e-11
+absolute-plus-relative tolerance. Comparisons using a query budget of 11,
+20 requested draws and seed 99 include real preparation-normalization work in
+the same query collector as sampling, retain only committed rows and check the
+first failed attempt. Reuse methods keep the fourth-callback failure in runs
+with 70 draws and seed 8, explicit query budgets of 10000 and two, and the
+original preparation boundary of two compilations for 20 draws with seed 4.
+Actual re-preparation controls detect additional work. These are finite
+contracts, with independent Rust RNG semantics, not native cache-object
+identity, peak-memory or paper-throughput equivalence.
 
 ## Original file decoder moments and XOR marginalization
 

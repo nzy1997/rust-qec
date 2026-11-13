@@ -833,7 +833,7 @@
     {
       "id": "test_file_batch.NativeBatchTests.test_aggregate_matches_single_draws",
       "status": "verified",
-      "contract": "Complete original H/T/Z_ERROR(1/10)/MX plus-target 79-draw seed391 aggregate method, both history samplers, physical and scale2 importance noise, expanded over both compilers and causal configurations. Public sequential draws and fresh FileTask run share equivalent preparation-plus-draw query meters. Independent exact full-list centered means, paired-ratio variance, all standard errors, complete-weight ESS/mean and actual/reference L/W residual diagnostics match typed reports and ordinary/scientific JSON within declared1e-11 absolute-plus-relative tolerance. All79 requested records, per-draw MX acceptance/error/target-success anchors, query counts and source immutability retained. Rust RNG semantics are independent of native. MPL-2.0 attribution.",
+      "contract": "Complete original H/T/Z_ERROR(1/10)/MX plus-target 79-draw seed 391 aggregate method, both history samplers, physical and scale 2 importance noise, expanded over both compilers and causal configurations. Public sequential draws and fresh FileTask run share equivalent preparation-plus-draw query meters. Independent exact full-list centered means, paired-ratio variance, all standard errors, complete-weight ESS/mean and actual/reference L/W residual diagnostics match typed reports and ordinary/scientific JSON within declared 1e-11 absolute-plus-relative tolerance. All 79 requested records, per-draw MX acceptance/error/target-success anchors, query counts and source immutability retained. Rust RNG semantics are independent of native. MPL-2.0 attribution.",
       "rust_tests": [
         {
           "package": "rmagna",
@@ -846,7 +846,7 @@
     {
       "id": "test_file_batch.NativeBatchTests.test_failure_retains_only_completed_prefix",
       "status": "verified",
-      "contract": "Complete original X_ERROR(1/3)/M zero-target method,20requested draws,seed99,querycap11 in all8configurations. Manual and fresh FileTask executions include actual preparation target-normalization queries in the same caller-owned quota; no hardcoded offset. Stop at the first failure and compare exact committed prefix, failed shot/message/counts, actual query collectors, absent main statistics and independent centered partial estimates/uncertainties/efficiency with finite JSON tolerance1e-11. MPL-2.0 attribution.",
+      "contract": "Complete original X_ERROR(1/3)/M zero-target method, 20 requested draws, seed 99 and query cap 11 in all 8 configurations. Manual and fresh FileTask executions include actual preparation target-normalization queries in the same caller-owned quota; no hardcoded offset. Stop at the first failure and compare exact committed prefix, failed shot/message/counts, actual query collectors, absent main statistics and independent centered partial estimates/uncertainties/efficiency with finite JSON tolerance 1e-11. MPL-2.0 attribution.",
       "rust_tests": [
         {
           "package": "rmagna",
@@ -980,7 +980,7 @@
     {
       "id": "test_file_reuse.FileReuseTests.test_batch_failure_keeps_completed_prefix_and_query_budget_contract",
       "status": "verified",
-      "contract": "Complete original fail-controller circuit,70requested draws,seed8,fourth-callback error and separately bound querybudget10000 run in all8configurations. Actual callback transcripts and failure details agree, exactly3rowscomplete/1fails/66unattempted, no main statistics, and independent positive provisional prefix/manual shared-meter comparison. Separate original H/M three-draw querybudget2 clause retains2complete/1failed/0unattempted. No synthetic result substitutes for execution. MPL-2.0 attribution.",
+      "contract": "Complete original fail-controller circuit, 70 requested draws, seed 8, fourth-callback error and separately bound query budget 10000 run in all 8 configurations. Actual callback transcripts and failure details agree, exactly 3 rows complete, 1 fails and 66 remain unattempted, no main statistics, and independent positive provisional prefix/manual shared-meter comparison. Separate original H/M three-draw query budget 2 clause retains 2 complete, 1 failed and 0 unattempted. No synthetic result substitutes for execution. MPL-2.0 attribution.",
       "rust_tests": [
         {
           "package": "rmagna",
@@ -1003,7 +1003,7 @@
     {
       "id": "test_file_reuse.FileReuseTests.test_fixed_preparation_is_reused_for_new_original_faults",
       "status": "verified",
-      "contract": "Complete original H/T/DEPOLARIZE1(1/10)/M(1/10)/CX reported-feedback circuit,output1,zero target,20draws,seed4 in all8configurations. Actual shared preparation-plus-draw compilation meter records2afterpreparation and remains2aftereachactualnewfaultdraw, each draw reportszeroadditionalnetworkcompilations; typed compiled FileTask inspection/run confirms2capturedpreparationcompilations andzeroadditionalbatchconstructions. Counter proof does not assert native private cache layout or timing. MPL-2.0 attribution.",
+      "contract": "Complete original H/T/DEPOLARIZE1(1/10)/M(1/10)/CX reported-feedback circuit, output 1, zero target, 20 draws and seed 4 in all 8 configurations. Actual shared preparation-plus-draw compilation meter records 2 compilations after preparation and remains at 2 after each draw with new faults, each draw reports zero additional network compilations; typed compiled FileTask inspection/run confirms 2 captured preparation compilations and zero additional batch constructions. Counter proof does not assert native private cache layout or timing. MPL-2.0 attribution.",
       "rust_tests": [
         {
           "package": "rmagna",
