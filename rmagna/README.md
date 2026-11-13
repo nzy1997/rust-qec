@@ -545,6 +545,42 @@ is available in `enumerate`. Read, parse and option-conflict errors precede circ
 loading and decoder imports. The CLI rejects duplicate, unknown and inapplicable
 options before decoder imports.
 
+`--ideal-state target.magna` and `--recovery recovery.magna` supply terminal
+modules separately from task JSON. Explicit relative paths resolve from the
+caller's working directory at load time; task-declared relative paths resolve
+beside the task file. A module declared through both sources is an error, including
+a task key set to `null`. Recovery requires an ideal target, and classical
+`error_observables` exclude quantum target/recovery definitions. These conflicts
+are checked before opening an explicit module.
+
+Library callers use `FileInputPaths` with `FileTask::load_paths`. Loading captures
+the module contents for later inspection, compilation, runs and fingerprints;
+changing a file afterward leaves the loaded snapshot intact. Both loading entry
+points use the same source limits, module validation and preparation/query quotas.
+The original `FileTask::load` signature and `FileLoadOptions` remain available.
+
+```no_run
+use rmagna::file_api::{FileInputPaths, FileLoadOptions, FileTask, FileTaskOptions};
+use rmagna::noise::NoiseSampling;
+use rmagna::runtime::ControllerRegistry;
+use std::{collections::BTreeMap, path::Path};
+# fn main() -> Result<(), Box<dyn std::error::Error>> {
+let files = FileTask::load_paths(
+    FileInputPaths {
+        physical: Path::new("physical.magna"),
+        task: None,
+        ideal_state: Some(Path::new("target.magna")),
+        recovery: Some(Path::new("recovery.magna")),
+    },
+    &ControllerRegistry::default(), NoiseSampling::Physical,
+    FileTaskOptions::default(), &FileLoadOptions::default(), BTreeMap::new(),
+)?;
+let metadata = files.inspect(&Default::default())?;
+assert!(metadata["evaluation"]["ideal_state"].is_object());
+# Ok(())
+# }
+```
+
 External Python decoders require `--controllers controllers.json`; optionally
 select `--python /path/to/python` and `--module-root /path/to/decoder/sources`.
 Explicit decoder modules execute on import, including during validation and
@@ -1530,6 +1566,57 @@ must fit the tighter scalar and field coefficient budget before reduction.
 The evaluator checks the factor and fault identities before entropy or
 controller calls. These draws do not establish unbiased sampling of any noise
 law.
+
+### Optional sample diagnostics
+
+`sample_with_diagnostics` returns the ordinary `TaskEvaluation` together with
+learned-record rank, actual protocol/recovery callback counts and separate noise
+and history entropy-word counts. It resolves one history and evaluates that same
+draw, preserving the ordinary estimator values, callbacks and random stream.
+Ordinary `sample` performs its existing work without the optional rank aggregation.
+
+Learned rank counts independent nonzero rows in reported-record coordinates after
+substituting observed controller decisions. Constants and duplicate rows add no
+rank; a deterministic newly observed record can add rank while consuming zero
+entropy. Physical and recovery records retain separate coordinates. Callback
+counts use the actual call trace and its phase boundary, so both phases can use
+the same decoder name. `history_queries` keeps its query-group meaning and
+execution costs keep their existing logical-work definitions.
+
+```rust
+use rmagna::circuit::{ParseOptions, parse_circuit};
+use rmagna::noise::SplitMix64;
+use rmagna::runtime::ControllerRegistry;
+use rmagna::task::{EvaluationOptions, TaskEvaluator, TaskOptions,
+                  TaskSampleDiagnosticOptions, parse_task};
+use std::path::Path;
+# fn main() -> Result<(), Box<dyn std::error::Error>> {
+let parse = ParseOptions::default();
+let physical = parse_circuit("H 0\nM 0", &parse)?;
+let modules = parse_task(r#"{"sample_records":[0]}"#, Path::new("."),
+                         &TaskOptions::default())?.load_modules(&physical, &parse)?;
+let evaluator = TaskEvaluator::new(&physical, &modules,
+    &ControllerRegistry::default(), EvaluationOptions::default())?;
+let (draw, diagnostics) = evaluator.sample_with_diagnostics(
+    &mut SplitMix64::new(4), &TaskSampleDiagnosticOptions::default())?;
+assert_eq!(draw.sampled_records.len(), 1);
+assert_eq!(diagnostics.learned_record_rank, 1);
+assert_eq!(diagnostics.protocol_controller_calls, 0);
+assert_eq!(diagnostics.recovery_controller_calls, 0);
+# Ok(())
+# }
+```
+
+`TaskSampleDiagnosticOptions` defaults to 65536 record bits, 65536 resolved
+conditions and 1048576 logical packed words for the basis plus its working row.
+The word budget excludes allocator/map overhead and runtime expression storage;
+it is not a process-memory limit. Width admission precedes entropy and callbacks.
+Condition/workspace checks follow history resolution, so a diagnostic failure may
+already have consumed the ordinary draw's entropy or invoked its callbacks. The
+method reports that failure without retrying. These optional diagnostics are
+separate from the file-result schema.
+
+### Supplied Pauli actions
 
 `TaskEvaluator::prepare_supplied_actions` also accepts Pauli actions outside
 the physical alternatives. Each expanded noise instruction owns its target

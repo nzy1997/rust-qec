@@ -1072,8 +1072,16 @@
     },
     {
       "id": "test_file_reuse.FileReuseTests.test_uint64_denominator_boundary_and_reproducibility",
-      "status": "unmapped",
-      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+      "status": "verified",
+      "contract": "All three original probabilities with denominator 18446744073709551615, literal first numerator 9223372036854775814 and all 128 seeds compare complete reused/fresh draws and final Rust RNG states. Tail choices are (-1,0), first-category count satisfies 40<count<88, P=Q and likelihood is one. A separate owning supplement checks literal CDF thresholds 9223372036854775801,18446744073709551614,1, rejection of word D, actual three/four entropy words and 64-bit versus 63-bit denominator caps. Independent Rust streams do not claim native RNG identity.",
+      "rust_tests": [
+        {
+          "package": "rmagna",
+          "target": "original_reuse_u64",
+          "test": "original_uint64_denominator_boundary_and_reproducibility",
+          "source_sha256": "1af8e7188ad7f4423afa0cda35b53215c3f9049658cf6c83db93da8365f22a86"
+        }
+      ]
     },
     {
       "id": "test_gf2_kernel.SharedGF2KernelTest.test_byte_oracles_with_undefined_behavior_sanitizer",
@@ -1474,8 +1482,16 @@
     },
     {
       "id": "test_kernel_contract.KernelContractTests.test_random_full_records_states_faults_and_moments_against_independent_matrices",
-      "status": "unmapped",
-      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+      "status": "verified",
+      "contract": "The complete original seed 26092393 schedule retains all 24 three-wire ten-gate circuits, four record assignments, complex initial phase, ordered same-anchor faults, signed YX readout, repeated report flips, plus reset, destructive X readout, outputs (1,0) and reset environment. Both compilers check 192 branch/network probabilities, 1536 complex amplitudes, 768 Pauli moments, 32 absorbed certificates and 256 coherent amplitudes, with exact total mass one. Independent vectors use unchanged original AST schedules and NumPy physical matrices; native code supplies IR metadata/branch materialization only. A pinned portable fixture and offline provenance/output guards bind all 475 source identities. Amplitude tolerance is 3e-12, probability/moment tolerance 4e-13; no native object/ABI or performance identity is claimed.",
+      "rust_tests": [
+        {
+          "package": "rmagna",
+          "target": "original_kernel_matrices",
+          "test": "original_random_full_records_states_faults_and_moments_against_independent_matrices",
+          "source_sha256": "e049b31fee806de732ed76c38a340f9829e1d02857a4b5719861484ff8c858bd"
+        }
+      ]
     },
     {
       "id": "test_kernel_contract.KernelContractTests.test_unexpected_kernel_errors_are_never_retried_on_another_backend",
@@ -2364,8 +2380,16 @@
     },
     {
       "id": "test_quantum_output.QuantumOutputTests.test_entry_validation",
-      "status": "unmapped",
-      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+      "status": "verified",
+      "contract": "The complete original entry method preserves six retired-field forms, two non-earlier record references, eight malformed/undeclared observable tasks and four classical/quantum conflicts. Structured error_observables conflicts precede recovery dependency validation and module I/O; standalone recovery still requires ideal_state. An additional owning positive test preserves seven valid declarations. Typed modules/errors translate original circuit objects and exception classes; no simulator or native ABI change is claimed.",
+      "rust_tests": [
+        {
+          "package": "rmagna",
+          "target": "original_quantum_entry",
+          "test": "original_entry_validation",
+          "source_sha256": "1ec0e425296f14a09eaec0be190f40fb27971873f27f8ccecd0a569811ee313c"
+        }
+      ]
     },
     {
       "id": "test_quantum_output.QuantumOutputTests.test_public_run_enumeration_and_task_file",
@@ -2379,8 +2403,16 @@
     },
     {
       "id": "test_quantum_output.QuantumOutputTests.test_unsampled_quantum_output_is_terminal_conditional_expectation",
-      "status": "unmapped",
-      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+      "status": "verified",
+      "contract": "Both compilers retain physical H/T, ideal H and measured MX with record zero requested only for the measured route. The original at-most-64-seed search observes both branches. Independent exact masses (2+sqrt(2))/4 and (2-sqrt(2))/4 sum to one; raw error numerators are zero and the latter mass, summing to the unsampled error strictly between zero and one. Normalized conditional errors are exactly zero/one, with unit history/noise factors. Explicit typed output zero and raw-versus-normalized fields translate the native interface without RNG ABI identity.",
+      "rust_tests": [
+        {
+          "package": "rmagna",
+          "target": "original_quantum_terminal",
+          "test": "original_unsampled_quantum_output_is_terminal_conditional_expectation",
+          "source_sha256": "4caa67fbc44bd8e9a69f2092687c805c3b5630aca8c715a9cd94586925fb3ff2"
+        }
+      ]
     },
     {
       "id": "test_query_reuse.OwnershipAndDependencies.test_deferred_public_graph_isolation_and_owned_transfer",
@@ -2842,58 +2874,146 @@
     },
     {
       "id": "test_terminal_evaluation.TerminalEvaluationTests.test_affine_recovery_integrates_records_and_moments_before_target",
-      "status": "unmapped",
-      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+      "status": "verified",
+      "contract": "The complete affine measurement/XOR/correction recovery is integrated under both compilers/history samplers, retaining learned rank zero, no sampled callbacks, exact error zero and moment one. Reset recovery against the opposite target retains error one through individual draws and actual batches. Ordinary/diagnostic complete task results and streams agree; integrated measurements do not become fabricated sampled record rows.",
+      "rust_tests": [
+        {
+          "package": "rmagna",
+          "target": "task_sample_diagnostics",
+          "test": "original_affine_recovery_integrates_records_and_moments_before_target",
+          "source_sha256": "d791c0a503914ccb522a4f6b589212931713f4e5763862a6ed3aa8640b6f7190"
+        }
+      ]
     },
     {
       "id": "test_terminal_evaluation.TerminalEvaluationTests.test_module_validation_and_mutually_exclusive_metrics",
-      "status": "unmapped",
-      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+      "status": "verified",
+      "contract": "All five invalid original targets, both noisy recoveries, empty recovery without target and three retired/unknown/classical-conflict tasks reject through their owning typed fields/reasons. The real one-query file run charges target normalization, then fails at sampling shot zero with completed/failed/not-attempted (0,1,0), one successful actual query, zero invented failed queries and null estimates/statistics. Structured Rust errors translate Python exception contracts.",
+      "rust_tests": [
+        {
+          "package": "rmagna",
+          "target": "original_terminal_validation",
+          "test": "original_module_validation_and_mutually_exclusive_metrics",
+          "source_sha256": "f48545ed8b40f0857c30e75704241b357d39d7c8d827da3e3b289cb20c70887e"
+        }
+      ]
     },
     {
       "id": "test_terminal_evaluation.TerminalEvaluationTests.test_nonclifford_terminal_feedback_and_multiple_calls",
-      "status": "unmapped",
-      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+      "status": "verified",
+      "contract": "All eight original seeds run H/T with H/measurement/echo/controlled-S/echo/controlled-H recovery under both compilers/history samplers. Both recovery callback inputs agree, actual recovery-call count is two, learned record rank is one despite two query groups, and exact error is zero or three quarters according to the bit. Ordinary/diagnostic full results, callback effects and final Rust RNG agree. A deterministic I replacement still learns rank one with zero history entropy. Extra literal empty/constant/duplicate/independent/66-record fixtures and explicit bounds distinguish rank, entropy and resource failure scope.",
+      "rust_tests": [
+        {
+          "package": "rmagna",
+          "target": "task_sample_diagnostics",
+          "test": "original_nonclifford_terminal_feedback_and_multiple_calls",
+          "source_sha256": "d791c0a503914ccb522a4f6b589212931713f4e5763862a6ed3aa8640b6f7190"
+        }
+      ]
     },
     {
       "id": "test_terminal_evaluation.TerminalEvaluationTests.test_output_mapping_and_unobserved_environment",
-      "status": "unmapped",
-      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+      "status": "verified",
+      "contract": "All four original output-map/environment cases run under both compilers. Ordered (2,0) versus (0,2) mappings distinguish exact errors zero and one; an unobserved physical Bell wire and a traced recovery ancilla give one-half. Actual target width, recovery ancilla count, individual raw/field metrics and two-draw batch values are retained without native object/RNG identity.",
+      "rust_tests": [
+        {
+          "package": "rmagna",
+          "target": "original_terminal_oracles",
+          "test": "original_output_mapping_and_unobserved_environment",
+          "source_sha256": "e54713bdb55a28feb68950147975fe5e76186aafc0ae373cab9917151fee5a4b"
+        }
+      ]
     },
     {
       "id": "test_terminal_evaluation.TerminalEvaluationTests.test_recovery_samples_joint_syndromes_without_acceptance_or_target_bias",
-      "status": "unmapped",
-      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+      "status": "verified",
+      "contract": "All twelve original paired seeds run Bell measurement/postselection and terminal echo correction with opposite targets under all eight compiler/history/causal configurations: 96 pairs. Targets preserve identical recovery bits and final Rust RNG states, one actual callback per draw and both bit outcomes. Acceptance equals the bit, zero-target error is zero and opposite-target error equals acceptance; raw history masses and unit factors are checked. These finite paired histories preserve quantum sampling independent of the target/postselection question.",
+      "rust_tests": [
+        {
+          "package": "rmagna",
+          "target": "original_terminal_recovery",
+          "test": "original_recovery_samples_joint_syndromes_without_acceptance_or_target_bias",
+          "source_sha256": "ce5a901556f6518ac15188374c1fe5083b1cf0a9f8c0ba03d706518b5edfd8a0"
+        }
+      ]
     },
     {
       "id": "test_terminal_evaluation.TerminalEvaluationTests.test_repetition_recovery_preserves_encoded_magic_and_original_faults",
-      "status": "unmapped",
-      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+      "status": "verified",
+      "contract": "All five original fault patterns run with the encoded H/T repetition target, both compilers, both history samplers and both causal strategies: 40 scenarios. Literal four-entry decoder syndromes/corrections, complete callback counts/transcripts, individual exact errors [0,0,0,0,1/2], two-draw batches and bare error one for every nonempty fault pattern are retained. Independently seeded Rust routes do not claim native RNG identity.",
+      "rust_tests": [
+        {
+          "package": "rmagna",
+          "target": "original_terminal_recovery",
+          "test": "original_repetition_recovery_preserves_encoded_magic_and_original_faults",
+          "source_sha256": "ce5a901556f6518ac15188374c1fe5083b1cf0a9f8c0ba03d706518b5edfd8a0"
+        }
+      ]
     },
     {
       "id": "test_terminal_evaluation.TerminalEvaluationTests.test_t_targets_and_empty_recovery",
-      "status": "unmapped",
-      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+      "status": "verified",
+      "contract": "All nine original T-target/suffix/recovery combinations run under both compilers, retaining empty/identity/absent recovery, exact errors zero/one/one-half, target width and no recovery ancilla. Individual raw/field metrics and actual two-draw batch estimates, counts and zero uncertainties agree. These finite typed task assertions do not claim native RNG or performance identity.",
+      "rust_tests": [
+        {
+          "package": "rmagna",
+          "target": "original_terminal_oracles",
+          "test": "original_t_targets_and_empty_recovery",
+          "source_sha256": "e54713bdb55a28feb68950147975fe5e76186aafc0ae373cab9917151fee5a4b"
+        }
+      ]
     },
     {
       "id": "test_terminal_evaluation.TerminalEvaluationTests.test_target_inverse_against_independent_dense_amplitudes",
-      "status": "unmapped",
-      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+      "status": "verified",
+      "contract": "All four computational basis inputs compare against the original entangled H/T/Y/CX/CS/CH target under both compilers. Independent physical-matrix probabilities are 1/4,1/4+sqrt(2)/8,1/4,1/4-sqrt(2)/8 with q0 as the low bit; errors are their exact complements. Individual and two-draw batch values retain exact cyclotomic assertions. A separate unchanged NumPy AST oracle agrees with these literals within 2e-15.",
+      "rust_tests": [
+        {
+          "package": "rmagna",
+          "target": "original_terminal_oracles",
+          "test": "original_target_inverse_against_independent_dense_amplitudes",
+          "source_sha256": "e54713bdb55a28feb68950147975fe5e76186aafc0ae373cab9917151fee5a4b"
+        }
+      ]
     },
     {
       "id": "test_terminal_evaluation.TerminalEvaluationTests.test_terminal_namespace_report_errors_and_external_decoders",
-      "status": "unmapped",
-      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+      "status": "verified",
+      "contract": "All eight original seeds execute the forced physical report-flip circuit and terminal echo recovery under both compilers/history samplers. Actual protocol and recovery callbacks each occur once, with complete traces, distinct call IDs, separate record coordinates of rank two and exact error zero. Optional diagnostics share one history resolution; ordinary/diagnostic exact evaluations, actual callback transcripts, counted entropy and final Rust RNG states agree. Same decoder names do not merge phase ownership.",
+      "rust_tests": [
+        {
+          "package": "rmagna",
+          "target": "task_sample_diagnostics",
+          "test": "original_terminal_namespace_report_errors_and_external_decoders",
+          "source_sha256": "d791c0a503914ccb522a4f6b589212931713f4e5763862a6ed3aa8640b6f7190"
+        }
+      ]
     },
     {
       "id": "test_terminal_evaluation.TerminalEvaluationTests.test_three_file_cli_task_relative_paths_and_fingerprints",
-      "status": "unmapped",
-      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+      "status": "verified",
+      "contract": "The complete original physical-X/identity-target/measurement-correction three-file case executes actual validate, inspect and run commands. Recovered error is zero; changing the target to X yields error one and a changed target-content fingerprint; duplicate explicit/task target sources reject. Supplementary owning tests cover both compilers, immutable snapshots after file mutation, projected targets, null-presence duplicates before module I/O, classical/recovery dependencies, source/query limits, explicit CLI inputs and caller-CWD versus task-relative same-basename files. Public FileInputPaths/load_paths preserve existing load/options calls and normalized Rust reports without Python keyword/RNG ABI identity.",
+      "rust_tests": [
+        {
+          "package": "rmagna",
+          "target": "file_module_paths",
+          "test": "original_three_file_cli_task_relative_paths_and_fingerprints",
+          "source_sha256": "f42aa20e2979bca97a425c191eed5312f4d85583a52161f288bfe025bd8c9701"
+        }
+      ]
     },
     {
       "id": "test_terminal_evaluation.TerminalEvaluationTests.test_wide_clifford_encoded_t_target_uses_compact_native_boundary",
-      "status": "unmapped",
-      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+      "status": "verified",
+      "contract": "The original width-three and width-65 encoded magic targets, forced X fault and parity recovery run under both compilers. Target width, zero recovery ancillas, exact recovered error zero, quotient rank at most two and at most four terms are checked alongside individual and actual two-draw batch values. Resource assertions describe these finite tasks rather than paper throughput.",
+      "rust_tests": [
+        {
+          "package": "rmagna",
+          "target": "original_terminal_oracles",
+          "test": "original_wide_clifford_encoded_t_target_uses_compact_native_boundary",
+          "source_sha256": "e54713bdb55a28feb68950147975fe5e76186aafc0ae373cab9917151fee5a4b"
+        }
+      ]
     },
     {
       "id": "test_trace_global_phase.TraceGlobalPhaseTests.test_amplitude_compiler_preserves_the_requested_phase",

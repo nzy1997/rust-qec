@@ -1,4 +1,6 @@
 //! Owned file-task snapshots, reusable compilation, and schema-2 run reports.
+#[cfg(test)]
+use crate::task::parse_task;
 mod comparison;
 mod exclusive;
 pub use comparison::{
@@ -21,7 +23,7 @@ use crate::task::{
     BatchExportError, CancellationToken, ContentFingerprints, EvaluationOptions, FingerprintError,
     FingerprintInputs, FingerprintOptions, LoadedModules, ProgressObserver, RunHooks, TaskError,
     TaskEvaluator, TaskOptions, TaskRunOptions, TaskRunResult, export_batch_metrics,
-    fingerprint_content, parse_task, resolved_options, run_task_batch_inspected,
+    fingerprint_content, parse_task_with_paths, resolved_options, run_task_batch_inspected,
     sampling_configuration, validate_snapshot_fingerprints,
 };
 pub use enumeration::{FileEnumerationOptions, FileEnumerationReport};
@@ -51,6 +53,17 @@ impl Default for FileTaskOptions {
         }
     }
 }
+/// Input paths borrowed only while constructing an immutable file snapshot.
+/// Explicit ideal/recovery paths are relative to caller CWD. JSON module paths
+/// remain relative to the task file, or the circuit directory without a task.
+#[derive(Clone, Copy, Debug)]
+pub struct FileInputPaths<'a> {
+    pub physical: &'a Path,
+    pub task: Option<&'a Path>,
+    pub ideal_state: Option<&'a Path>,
+    pub recovery: Option<&'a Path>,
+}
+
 #[derive(Clone, Debug, Default)]
 pub struct FileLoadOptions {
     pub circuit: ParseOptions,
@@ -194,6 +207,37 @@ impl FileTask {
         load: &FileLoadOptions,
         identities: BTreeMap<String, Value>,
     ) -> Result<Self, FileApiError> {
+        Self::load_paths(
+            FileInputPaths {
+                physical,
+                task,
+                ideal_state: None,
+                recovery: None,
+            },
+            registry,
+            sampling,
+            options,
+            load,
+            identities,
+        )
+    }
+    /// Load explicit terminal modules through the same bounded parser, immutable
+    /// source capture and fingerprint path as task-declared modules. A task JSON
+    /// declaration and explicit path for the same field conflict, even for null.
+    pub fn load_paths(
+        paths: FileInputPaths<'_>,
+        registry: &ControllerRegistry,
+        sampling: NoiseSampling,
+        options: FileTaskOptions,
+        load: &FileLoadOptions,
+        identities: BTreeMap<String, Value>,
+    ) -> Result<Self, FileApiError> {
+        let FileInputPaths {
+            physical,
+            task,
+            ideal_state,
+            recovery,
+        } = paths;
         let mut parse = load.circuit.clone();
         parse.controllers.extend(registry.names());
         parse.source = Some(physical.display().to_string());
@@ -206,7 +250,7 @@ impl FileTask {
             ),
             None => ("{}".to_owned(), physical.parent().unwrap_or(Path::new("."))),
         };
-        let spec = parse_task(&text, base, &load.task)?;
+        let spec = parse_task_with_paths(&text, base, &load.task, ideal_state, recovery)?;
         let modules = spec.load_modules(&circuit, &parse)?;
         Self::from_loaded(circuit, modules, registry, sampling, options, identities)
     }

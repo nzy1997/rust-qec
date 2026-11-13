@@ -16,6 +16,8 @@ use crate::scalar::{ExactScalar, ScalarArithmetic};
 use crate::unitary::{CompiledUnitary, DensityBoundary};
 use num_rational::BigRational;
 use num_traits::One;
+mod diagnostics;
+pub use diagnostics::{TaskSampleDiagnosticOptions, TaskSampleDiagnostics};
 mod preparation;
 mod supplied_actions;
 pub use preparation::{
@@ -67,6 +69,8 @@ pub struct TaskEvaluator {
     execution: Execution,
     options: EvaluationOptions,
     sampling: NoiseSampling,
+    diagnostic_record_width: usize,
+    protocol_call_boundary: usize,
 }
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct ContractionResources {
@@ -287,6 +291,8 @@ impl TaskEvaluator {
             execution,
             options,
             sampling: sampling.clone(),
+            diagnostic_record_width: composed.num_records(),
+            protocol_call_boundary: physical.external_calls(),
         })
     }
     pub fn scaled_proposal_summary(&self) -> Option<&ScaledProposalSummary> {
@@ -394,12 +400,29 @@ impl TaskEvaluator {
         random: &mut impl RandomSource,
         meter: Option<&ExecutionMeter>,
     ) -> Result<TaskEvaluation, TaskError> {
+        self.sample_observed_inner(random, meter, None)
+            .map(|(evaluation, _)| evaluation)
+    }
+    fn sample_observed_inner(
+        &self,
+        random: &mut impl RandomSource,
+        meter: Option<&ExecutionMeter>,
+        diagnostics: Option<&TaskSampleDiagnosticOptions>,
+    ) -> Result<(TaskEvaluation, Option<TaskSampleDiagnostics>), TaskError> {
+        if let Some(options) = diagnostics {
+            options.preflight(self.diagnostic_record_width)?;
+        }
         match &self.execution {
             Execution::Causal(program) => {
                 let history = program
                     .resolve_observed(&self.requested, random, &self.options.scalars, meter)
                     .map_err(|e| error("runtime", e))?;
-                self.evaluate_observed(EvaluationInput::history(&history), meter)
+                let captured = diagnostics
+                    .map(|options| options.capture(&history, self.protocol_call_boundary))
+                    .transpose()?;
+                let evaluation =
+                    self.evaluate_observed(EvaluationInput::history(&history), meter)?;
+                Ok((evaluation, captured))
             }
             Execution::Linear {
                 instrument,
@@ -407,7 +430,11 @@ impl TaskEvaluator {
                 ..
             } => {
                 let draw = sampler.draw(random).map_err(|e| error("noise", e))?;
-                self.evaluate_observed(
+                let captured = diagnostics.map(|_| TaskSampleDiagnostics {
+                    noise_entropy_words: draw.entropy_words,
+                    ..Default::default()
+                });
+                let evaluation = self.evaluate_observed(
                     EvaluationInput {
                         instrument,
                         faults: &draw.faults,
@@ -417,7 +444,8 @@ impl TaskEvaluator {
                         history: None,
                     },
                     meter,
-                )
+                )?;
+                Ok((evaluation, captured))
             }
         }
     }
