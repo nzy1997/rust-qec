@@ -8,7 +8,7 @@ Add the decoder library from crates.io:
 
 ```toml
 [dependencies]
-rmatching = "0.3.0"
+rmatching = "0.4.0"
 ```
 
 ## Highlights

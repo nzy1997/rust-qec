@@ -1,7 +1,7 @@
 # Packaged-crate consumer check
 
-This independent Rust workspace demonstrates the `rstim` 0.3.0 and `rmatching`
-0.3.0 registry APIs. Once these versions are available on crates.io, run:
+This independent Rust workspace demonstrates the `rstim` 0.4.0 and `rmatching`
+0.4.0 registry APIs. Once these versions are available on crates.io, run:
 
 ```sh
 cargo run --manifest-path examples/rust-consumer/Cargo.toml

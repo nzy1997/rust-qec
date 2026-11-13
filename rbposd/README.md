@@ -9,7 +9,7 @@ Add the crate to an application with:
 
 ```toml
 [dependencies]
-rbposd = "0.3.0"
+rbposd = "0.4.0"
 ```
 
 ```rust

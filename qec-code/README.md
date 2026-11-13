@@ -17,13 +17,13 @@ Add the library from crates.io:
 
 ```toml
 [dependencies]
-qec-code = "0.3.0"
+qec-code = "0.4.0"
 ```
 
 Enable the open-source exact ILP backend only when it is needed:
 
 ```toml
-qec-code = { version = "0.3.0", features = ["distance-ilp-highs"] }
+qec-code = { version = "0.4.0", features = ["distance-ilp-highs"] }
 ```
 
 The default build is a library-only build with no command-line parser or native

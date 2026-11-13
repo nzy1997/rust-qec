@@ -8,5 +8,5 @@ publish = false
 
 [dependencies]
 rand = "0.8"
-rmatching = "0.3.0"
-rstim = { version = "0.3.0", default-features = false }
+rmatching = "=0.4.0"
+rstim = { version = "=0.4.0", default-features = false }

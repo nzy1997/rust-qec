@@ -1,8 +1,8 @@
 # Support and compatibility contract
 
-This contract covers the RustQEC 0.3 release line. The documentation version
+This contract covers the RustQEC 0.4 release line. The documentation version
 selects the development branch or a stable release; individual crates may have
-different patch versions. Package requirements such as `rstim >=0.3.1,<0.4.0`
+different patch versions. Package requirements such as `rstim >=0.4.0,<0.5.0`
 apply to that crate.
 
 ## Support levels
@@ -117,9 +117,9 @@ metadata when reproducing an exact package version.
 
 <span id="development-cargo-features-before-the-first-registry-release"></span>
 
-## Cargo features in the 0.3 release line
+## Cargo features in the 0.4 release line
 
-The 0.3 source package defaults keep native solver dependencies optional.
+The 0.4 source package defaults keep native solver dependencies optional.
 `rstim` needs `--features ilp` for `envelope-mle`; default builds advertise
 only the available decoder choices. Official native archives retain ILP support.
 `rsinter` needs explicit runner/plotting features, or `full` for the previous
@@ -134,10 +134,14 @@ probabilities `0 <= p < 1`; probability-1 errors require a different representat
 and are rejected explicitly. This restriction does not apply to rstim sampling
 or DEM generation, including the probability-1 installed quickstart.
 
-Library defaults now omit compatibility CLI parsing, CSS generation, the local
-viewer, and native ILP backends. Enable `rstim` features `cli`, `codegen-css`,
-and `shot-viewer` where needed; `qec-code/cli` enables its executable and
-`qec-ilp-core/highs` enables its open-source solver. Full native archives retain
-the viewer. `rmatching` benchmark binaries moved to the unpublished
+The default `rstim` feature set includes compatibility CLI parsing, CSS
+generation, the local viewer and compressed archives, while native ILP remains
+optional. Library consumers can disable defaults and enable `cli`, `codegen-css`,
+`shot-viewer` or `archive-zstd` explicitly. `qec-code/cli` enables its executable
+and `qec-ilp-core/highs` enables its open-source solver. Full native archives
+retain the viewer. `rmatching` benchmark binaries moved to the unpublished
 `rmatching-bench-tools` workspace member. See the
 [feature migration guide](https://github.com/nzy1997/rust-qec/blob/master/docs/crates-io.md#library-feature-boundaries).
+
+See the [0.4 source-snapshot migration contract](qude-dependency-release.md)
+for the public enum and archive-feature changes relative to published 0.3.0.

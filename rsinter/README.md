@@ -10,7 +10,7 @@ The default installation provides the library, benchmark merging, and the
 real decoder benchmark. For BP-OSD and MWPM:
 
 ```sh
-cargo install --locked rsinter --version 0.3.0 --features rbposd-runner,rmatching-runner
+cargo install --locked rsinter --version 0.4.0 --features rbposd-runner,rmatching-runner
 rsinter --help
 ```
 
@@ -18,11 +18,11 @@ For use as a library:
 
 ```toml
 [dependencies]
-rsinter = { version = "0.3.0", features = ["rbposd-runner"] }
+rsinter = { version = "0.4.0", features = ["rbposd-runner"] }
 ```
 
 The RustQEC crates used by this release (`rstim`, `rbposd`, `rmatching`,
-`rilpqec`, and `qec-ilp-core`) are all resolved at version 0.3. Rust 1.88 or
+`rilpqec`, and `qec-ilp-core`) are all resolved at version 0.4. Rust 1.88 or
 newer is required.
 
 ## Replay a detector dataset

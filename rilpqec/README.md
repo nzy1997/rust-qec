@@ -9,8 +9,8 @@ It does not sum probabilities over logically equivalent error configurations.
 
 ```toml
 [dependencies]
-rilpqec = "0.3.0"
-rstim = "0.3.0"
+rilpqec = "0.4.0"
+rstim = "0.4.0"
 ```
 
 HiGHS is included in every `rilpqec` build. Install C/C++ build tools, CMake,

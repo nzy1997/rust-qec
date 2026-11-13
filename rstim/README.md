@@ -10,7 +10,7 @@ Add the simulator library from crates.io:
 ```toml
 [dependencies]
 rand = "0.8"
-rstim = { version = "0.3.0", default-features = false }
+rstim = { version = "0.4.0", default-features = false }
 ```
 
 `rstim`'s sampling APIs accept RNGs from `rand` 0.8, so downstream crates that

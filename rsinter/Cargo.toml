@@ -1,6 +1,6 @@
 [package]
 name = "rsinter"
-version = "0.3.0"
+version = "0.4.0"
 edition = "2024"
 license.workspace = true
 rust-version.workspace = true
@@ -22,11 +22,11 @@ full = ["rbposd-runner", "rmatching-runner", "ilp-runner", "plotting"]
 gurobi = ["ilp-runner", "rilpqec/gurobi"]
 
 [dependencies]
-rstim = { version = "0.3.0", path = "../rstim", default-features = false, features = ["codegen-css"] }
-rmatching = { version = "0.3.0", path = "../rmatching", optional = true }
-rbposd = { version = "0.3.0", path = "../rbposd", optional = true }
-rilpqec = { version = "0.3.0", path = "../rilpqec", optional = true }
-qec-ilp-core = { version = "0.3.0", path = "../qec-ilp-core", optional = true }
+rstim = { version = "=0.4.0", path = "../rstim", default-features = false, features = ["codegen-css"] }
+rmatching = { version = "=0.4.0", path = "../rmatching", optional = true }
+rbposd = { version = "=0.4.0", path = "../rbposd", optional = true }
+rilpqec = { version = "=0.4.0", path = "../rilpqec", optional = true }
+qec-ilp-core = { version = "=0.4.0", path = "../qec-ilp-core", optional = true }
 rand = "0.8"
 rayon = "1"
 clap = { version = "4", features = ["derive"] }
@@ -39,7 +39,7 @@ tempfile = "3"
 plotters = { version = "0.3", default-features = false, features = ["svg_backend", "bitmap_backend", "bitmap_encoder", "line_series", "full_palette", "ttf"], optional = true }
 
 [dev-dependencies]
-qec-code = { version = "0.3.0", path = "../qec-code", features = ["cli"] }
+qec-code = { version = "=0.4.0", path = "../qec-code", features = ["cli"] }
 
 [[bin]]
 name = "rsinter"
