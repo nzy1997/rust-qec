@@ -24,6 +24,8 @@ The five categories are next-work assessments: validation first (`V`), confirmed
 corresponding-service gaps (`G`), unestablished reuse/integration contracts (`P`),
 Rust contract adaptations (`E`), and aggregate tests needing decomposition (`U`).
 None is an architecture exclusion or an executable parity certificate.
+The source-derived catalog summaries retain MPL-2.0 attribution in
+`remaining-contracts.NOTICE.md`; the bundled license is linked there.
 
 ```sh
 python3 benchmarks/magna_reproduction/remaining_contracts.py check \
