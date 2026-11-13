@@ -122,6 +122,43 @@ def rust_configuration(actual, manifest, sampler):
     require(actual["compilation"]["strategy"] == "SharedCommutingLayer", "Rust compiler changed")
 
 
+def validate_rust_metrics(result):
+    """The exported metrics and the outer diagnostic describe the same batch."""
+    metrics = result["metrics"]
+    for key in ("requested", "completed", "failed", "not_attempted", "seed"):
+        require(count(metrics[key]) and metrics[key] == result[key], f"nested Rust metrics {key} changed")
+    require(metrics["status"] == result["status"], "nested Rust metrics status changed")
+    expected_failures = []
+    for failure in result["failures"]:
+        require(isinstance(failure["phase"], str), "invalid Rust failure phase")
+        expected_failures.append(dict(phase=failure["phase"].lower(), shot=failure["shot"],
+                                      type=failure["kind"], message=failure["message"]))
+    require(metrics["failures"] == expected_failures, "nested Rust metrics failures changed")
+    for key in ("network_compilations", "history_groups"):
+        value = metrics["completed_resources"][key]
+        require(count(value) and value == result[key], f"nested Rust metrics {key} changed")
+    timings = metrics["timings"]
+    require(duration(timings["sampling_seconds"]) and duration(timings["total_seconds"])
+            and timings["sampling_seconds"] == result["sampling_seconds"]
+            and timings["total_seconds"] >= timings["sampling_seconds"]
+            and (timings["preparation_seconds"] is None or duration(timings["preparation_seconds"])),
+            "nested Rust metrics timing changed")
+    costs = metrics["execution_costs"]
+    require(costs["scope"] == "this_call_including_failed_attempts"
+            and costs["timing"] == "inclusive_wall_seconds", "nested Rust execution scope changed")
+    for key in ("compilation", "query", "decoder", "support"):
+        cost = costs[key]
+        require(all(count(cost[k]) for k in ("attempted", "succeeded", "failed"))
+                and cost["attempted"] == cost["succeeded"] + cost["failed"]
+                and duration(cost["seconds"]), f"invalid nested Rust {key} cost")
+    require(costs["query"]["attempted"] == result["query_attempts"]
+            and costs["decoder"]["seconds"] == result["decoder_seconds"], "nested Rust execution cost changed")
+    for key in ("weights", "efficiency"):
+        if metrics[key] is not None:
+            require(count(metrics[key]["completed"]) and metrics[key]["completed"] == result["completed"],
+                    f"nested Rust {key} count changed")
+
+
 def validate_noisy(stage, manifest, engine):
     payload = stage["payload"]
     if engine == "reference":
@@ -135,6 +172,7 @@ def validate_noisy(stage, manifest, engine):
                                                "query_attempts", "network_compilations", "history_groups")),
                 "invalid Rust pilot counters")
         require(duration(result["sampling_seconds"]) and duration(result["decoder_seconds"]), "invalid Rust pilot timing")
+        validate_rust_metrics(result)
         metrics = result["metrics"]
     require(all(count(result[k]) for k in ("requested", "completed", "failed", "not_attempted", "seed")),
             "invalid noisy run counts")

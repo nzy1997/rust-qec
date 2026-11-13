@@ -43,6 +43,17 @@ def rust_payload(manifest, noisy=False):
             seed=manifest["seed"], failed=0, not_attempted=0, status="complete", failures=[],
             query_attempts=16, network_compilations=0, history_groups=8, sampling_seconds=.25, decoder_seconds=.05,
             metrics=dict(estimates=dict(acceptance=.75, error=.125), standard_errors=dict(acceptance=.1, error=.05)))
+        metrics = value["pilot"]["metrics"]
+        metrics.update(status="complete", requested=manifest["shots"], completed=manifest["shots"],
+            failed=0, not_attempted=0, seed=manifest["seed"], failures=[],
+            completed_resources=dict(network_compilations=0, history_groups=8),
+            timings=dict(preparation_seconds=None, sampling_seconds=.25, total_seconds=.3),
+            execution_costs=dict(scope="this_call_including_failed_attempts", timing="inclusive_wall_seconds",
+                compilation=dict(attempted=0, succeeded=0, failed=0, seconds=0.),
+                query=dict(attempted=16, succeeded=16, failed=0, seconds=.15),
+                decoder=dict(attempted=8, succeeded=8, failed=0, seconds=.05),
+                support=dict(attempted=0, succeeded=0, failed=0, seconds=0.)),
+            weights=dict(completed=manifest["shots"]), efficiency=dict(completed=manifest["shots"]))
     return value
 
 
@@ -145,6 +156,9 @@ class PaperPilotTests(unittest.TestCase):
         partial["pilot"].update(status="failed", completed=3, failed=1, not_attempted=4,
                               failures=[dict(phase="Sampling", shot=3, kind="TaskError", message="quota")])
         partial["pilot"]["metrics"]["estimates"] = None
+        partial["pilot"]["metrics"].update(status="failed", completed=3, failed=1, not_attempted=4,
+            failures=[dict(phase="sampling", shot=3, type="TaskError", message="quota")],
+            weights=dict(completed=3), efficiency=dict(completed=3))
         cell["stages"]["rust_noisy"] = dict(status="complete", returncode=0, wall_seconds=.5, payload=partial)
         self.persist()
         self.assertEqual(self.check()["negative"], 1)
@@ -153,6 +167,34 @@ class PaperPilotTests(unittest.TestCase):
         self.persist()
         with self.assertRaisesRegex(ValueError, "required pilot success"):
             self.check()
+
+    def test_nested_metrics_cannot_contradict_completed_outer_pilot_even_after_rehashing(self):
+        baseline = copy.deepcopy(self.cells)
+        changes = [
+            lambda m: m.update(status="failed"),
+            lambda m: m.update(requested=64),
+            lambda m: m.update(completed=1),
+            lambda m: m.update(failed=63),
+            lambda m: m.update(not_attempted=1),
+            lambda m: m.update(seed=0),
+            lambda m: m.update(completed=True),
+            lambda m: m.update(failures=[dict(phase="sampling", shot=0, type="TaskError", message="quota")]),
+            lambda m: m["timings"].update(sampling_seconds=-99),
+            lambda m: m["timings"].update(sampling_seconds=.5, total_seconds=.2),
+            lambda m: m["execution_costs"]["query"].update(attempted=99999, succeeded=99999),
+            lambda m: m["execution_costs"]["query"].update(succeeded=15),
+            lambda m: m["execution_costs"]["decoder"].update(seconds=.1),
+            lambda m: m["completed_resources"].update(network_compilations=42),
+            lambda m: m["weights"].update(completed=1),
+            lambda m: m["efficiency"].update(completed=1),
+        ]
+        for index, change in enumerate(changes):
+            with self.subTest(mutation=index):
+                self.cells = copy.deepcopy(baseline)
+                change(self.cells["bh2-T"]["stages"]["rust_noisy"]["payload"]["pilot"]["metrics"])
+                self.persist()
+                with self.assertRaises(ValueError):
+                    self.check()
 
     def test_author_decoder_preflight_and_manifest_bounds(self):
         bad = copy.deepcopy(self.manifest)

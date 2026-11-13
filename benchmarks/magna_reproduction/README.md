@@ -85,6 +85,9 @@ counts. `PASS` means a valid bounded pilot with its required successes; it does
 not mean every selected task succeeded or that the paper is reproduced. The
 corruption tests reject altered inputs, omitted cells, mixed output contracts,
 wrong exact values/transcripts, dishonest counts and removed negative outcomes.
+The nested Rust metrics must agree with the outer diagnostic's status, counts,
+seed, failures, resource counts, timings and execution costs, including partial
+failed batches. Recomputing an artifact hash cannot hide those contradictions.
 No million-draw campaign runs in PR CI. The later BH/cultivation/decoder campaigns
 and publication evidence are separate issues in the catalog; #794 and #601
 provide related evidence conventions without becoming completed by this pilot.
