@@ -7,9 +7,9 @@ implement a simulator or claim reproduction of the paper's precision curves.
 
 ## Current coverage
 
-The source-bound ledger currently has 149 verified, 2 partial and 201 unmapped
+The source-bound ledger currently has 164 verified, 2 partial and 186 unmapped
 original methods, with zero architecture-specific core exclusions. It requires
-173 distinct Rust witnesses from 175 declarations across 71 targets. Strict
+188 distinct Rust witnesses from 190 declarations across 80 targets. Strict
 complete parity intentionally exits 2. The detailed per-change sections below
 retain their historical inventory snapshots; `coverage.json` is authoritative.
 
@@ -3074,3 +3074,53 @@ targets must execute. Strict complete parity still exits 2, with no architecture
 exclusions. Boundary/nonfinite methods, Python SIGALRM delivery, sparse-width
 performance, M6 compatibility and M7 paper experiments retain their existing
 incomplete status.
+
+## Full-record matrices and terminal module contracts
+
+The related owning targets cover fifteen complete original methods in one batch:
+
+```sh
+cargo test --locked -p rmagna --test original_kernel_matrices --test original_reuse_u64 --test original_quantum_terminal
+cargo test --locked -p rmagna --test original_quantum_entry --test original_terminal_oracles --test task_sample_diagnostics
+cargo test --locked -p rmagna --test original_terminal_recovery --test original_terminal_validation --test file_module_paths
+```
+
+The full-record fixture preserves all 24 circuits from the original seed 26092393,
+all 96 record branches, initial/global phase, ordered faults, signed readout,
+repeated report flips, reset environment and output order. Both compiler routes
+check complete amplitudes and moments, exact total probability, coherent queries
+and absorbed certificates. Its portable generator runs the unchanged original AST
+schedule and NumPy physical-matrix helpers; the native frontend supplies only IR
+metadata and branch materialization. All 475 source identities are verified before
+optional imports. Normal CI uses the pinned finite fixture and standard-library
+provenance, coordinate and output-guard tests. Regenerate into a fresh external
+path with the retained reference environment:
+
+```sh
+python3 benchmarks/magna_reproduction/original_kernel_matrix_reference.py \
+  --upstream /absolute/path/to/pinned/magna --out /absolute/path/to/new-kernel-vectors.json
+```
+
+Exact uint64 denominator tests preserve all original seeds and supplement them
+with literal CDF boundaries, rejection words and denominator caps. Quantum terminal
+tests compare integrated error with Born-weighted raw branches and exact conditional
+errors. The terminal module retains all eleven original methods: magic/entangled
+and wide targets, ordered outputs, traced environments, repetition and joint
+syndrome recovery, affine/nonlinear feedback, invalid modules, query accounting,
+real three-file CLI calls and changed target fingerprints.
+
+Optional task diagnostics count independent reported-record rows and actual
+protocol/recovery callbacks on the same draw. Literal deterministic, duplicate,
+constant and 66-record cases distinguish rank from entropy and query groups.
+Explicit module paths join the existing bounded task parser and immutable snapshot
+loader; task declarations retain their task-directory origin and explicit relative
+paths use caller CWD. Existing loading signatures and file report schemas remain
+available. See the crate README for both public APIs and resource/failure scope.
+
+Current coverage is 164 verified, 2 partial and 186 unmapped original methods,
+with 188 distinct witnesses from 190 declarations across 80 mapped targets and
+zero architecture exclusions. Strict complete parity intentionally remains exit 2.
+Other original contracts, existing SIGALRM/numerical partial gaps, M6 compatibility
+and M7 paper-scale measurements retain their existing incomplete status. These
+finite correctness contracts do not establish cross-language RNG/ABI or throughput
+identity.

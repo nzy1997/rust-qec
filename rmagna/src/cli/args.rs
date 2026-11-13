@@ -23,6 +23,8 @@ compare-samplers prepares independent affine/exact pilots; no production switchi
 
 Inputs and output:
   --task FILE                         Task JSON; module paths are relative to it
+  --ideal-state FILE                  Explicit ideal module; relative to caller CWD
+  --recovery FILE                     Explicit recovery module; requires a target
   --controllers FILE                  Explicit Python decoder bindings
   --python PROGRAM                    Decoder Python executable (default python3)
   --module-root DIR                   Decoder sources (default bindings directory)
@@ -164,6 +166,8 @@ pub struct Args {
     pub mode: Mode,
     pub circuit: PathBuf,
     pub task: Option<PathBuf>,
+    pub ideal_state: Option<PathBuf>,
+    pub recovery: Option<PathBuf>,
     pub controllers: Option<PathBuf>,
     pub python: String,
     pub module_root: Option<PathBuf>,
@@ -343,6 +347,8 @@ impl Args {
         let json = flags.text("--json").is_some();
         let output = flags.text("--output").map(PathBuf::from);
         let task = flags.text("--task").map(PathBuf::from);
+        let ideal_state = flags.text("--ideal-state").map(PathBuf::from);
+        let recovery = flags.text("--recovery").map(PathBuf::from);
         let controllers = flags.text("--controllers").map(PathBuf::from);
         if controllers.is_none()
             && ["--python", "--module-root", "--decoder-timeout"]
@@ -437,6 +443,8 @@ impl Args {
             mode,
             circuit,
             task,
+            ideal_state,
+            recovery,
             controllers,
             python,
             module_root,
@@ -487,6 +495,8 @@ fn parse_tokens(raw: Vec<String>) -> Result<(Mode, PathBuf, Flags), String> {
             "--json"
                 | "--output"
                 | "--task"
+                | "--ideal-state"
+                | "--recovery"
                 | "--controllers"
                 | "--python"
                 | "--module-root"

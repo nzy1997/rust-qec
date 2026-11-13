@@ -46,9 +46,13 @@ fn load_task(args: &Args) -> Result<(FileTask, Option<ControllerProcess>)> {
     } else {
         None
     };
-    let task = FileTask::load(
-        &args.circuit,
-        args.task.as_deref(),
+    let task = FileTask::load_paths(
+        rmagna::file_api::FileInputPaths {
+            physical: &args.circuit,
+            task: args.task.as_deref(),
+            ideal_state: args.ideal_state.as_deref(),
+            recovery: args.recovery.as_deref(),
+        },
         &registry,
         args.sampling.clone(),
         args.file,

@@ -8,6 +8,16 @@ pub fn parse_task(
     base_directory: &Path,
     options: &TaskOptions,
 ) -> Result<TaskSpec, TaskError> {
+    parse_task_with_paths(text, base_directory, options, None, None)
+}
+
+pub(crate) fn parse_task_with_paths(
+    text: &str,
+    base_directory: &Path,
+    options: &TaskOptions,
+    ideal_path: Option<&Path>,
+    recovery_path: Option<&Path>,
+) -> Result<TaskSpec, TaskError> {
     if text.len() > options.max_json_bytes {
         return Err(TaskError::new("<json>", "source exceeds max_json_bytes"));
     }
@@ -17,6 +27,16 @@ pub fn parse_task(
     // independently of additive dependency features; only masks need BigInt.
     let object: Object =
         serde_json::from_str(text).map_err(|e| TaskError::new("<json>", e.to_string()))?;
+    // Reject duplicate declarations, including explicit JSON null, before
+    // opening any ideal/recovery module or resolving an override path.
+    for (field, value) in [("ideal_state", ideal_path), ("recovery", recovery_path)] {
+        if value.is_some() && object.contains_key(field) {
+            return Err(TaskError::new(
+                field,
+                "declared in both task JSON and explicit module paths",
+            ));
+        }
+    }
     reject_removed_task_fields(&object)?;
     keys(
         &object,
@@ -45,22 +65,29 @@ pub fn parse_task(
         .get("error_observables")
         .map(|v| indices(v, "error_observables", options))
         .transpose()?;
-    let ideal = object
-        .get("ideal_state")
-        .filter(|v| !is_null(v))
-        .map(|v| target(v, base_directory, options))
-        .transpose()?;
-    let recovery = object
-        .get("recovery")
-        .filter(|v| !is_null(v))
-        .map(|v| path(v, base_directory, "recovery"))
-        .transpose()?;
-    if recovery.is_some() && ideal.is_none() {
-        return Err(TaskError::new(
-            "recovery",
-            "terminal recovery requires ideal_state",
-        ));
-    }
+    let ideal = if let Some(value) = ideal_path {
+        Some(TargetSpec {
+            circuit: explicit_path(value, "ideal_state")?,
+            outputs: None,
+            postselection: BTreeMap::new(),
+            object_form: false,
+        })
+    } else {
+        object
+            .get("ideal_state")
+            .filter(|v| !is_null(v))
+            .map(|v| target(v, base_directory, options))
+            .transpose()?
+    };
+    let recovery = if let Some(value) = recovery_path {
+        Some(explicit_path(value, "recovery")?)
+    } else {
+        object
+            .get("recovery")
+            .filter(|v| !is_null(v))
+            .map(|v| path(v, base_directory, "recovery"))
+            .transpose()?
+    };
     let sample_records = object
         .get("sample_records")
         .map(|v| indices(v, "sample_records", options))
@@ -88,6 +115,12 @@ pub fn parse_task(
         return Err(TaskError::new(
             "error_observables",
             "a classical error definition excludes ideal_state, recovery, nonempty outputs and observables",
+        ));
+    }
+    if recovery.is_some() && ideal.is_none() {
+        return Err(TaskError::new(
+            "recovery",
+            "terminal recovery requires ideal_state",
         ));
     }
     Ok(TaskSpec {
@@ -277,4 +310,15 @@ fn mask(value: &RawValue, field: &str, options: &TaskOptions) -> Result<BigUint,
         return Err(TaskError::new(field, "Pauli mask exceeds max_mask_bits"));
     }
     Ok(value)
+}
+
+// Explicit module paths are typed values resolved from caller CWD; task JSON
+// still uses its own base directory and never undergoes a Value roundtrip.
+fn explicit_path(path: &Path, field: &str) -> Result<PathBuf, TaskError> {
+    if path.is_absolute() {
+        return Ok(path.to_path_buf());
+    }
+    Ok(std::env::current_dir()
+        .map_err(|e| TaskError::new(field, e.to_string()))?
+        .join(path))
 }
