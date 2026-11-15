@@ -1626,13 +1626,13 @@
           "package": "rmagna",
           "target": "installed_cli_contracts",
           "test": "original_installed_scenarios_run_from_one_binary_without_checkout_imports",
-          "source_sha256": "44333826ed1f9285aabc6cd08c86e615e62442998af9e9738e467d274d1ebe30"
+          "source_sha256": "8769a84e3f3b68d8744bda07bc0d8c20b97a68911ee4e1132900c2bd7e604145"
         },
         {
           "package": "rmagna",
           "target": "installed_cli_contracts",
           "test": "downstream_rust_consumer_executes_both_tutorial_apis_and_embedded_catalogue",
-          "source_sha256": "44333826ed1f9285aabc6cd08c86e615e62442998af9e9738e467d274d1ebe30"
+          "source_sha256": "8769a84e3f3b68d8744bda07bc0d8c20b97a68911ee4e1132900c2bd7e604145"
         }
       ]
     },
@@ -1645,7 +1645,7 @@
           "package": "rmagna",
           "target": "installed_cli_contracts",
           "test": "original_installed_scenarios_run_from_one_binary_without_checkout_imports",
-          "source_sha256": "44333826ed1f9285aabc6cd08c86e615e62442998af9e9738e467d274d1ebe30"
+          "source_sha256": "8769a84e3f3b68d8744bda07bc0d8c20b97a68911ee4e1132900c2bd7e604145"
         }
       ]
     },
@@ -1658,7 +1658,7 @@
           "package": "rmagna",
           "target": "installed_cli_contracts",
           "test": "original_installed_scenarios_run_from_one_binary_without_checkout_imports",
-          "source_sha256": "44333826ed1f9285aabc6cd08c86e615e62442998af9e9738e467d274d1ebe30"
+          "source_sha256": "8769a84e3f3b68d8744bda07bc0d8c20b97a68911ee4e1132900c2bd7e604145"
         }
       ],
       "remaining_gap": "The Native private execution-state assertions (three fixed reference preparations,no later compilations,and zero reference resource/coordinate constructions) are not established by this installed CLI witness. R09 #1299 must provide corresponding reuse counters or retain this explicit gap."
@@ -1672,7 +1672,7 @@
           "package": "rmagna",
           "target": "installed_cli_contracts",
           "test": "original_installed_scenarios_run_from_one_binary_without_checkout_imports",
-          "source_sha256": "44333826ed1f9285aabc6cd08c86e615e62442998af9e9738e467d274d1ebe30"
+          "source_sha256": "8769a84e3f3b68d8744bda07bc0d8c20b97a68911ee4e1132900c2bd7e604145"
         }
       ]
     },
@@ -1685,7 +1685,7 @@
           "package": "rmagna",
           "target": "installed_cli_contracts",
           "test": "original_installed_scenarios_run_from_one_binary_without_checkout_imports",
-          "source_sha256": "44333826ed1f9285aabc6cd08c86e615e62442998af9e9738e467d274d1ebe30"
+          "source_sha256": "8769a84e3f3b68d8744bda07bc0d8c20b97a68911ee4e1132900c2bd7e604145"
         }
       ]
     },
@@ -1698,7 +1698,7 @@
           "package": "rmagna",
           "target": "installed_cli_contracts",
           "test": "original_installed_scenarios_run_from_one_binary_without_checkout_imports",
-          "source_sha256": "44333826ed1f9285aabc6cd08c86e615e62442998af9e9738e467d274d1ebe30"
+          "source_sha256": "8769a84e3f3b68d8744bda07bc0d8c20b97a68911ee4e1132900c2bd7e604145"
         }
       ]
     },
@@ -1711,7 +1711,7 @@
           "package": "rmagna",
           "target": "installed_cli_contracts",
           "test": "original_installed_scenarios_run_from_one_binary_without_checkout_imports",
-          "source_sha256": "44333826ed1f9285aabc6cd08c86e615e62442998af9e9738e467d274d1ebe30"
+          "source_sha256": "8769a84e3f3b68d8744bda07bc0d8c20b97a68911ee4e1132900c2bd7e604145"
         }
       ]
     },
@@ -1724,7 +1724,7 @@
           "package": "rmagna",
           "target": "installed_cli_contracts",
           "test": "original_installed_scenarios_run_from_one_binary_without_checkout_imports",
-          "source_sha256": "44333826ed1f9285aabc6cd08c86e615e62442998af9e9738e467d274d1ebe30"
+          "source_sha256": "8769a84e3f3b68d8744bda07bc0d8c20b97a68911ee4e1132900c2bd7e604145"
         }
       ]
     },
@@ -1737,7 +1737,7 @@
           "package": "rmagna",
           "target": "installed_cli_contracts",
           "test": "original_installed_scenarios_run_from_one_binary_without_checkout_imports",
-          "source_sha256": "44333826ed1f9285aabc6cd08c86e615e62442998af9e9738e467d274d1ebe30"
+          "source_sha256": "8769a84e3f3b68d8744bda07bc0d8c20b97a68911ee4e1132900c2bd7e604145"
         }
       ]
     },
@@ -1750,7 +1750,7 @@
           "package": "rmagna",
           "target": "installed_cli_contracts",
           "test": "original_installed_scenarios_run_from_one_binary_without_checkout_imports",
-          "source_sha256": "44333826ed1f9285aabc6cd08c86e615e62442998af9e9738e467d274d1ebe30"
+          "source_sha256": "8769a84e3f3b68d8744bda07bc0d8c20b97a68911ee4e1132900c2bd7e604145"
         }
       ]
     },
@@ -1763,7 +1763,7 @@
           "package": "rmagna",
           "target": "installed_cli_contracts",
           "test": "original_installed_scenarios_run_from_one_binary_without_checkout_imports",
-          "source_sha256": "44333826ed1f9285aabc6cd08c86e615e62442998af9e9738e467d274d1ebe30"
+          "source_sha256": "8769a84e3f3b68d8744bda07bc0d8c20b97a68911ee4e1132900c2bd7e604145"
         }
       ]
     },
@@ -1776,13 +1776,13 @@
           "package": "rmagna",
           "target": "installed_cli_contracts",
           "test": "original_installed_scenarios_run_from_one_binary_without_checkout_imports",
-          "source_sha256": "44333826ed1f9285aabc6cd08c86e615e62442998af9e9738e467d274d1ebe30"
+          "source_sha256": "8769a84e3f3b68d8744bda07bc0d8c20b97a68911ee4e1132900c2bd7e604145"
         },
         {
           "package": "rmagna",
           "target": "installed_cli_contracts",
           "test": "downstream_rust_consumer_executes_both_tutorial_apis_and_embedded_catalogue",
-          "source_sha256": "44333826ed1f9285aabc6cd08c86e615e62442998af9e9738e467d274d1ebe30"
+          "source_sha256": "8769a84e3f3b68d8744bda07bc0d8c20b97a68911ee4e1132900c2bd7e604145"
         }
       ]
     },
@@ -4198,7 +4198,7 @@
           "package": "rmagna",
           "target": "installed_cli_contracts",
           "test": "original_installed_scenarios_run_from_one_binary_without_checkout_imports",
-          "source_sha256": "44333826ed1f9285aabc6cd08c86e615e62442998af9e9738e467d274d1ebe30"
+          "source_sha256": "8769a84e3f3b68d8744bda07bc0d8c20b97a68911ee4e1132900c2bd7e604145"
         }
       ]
     },
@@ -4294,7 +4294,7 @@
           "package": "rmagna",
           "target": "installed_cli_contracts",
           "test": "downstream_rust_consumer_executes_both_tutorial_apis_and_embedded_catalogue",
-          "source_sha256": "44333826ed1f9285aabc6cd08c86e615e62442998af9e9738e467d274d1ebe30"
+          "source_sha256": "8769a84e3f3b68d8744bda07bc0d8c20b97a68911ee4e1132900c2bd7e604145"
         }
       ]
     },
@@ -4307,7 +4307,7 @@
           "package": "rmagna",
           "target": "installed_cli_contracts",
           "test": "downstream_rust_consumer_executes_both_tutorial_apis_and_embedded_catalogue",
-          "source_sha256": "44333826ed1f9285aabc6cd08c86e615e62442998af9e9738e467d274d1ebe30"
+          "source_sha256": "8769a84e3f3b68d8744bda07bc0d8c20b97a68911ee4e1132900c2bd7e604145"
         }
       ]
     },

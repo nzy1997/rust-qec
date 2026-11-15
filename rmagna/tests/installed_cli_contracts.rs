@@ -338,6 +338,7 @@ fn installed_nonlinear_and_decoder(installed: &mut Installed) {
     ];
     args.extend(decoder);
     let result = installed.complete(&args, 16);
+    assert_eq!(result["route"], "causal_fixed_template");
     assert_eq!(result["estimates"]["acceptance"], 1.0);
     let error = result["estimates"]["error"].as_f64().unwrap();
     assert!((0.0..=1.0).contains(&error));
@@ -357,11 +358,24 @@ fn installed_nonlinear_and_decoder(installed: &mut Installed) {
             args.extend(["--shots", "32", "--seed", "7"]);
         }
         let result = installed.json(&args, 0);
+        assert_eq!(result["circuit"]["format"], "magna-0.1");
+        if matches!(mode, "validate" | "inspect") {
+            assert_eq!(
+                result["status"],
+                if mode == "validate" {
+                    "valid"
+                } else {
+                    "complete"
+                }
+            );
+        }
         if mode == "enumerate" {
             assert_eq!(result["status"], "complete");
             assert_eq!(number(&result["result"]["masses"]["accepted"]), 0.75);
             assert_eq!(number(&result["result"]["masses"]["error"]), 0.25);
-            assert_eq!(number(&result["result"]["masses"]["moments"][0]), 0.25);
+            let moments = result["result"]["masses"]["moments"].as_array().unwrap();
+            assert_eq!(moments.len(), 1);
+            assert_eq!(number(&moments[0]), 0.25);
             close(
                 number(&result["result"]["conditional_error_within_enumerated_sector"]),
                 1.0 / 3.0,
@@ -397,6 +411,8 @@ fn installed_nonlinear_and_decoder(installed: &mut Installed) {
     ];
     inverse.extend(decoder);
     let result = installed.json(&inverse, 0);
+    assert_eq!(result["circuit"]["format"], "magna-0.1");
+    assert_eq!(result["status"], "complete");
     assert_eq!(number(&result["result"]["masses"]["accepted"]), 0.25);
     assert_eq!(number(&result["result"]["masses"]["error"]), 0.25);
     for bit in [0, 1] {
@@ -406,7 +422,15 @@ fn installed_nonlinear_and_decoder(installed: &mut Installed) {
         );
         let mut bad = vec!["validate", "bad.magna", "--json"];
         bad.extend(decoder);
-        assert_eq!(installed.json(&bad, 2)["status"], "invalid");
+        let rejected = installed.json(&bad, 2);
+        assert_eq!(rejected["status"], "invalid");
+        assert!(
+            rejected["error"]
+                .as_str()
+                .unwrap()
+                .contains("POSTSELECT has no numeric arguments"),
+            "{rejected}"
+        );
     }
     eprintln!(
         "installed:external majority16;nonlinear4commands,32-shot replay,exact3/4,1/4,conditional1/3;inverse1/4;two malformedselectors"
@@ -474,6 +498,11 @@ fn installed_progress_and_pilot(installed: &mut Installed) {
     ]);
     assert!(progress.status.success());
     let result: Value = serde_json::from_slice(&progress.stdout).unwrap();
+    assert_eq!(result["status"], "complete");
+    assert_eq!(result["completed"], 32);
+    assert_eq!(result["failed"], 0);
+    assert_eq!(result["not_attempted"], 0);
+    assert_eq!(result["history_sampler"], "affine_support");
     assert_eq!(result["efficiency"]["kappa"], 1.0);
     assert_eq!(
         String::from_utf8(progress.stderr)
@@ -497,6 +526,18 @@ fn installed_progress_and_pilot(installed: &mut Installed) {
         0,
     );
     assert_eq!(pilot["status"], "complete");
+    assert_eq!(pilot["pilot_shots_per_channel"], 32);
+    for channel in ["affine_support", "exact_marginal"] {
+        assert_eq!(
+            pilot["pilots"][channel]["sampling_receipt"]["completed"],
+            32
+        );
+        assert_eq!(pilot["pilots"][channel]["sampling_receipt"]["failed"], 0);
+        assert_eq!(
+            pilot["pilots"][channel]["sampling_receipt"]["not_attempted"],
+            0
+        );
+    }
     assert_eq!(pilot["automatic_switching"], false);
     assert!(pilot["gamma"].as_f64().unwrap() > 0.0);
     eprintln!("installed:32-shot progress,two kappa lines,and32x2 pilot,no automatic switching");
@@ -614,7 +655,7 @@ fn installed_importance_and_low_weight(installed: &mut Installed) {
         let error = importance["standard_errors"][key].as_f64().unwrap();
         assert!((importance["estimates"][key].as_f64().unwrap() - expected).abs() < 4.0 * error);
     }
-    installed.complete(
+    let from_file = installed.complete(
         &[
             "run",
             "importance-sampling/physical.magna",
@@ -630,6 +671,12 @@ fn installed_importance_and_low_weight(installed: &mut Installed) {
         ],
         64,
     );
+    assert_eq!(from_file["sampling"]["method"], "importance");
+    assert_eq!(
+        from_file["sampling"]["configuration"],
+        json!({"mode":"importance","proposal_scale":{"numerator":"100","denominator":"1"}})
+    );
+    assert_eq!(from_file["proposal_summary"]["scaled_categories"], 1);
     let guide_pilot = installed.json(
         &[
             "compare-samplers",
@@ -664,6 +711,7 @@ fn installed_importance_and_low_weight(installed: &mut Installed) {
         ],
         0,
     );
+    assert_eq!(low["status"], "complete");
     close(number(&low["result"]["masses"]["accepted"]), 0.9);
     assert_eq!(
         low["result"]["covered_probability"],
@@ -676,7 +724,7 @@ fn installed_importance_and_low_weight(installed: &mut Installed) {
 
 fn installed_portable_dk(installed: &mut Installed) {
     // The small original DK task and decoder are copied as data, not an environment.
-    installed.complete(
+    let result = installed.complete(
         &[
             "run",
             "dk/physical.magna",
@@ -694,6 +742,12 @@ fn installed_portable_dk(installed: &mut Installed) {
         ],
         4,
     );
+    let saved: Value =
+        serde_json::from_slice(&std::fs::read(installed.root.join("dk-result.json")).unwrap())
+            .unwrap();
+    assert_eq!(saved["status"], "complete");
+    assert_eq!(saved["completed"], 4);
+    assert_eq!(saved, result);
     eprintln!("installed:portable original DK directory/local decoder/universal Rust runner4shots");
 }
 

@@ -3531,7 +3531,10 @@ environment or Native build is copied.
 The owning suite executes 35 installed CLI commands: validate/inspect/enumerate/run,
 record success,nonlinear selection and its inverse,three-file terminal recovery,
 projected/mixed targets,the complete small DK task,the three sampling-guide
-examples,progress and pilot comparisons. Same-Rust-seed outputs are reproduced;
+examples,progress and pilot comparisons. Assertions cover resolved sampling-file
+configuration, default affine history sampling, completed pilot counts, causal
+execution routing, circuit format, the complete moment list, actionable selector
+diagnostics, enumeration status and the DK output artifact. Same-Rust-seed outputs are reproduced;
 Python Random trajectories and wheel namespace/signature identity are not claimed.
 It also compiles and executes one downstream Rust consumer for both original
 getting-started examples, with exact T-interference values,checks three rejected
