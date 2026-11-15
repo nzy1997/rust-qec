@@ -1,5 +1,7 @@
 //! Exact independent categorical noise and reproducible prescribed assignments.
 mod conditional;
+mod modulo_range;
+pub use modulo_range::{ModuloRangeError, ModuloWordRangeSource};
 mod sparse;
 pub use sparse::{
     SparseNoiseAction, SparseNoiseDraw, SparseNoiseError, SparseNoiseOptions, SparseNoiseSampler,
