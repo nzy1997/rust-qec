@@ -1619,63 +1619,172 @@
     },
     {
       "id": "test_installed_interface.InstalledInterfaceTests.test_getting_started_python_examples",
-      "status": "unmapped",
-      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+      "status": "verified",
+      "contract": "The pinned tutorial retains both original code blocks; a downstream Rust executable runs the file compile/run and operation-level H/T/H/MZ examples with exact (2+sqrt2)/4 values outside the checkout. The installed CLI independently uses the generated bundled catalogue.",
+      "rust_tests": [
+        {
+          "package": "rmagna",
+          "target": "installed_cli_contracts",
+          "test": "original_installed_scenarios_run_from_one_binary_without_checkout_imports",
+          "source_sha256": "44333826ed1f9285aabc6cd08c86e615e62442998af9e9738e467d274d1ebe30"
+        },
+        {
+          "package": "rmagna",
+          "target": "installed_cli_contracts",
+          "test": "downstream_rust_consumer_executes_both_tutorial_apis_and_embedded_catalogue",
+          "source_sha256": "44333826ed1f9285aabc6cd08c86e615e62442998af9e9738e467d274d1ebe30"
+        }
+      ]
     },
     {
       "id": "test_installed_interface.InstalledInterfaceTests.test_importance_sampling_guide_and_installed_cli",
-      "status": "unmapped",
-      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+      "status": "verified",
+      "contract": "Retain all three original guide examples: physical1000,scale10 importance1000 and256-per-channel pilot at seed7. Check one scaled category,ESS bounds,4SE error0.001/acceptance1 tests and the original64-shot sampling-file command. Typed Rust statistics/CLI fields replace Python dictionaries.",
+      "rust_tests": [
+        {
+          "package": "rmagna",
+          "target": "installed_cli_contracts",
+          "test": "original_installed_scenarios_run_from_one_binary_without_checkout_imports",
+          "source_sha256": "44333826ed1f9285aabc6cd08c86e615e62442998af9e9738e467d274d1ebe30"
+        }
+      ]
     },
     {
       "id": "test_installed_interface.InstalledInterfaceTests.test_installed_conditional_noise_fixed_reference_networks",
-      "status": "unmapped",
-      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+      "status": "partial",
+      "contract": "The installed binary executes the complete guarded-noise source for64 draws and independently enumerates acceptance1/error1/12 without source imports.",
+      "rust_tests": [
+        {
+          "package": "rmagna",
+          "target": "installed_cli_contracts",
+          "test": "original_installed_scenarios_run_from_one_binary_without_checkout_imports",
+          "source_sha256": "44333826ed1f9285aabc6cd08c86e615e62442998af9e9738e467d274d1ebe30"
+        }
+      ],
+      "remaining_gap": "The Native private execution-state assertions (three fixed reference preparations,no later compilations,and zero reference resource/coordinate constructions) are not established by this installed CLI witness. R09 #1299 must provide corresponding reuse counters or retain this explicit gap."
     },
     {
       "id": "test_installed_interface.InstalledInterfaceTests.test_installed_console_commands_and_seed_reproducibility",
-      "status": "unmapped",
-      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+      "status": "verified",
+      "contract": "One copied current executable runs validate/inspect/run on the original parity task,checks8 completed draws and output-file equality,and replays exact same-Rust-seed estimates,records,weights and fingerprints outside the checkout.",
+      "rust_tests": [
+        {
+          "package": "rmagna",
+          "target": "installed_cli_contracts",
+          "test": "original_installed_scenarios_run_from_one_binary_without_checkout_imports",
+          "source_sha256": "44333826ed1f9285aabc6cd08c86e615e62442998af9e9738e467d274d1ebe30"
+        }
+      ]
     },
     {
       "id": "test_installed_interface.InstalledInterfaceTests.test_installed_external_decoder_binding",
-      "status": "unmapped",
-      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+      "status": "verified",
+      "contract": "The original majority circuit/task and explicitly selected local decoder execute16 seeded draws from an isolated working directory; acceptance is1 and error lies in[0,1]. The standalone binary embeds its decoder worker.",
+      "rust_tests": [
+        {
+          "package": "rmagna",
+          "target": "installed_cli_contracts",
+          "test": "original_installed_scenarios_run_from_one_binary_without_checkout_imports",
+          "source_sha256": "44333826ed1f9285aabc6cd08c86e615e62442998af9e9738e467d274d1ebe30"
+        }
+      ]
     },
     {
       "id": "test_installed_interface.InstalledInterfaceTests.test_installed_history_progress_and_pilot",
-      "status": "unmapped",
-      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+      "status": "verified",
+      "contract": "The original X_ERROR(1/2) task runs32 draws with two16-draw progress lines,kappa1,and32 draws per pilot channel; gamma is positive and automatic switching is false.",
+      "rust_tests": [
+        {
+          "package": "rmagna",
+          "target": "installed_cli_contracts",
+          "test": "original_installed_scenarios_run_from_one_binary_without_checkout_imports",
+          "source_sha256": "44333826ed1f9285aabc6cd08c86e615e62442998af9e9738e467d274d1ebe30"
+        }
+      ]
     },
     {
       "id": "test_installed_interface.InstalledInterfaceTests.test_installed_low_weight_enumeration",
-      "status": "unmapped",
-      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+      "status": "verified",
+      "contract": "The original X_ERROR(1/10),M,detector and zero selection enumerate all weight<=1 patterns outside the checkout,with acceptance0.9 and covered probability1. Rust has no runtime Python adapter discovery.",
+      "rust_tests": [
+        {
+          "package": "rmagna",
+          "target": "installed_cli_contracts",
+          "test": "original_installed_scenarios_run_from_one_binary_without_checkout_imports",
+          "source_sha256": "44333826ed1f9285aabc6cd08c86e615e62442998af9e9738e467d274d1ebe30"
+        }
+      ]
     },
     {
       "id": "test_installed_interface.InstalledInterfaceTests.test_installed_nonlinear_postselection_api_and_console",
-      "status": "unmapped",
-      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+      "status": "verified",
+      "contract": "All four installed commands execute the original majority selection; exact acceptance3/4,error1/4,moment1/4,conditional error1/3;32-shot same-Rust-seed replay;inverse selection acceptance/error1/4;both invalid parameterized selectors reject.",
+      "rust_tests": [
+        {
+          "package": "rmagna",
+          "target": "installed_cli_contracts",
+          "test": "original_installed_scenarios_run_from_one_binary_without_checkout_imports",
+          "source_sha256": "44333826ed1f9285aabc6cd08c86e615e62442998af9e9738e467d274d1ebe30"
+        }
+      ]
     },
     {
       "id": "test_installed_interface.InstalledInterfaceTests.test_installed_record_success_entry",
-      "status": "unmapped",
-      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+      "status": "verified",
+      "contract": "The original physical/report-error observable example enumerates exact error2/7 and runs8 draws with its task file outside the checkout; Rust schema2 exact/numeric fields replace Python return dictionaries.",
+      "rust_tests": [
+        {
+          "package": "rmagna",
+          "target": "installed_cli_contracts",
+          "test": "original_installed_scenarios_run_from_one_binary_without_checkout_imports",
+          "source_sha256": "44333826ed1f9285aabc6cd08c86e615e62442998af9e9738e467d274d1ebe30"
+        }
+      ]
     },
     {
       "id": "test_installed_interface.InstalledInterfaceTests.test_portable_directory_with_local_decoder_and_universal_runner",
-      "status": "unmapped",
-      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+      "status": "verified",
+      "contract": "Run the complete pinned small DK circuit,ideal,recovery,task and local Steane decoder from the installed executable outside the checkout,4 draws at seed7 and an output file. The universal Rust runner takes explicit circuit/task/controller paths; it does not execute Python run_task.py or interpret Native-only run.json options.",
+      "rust_tests": [
+        {
+          "package": "rmagna",
+          "target": "installed_cli_contracts",
+          "test": "original_installed_scenarios_run_from_one_binary_without_checkout_imports",
+          "source_sha256": "44333826ed1f9285aabc6cd08c86e615e62442998af9e9738e467d274d1ebe30"
+        }
+      ]
     },
     {
       "id": "test_installed_interface.InstalledInterfaceTests.test_three_file_evaluation_with_installed_native_engine",
-      "status": "unmapped",
-      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+      "status": "verified",
+      "contract": "Original terminal physical/ideal/recovery inputs run4 draws with acceptance1/error0,raw target error1,auxiliary five-qubit projected target error0.9,mixed target error0.5,and explicit recovery CLI2 draws error0;all from the standalone Rust binary and local decoder.",
+      "rust_tests": [
+        {
+          "package": "rmagna",
+          "target": "installed_cli_contracts",
+          "test": "original_installed_scenarios_run_from_one_binary_without_checkout_imports",
+          "source_sha256": "44333826ed1f9285aabc6cd08c86e615e62442998af9e9738e467d274d1ebe30"
+        }
+      ]
     },
     {
       "id": "test_installed_interface.InstalledInterfaceTests.test_wheel_global_query_and_legacy_api_without_protocol_paths",
-      "status": "unmapped",
-      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+      "status": "verified",
+      "contract": "A standalone Rust executable and generated bundled catalogue evaluate exact T interference outside the checkout; a downstream consumer executes the legacy operation-level probability API. Root make_plan import is rejected. Rust modules replace wheel resources and CPython namespaces; no Python wheel/retired-module ABI identity is claimed.",
+      "rust_tests": [
+        {
+          "package": "rmagna",
+          "target": "installed_cli_contracts",
+          "test": "original_installed_scenarios_run_from_one_binary_without_checkout_imports",
+          "source_sha256": "44333826ed1f9285aabc6cd08c86e615e62442998af9e9738e467d274d1ebe30"
+        },
+        {
+          "package": "rmagna",
+          "target": "installed_cli_contracts",
+          "test": "downstream_rust_consumer_executes_both_tutorial_apis_and_embedded_catalogue",
+          "source_sha256": "44333826ed1f9285aabc6cd08c86e615e62442998af9e9738e467d274d1ebe30"
+        }
+      ]
     },
     {
       "id": "test_kernel_contract.KernelContractTests.test_legacy_flags_cannot_select_an_old_kernel_and_general_callbacks_work",
@@ -4082,8 +4191,16 @@
     },
     {
       "id": "test_user_interface.CommandLineTests.test_unimportable_decoder_binding_is_invalid_input",
-      "status": "unmapped",
-      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+      "status": "verified",
+      "contract": "Both original missing module/function bindings and an actually removed local decoder fail with invalid-input exit2 before any draw; no checkout or package fallback is used.",
+      "rust_tests": [
+        {
+          "package": "rmagna",
+          "target": "installed_cli_contracts",
+          "test": "original_installed_scenarios_run_from_one_binary_without_checkout_imports",
+          "source_sha256": "44333826ed1f9285aabc6cd08c86e615e62442998af9e9738e467d274d1ebe30"
+        }
+      ]
     },
     {
       "id": "test_user_interface.CommandLineTests.test_version_and_command_help",
@@ -4166,17 +4283,33 @@
     {
       "id": "test_user_interface.MissingExtensionTests.test_import_without_native_extension_explains_how_to_build",
       "status": "unmapped",
-      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+      "reason": "The standalone Rust distribution has no CPython extension-import step. The consumer checks OS NotFound after removing an executable,but the original Python missing-extension/build-instruction contract is not implemented and remains unmapped;no architecture exclusion."
     },
     {
       "id": "test_user_interface.NamespaceTests.test_first_parameters_have_their_documented_names",
-      "status": "unmapped",
-      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+      "status": "verified",
+      "contract": "A downstream consumer compiles and executes documented typed file APIs and operation APIs; passing a compiled task as the load input fails with E0308. Rust positional types replace Python keyword-name reflection; inspect.signature compatibility is not claimed.",
+      "rust_tests": [
+        {
+          "package": "rmagna",
+          "target": "installed_cli_contracts",
+          "test": "downstream_rust_consumer_executes_both_tutorial_apis_and_embedded_catalogue",
+          "source_sha256": "44333826ed1f9285aabc6cd08c86e615e62442998af9e9738e467d274d1ebe30"
+        }
+      ]
     },
     {
       "id": "test_user_interface.NamespaceTests.test_top_level_is_the_file_interface_and_operations_is_separate",
-      "status": "unmapped",
-      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+      "status": "verified",
+      "contract": "A compiled/executed downstream example uses public file_api and instrument modules separately; a root run import and retired make_plan import fail with E0432. This is the explicit Rust module contract,not a CPython __all__ compatibility claim.",
+      "rust_tests": [
+        {
+          "package": "rmagna",
+          "target": "installed_cli_contracts",
+          "test": "downstream_rust_consumer_executes_both_tutorial_apis_and_embedded_catalogue",
+          "source_sha256": "44333826ed1f9285aabc6cd08c86e615e62442998af9e9738e467d274d1ebe30"
+        }
+      ]
     },
     {
       "id": "test_virtual_clifford_feedback.VirtualCliffordFeedbackTests.test_composed_control_simplification_and_versions_determine_route",

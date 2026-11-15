@@ -3517,3 +3517,43 @@ Exact manifest-relative reference paths avoid basename-search ambiguity; this is
 not a new Rust C++ header resolver. None of these gaps is an architecture exclusion
 or removed from the original 352-method denominator. These decisions do not claim
 paper benchmark completion or throughput parity.
+
+### Installed Rust consumers (R05)
+
+`cargo test --locked -p rmagna --test installed_cli_contracts` copies the current
+executable and 31 small, hash-verified original task/decoder inputs into a temporary
+working directory outside the checkout. It clears inherited environment/source
+search settings,embeds a source-package import trap,and explicitly selects local
+decoder modules. The binary includes its Python worker and generates its 15-entry certified phase
+catalogue internally, without reading external catalogue files. No Python wheel, source tree, dependency
+environment or Native build is copied.
+
+The owning suite executes 35 installed CLI commands: validate/inspect/enumerate/run,
+record success,nonlinear selection and its inverse,three-file terminal recovery,
+projected/mixed targets,the complete small DK task,the three sampling-guide
+examples,progress and pilot comparisons. Same-Rust-seed outputs are reproduced;
+Python Random trajectories and wheel namespace/signature identity are not claimed.
+It also compiles and executes one downstream Rust consumer for both original
+getting-started examples, with exact T-interference values,checks three rejected
+API misuses,and checks a removed executable as OS NotFound. Existing compiled
+libraries are reused across Cargo artifact layouts; no nested Cargo build occurs.
+Every temporary installation is removed on success or unwinding failure.
+
+Regenerate the 22 KiB input fixture without building anything:
+
+```sh
+python3 benchmarks/magna_reproduction/original_installed_inputs.py --upstream "$MAGNA_REFERENCE" --out "$NEW_INPUT_JSON"
+```
+
+The fixture contains original input texts and tutorial blocks, not wheel-run
+results. Both full source hashes and the complete fixture hash are checked.
+The universal Rust CLI takes explicit circuit/task/controller paths; it does not
+execute the original Python runner or silently translate Native-only run.json
+options. The library exposes file-task APIs under `rmagna::file_api` and operation
+APIs under `rmagna::instrument`;downstream examples check these typed boundaries.
+
+Fourteen R05 methods are verified as explicit Rust equivalents. The installed
+conditional-noise method remains partial for Native-private preparation/reuse
+counters,owned by R09 #1299. Python missing-extension/build-guidance remains
+unmapped despite the separate Rust missing-executable check. Neither is an
+architecture exclusion. These cases do not establish paper benchmark results.

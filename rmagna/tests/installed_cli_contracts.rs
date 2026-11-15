@@ -2,6 +2,8 @@
 // Typed installed-consumer equivalents of itpyi/magna@56847478c840395735146ef1e1ccdc3d8aedc10f,
 // tests/core/test_installed_interface.py and test_user_interface.py.
 // No pip wheel, CPython namespace or Python seed trajectory is claimed.
+#[path = "support/build_artifacts.rs"]
+mod build_artifacts;
 use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
 use std::{
@@ -83,6 +85,20 @@ impl Installed {
     fn put(&self, name: &str, text: &str) {
         std::fs::write(self.root.join(name), text).unwrap();
     }
+    fn compiler(&self, artifacts: &build_artifacts::Artifacts) -> Command {
+        let mut command = Command::new(std::env::var_os("RUSTC").unwrap_or_else(|| "rustc".into()));
+        command
+            .current_dir(&self.root)
+            .arg("--edition=2024")
+            .arg("--extern")
+            .arg(format!("rmagna={}", artifacts.library.display()));
+        for directory in &artifacts.dependencies {
+            command
+                .arg("-L")
+                .arg(format!("dependency={}", directory.display()));
+        }
+        command
+    }
     fn command(&self, program: &Path) -> Command {
         let mut command = Command::new(program);
         command.current_dir(&self.root).env_clear();
@@ -161,6 +177,20 @@ fn close(found: f64, expected: f64) {
 #[test]
 fn original_installed_scenarios_run_from_one_binary_without_checkout_imports() {
     let mut installed = Installed::new();
+    installed_console_commands(&mut installed);
+    installed_record_success(&mut installed);
+    installed_tutorial(&mut installed);
+    installed_nonlinear_and_decoder(&mut installed);
+    installed_conditional_noise(&mut installed);
+    installed_progress_and_pilot(&mut installed);
+    installed_terminal_modules(&mut installed);
+    installed_importance_and_low_weight(&mut installed);
+    installed_portable_dk(&mut installed);
+    installed_missing_decoder(&mut installed);
+    assert_eq!(installed.calls, 35);
+}
+
+fn installed_console_commands(installed: &mut Installed) {
     // Console commands, output file, and same-Rust-seed reproducibility.
     for mode in ["validate", "inspect"] {
         let result = installed.json(
@@ -214,7 +244,9 @@ fn original_installed_scenarios_run_from_one_binary_without_checkout_imports() {
         assert_eq!(first[key], repeated[key], "same Rust seed: {key}");
     }
     eprintln!("installed:console validate/inspect/run;8-shot seed19 output file/replay");
+}
 
+fn installed_record_success(installed: &mut Installed) {
     // Complete original record-success example, using the Rust enumeration schema.
     installed.put(
         "record.magna",
@@ -250,7 +282,9 @@ fn original_installed_scenarios_run_from_one_binary_without_checkout_imports() {
         8,
     );
     eprintln!("installed:record-success exact error2/7 plus8-shot run");
+}
 
+fn installed_tutorial(installed: &mut Installed) {
     // Tutorial circuit and all actual T interference arithmetic outside source.
     let inputs: Value =
         serde_json::from_str(include_str!("data/original-installed-inputs.json")).unwrap();
@@ -281,7 +315,9 @@ fn original_installed_scenarios_run_from_one_binary_without_checkout_imports() {
     eprintln!(
         "installed:tutorial2Python examples mapped to typed API/CLI;bundled catalogue T interference"
     );
+}
 
+fn installed_nonlinear_and_decoder(installed: &mut Installed) {
     // External majority binding and the complete nonlinear selection/inverse cases.
     let decoder = [
         "--controllers",
@@ -375,7 +411,9 @@ fn original_installed_scenarios_run_from_one_binary_without_checkout_imports() {
     eprintln!(
         "installed:external majority16;nonlinear4commands,32-shot replay,exact3/4,1/4,conditional1/3;inverse1/4;two malformedselectors"
     );
+}
 
+fn installed_conditional_noise(installed: &mut Installed) {
     // Conditional noise uses the same parsed task; enumeration is an independent law.
     installed.put(
         "conditional.magna",
@@ -416,7 +454,9 @@ fn original_installed_scenarios_run_from_one_binary_without_checkout_imports() {
     eprintln!(
         "installed:conditional64-shot run;exact acceptance1,error1/12;private Native preparation counters are separate R09 scope"
     );
+}
 
+fn installed_progress_and_pilot(installed: &mut Installed) {
     installed.put("pilot.magna", "X_ERROR(1/2) 0");
     installed.put("ideal.magna", "I 0");
     let progress = installed.output(&[
@@ -460,7 +500,10 @@ fn original_installed_scenarios_run_from_one_binary_without_checkout_imports() {
     assert_eq!(pilot["automatic_switching"], false);
     assert!(pilot["gamma"].as_f64().unwrap() > 0.0);
     eprintln!("installed:32-shot progress,two kappa lines,and32x2 pilot,no automatic switching");
+}
 
+fn installed_terminal_modules(installed: &mut Installed) {
+    installed.put("ideal.magna", "I 0");
     // Three-file terminal recovery, the original auxiliary projection and mixed target.
     let terminal = [
         "run",
@@ -526,7 +569,11 @@ fn original_installed_scenarios_run_from_one_binary_without_checkout_imports() {
     );
     assert_eq!(recovered["estimates"]["error"], 0.0);
     eprintln!("installed:three-file4shots/raw/auxiliary0.9/mixed0.5/explicit recovery2shots");
+}
 
+fn installed_importance_and_low_weight(installed: &mut Installed) {
+    let inputs: Value =
+        serde_json::from_str(include_str!("data/original-installed-inputs.json")).unwrap();
     let sampling = &inputs["docs"]["docs/software/sampling.md"];
     assert_eq!(sampling["python_blocks"].as_array().unwrap().len(), 3);
     installed.complete(
@@ -625,7 +672,9 @@ fn original_installed_scenarios_run_from_one_binary_without_checkout_imports() {
     eprintln!(
         "installed:importance guide3examples,1000-shot4SE checks,64-shot console;low-weight acceptance0.9 and full coverage"
     );
+}
 
+fn installed_portable_dk(installed: &mut Installed) {
     // The small original DK task and decoder are copied as data, not an environment.
     installed.complete(
         &[
@@ -646,7 +695,24 @@ fn original_installed_scenarios_run_from_one_binary_without_checkout_imports() {
         4,
     );
     eprintln!("installed:portable original DK directory/local decoder/universal Rust runner4shots");
+}
 
+fn installed_missing_decoder(installed: &mut Installed) {
+    let args = [
+        "run",
+        "basic/majority_feedback.magna",
+        "--task",
+        "basic/majority_feedback.task.json",
+        "--shots",
+        "16",
+        "--seed",
+        "7",
+        "--json",
+        "--controllers",
+        "basic/controllers.json",
+        "--module-root",
+        "basic/decoder_plugin",
+    ];
     // Missing external code is invalid input before any draw, with no checkout fallback.
     std::fs::remove_file(
         installed
@@ -689,22 +755,8 @@ fn downstream_rust_consumer_executes_both_tutorial_apis_and_embedded_catalogue()
             .as_str()
             .unwrap(),
     );
-    let deps = std::env::current_exe()
-        .unwrap()
-        .parent()
-        .unwrap()
-        .to_path_buf();
-    let library = std::fs::read_dir(&deps)
-        .unwrap()
-        .filter_map(Result::ok)
-        .map(|e| e.path())
-        .filter(|p| {
-            p.file_name()
-                .and_then(|p| p.to_str())
-                .is_some_and(|s| s.starts_with("librmagna-") && s.ends_with(".rlib"))
-        })
-        .max_by_key(|p| p.metadata().unwrap().modified().unwrap())
-        .unwrap();
+    let artifacts = build_artifacts::rmagna().unwrap();
+    assert!(!installed.root.starts_with(&artifacts.profile));
     let source = r#"
 use rmagna::{file_api::{FileTask,FileLoadOptions,FileTaskOptions},runtime::ControllerRegistry,
     noise::NoiseSampling,task::TaskRunOptions,scalar::ScalarArithmetic,field::FieldArithmetic,
@@ -737,13 +789,9 @@ fn main(){
     let binary = installed
         .root
         .join("consumer".to_owned() + std::env::consts::EXE_SUFFIX);
-    let compile = Command::new(std::env::var_os("RUSTC").unwrap_or_else(|| "rustc".into()))
-        .current_dir(&installed.root)
-        .args(["--edition=2024", "--crate-name=installed_consumer"])
-        .arg("--extern")
-        .arg(format!("rmagna={}", library.display()))
-        .arg("-L")
-        .arg(format!("dependency={}", deps.display()))
+    let compile = installed
+        .compiler(&artifacts)
+        .arg("--crate-name=installed_consumer")
         .arg(installed.root.join("consumer.rs"))
         .arg("-o")
         .arg(&binary)
@@ -778,13 +826,9 @@ fn main(){
     ] {
         let path = installed.root.join(format!("{name}.rs"));
         std::fs::write(&path, code).unwrap();
-        let result = Command::new(std::env::var_os("RUSTC").unwrap_or_else(|| "rustc".into()))
-            .current_dir(&installed.root)
-            .args(["--edition=2024", "--crate-type=lib", "--emit=metadata"])
-            .arg("--extern")
-            .arg(format!("rmagna={}", library.display()))
-            .arg("-L")
-            .arg(format!("dependency={}", deps.display()))
+        let result = installed
+            .compiler(&artifacts)
+            .args(["--crate-type=lib", "--emit=metadata"])
             .arg(path)
             .arg("-o")
             .arg(installed.root.join(format!("{name}.rmeta")))
