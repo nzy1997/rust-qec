@@ -4023,7 +4023,7 @@
           "package": "rmagna",
           "target": "weighted_noise_validation",
           "test": "invalid_scales_and_scaled_support",
-          "source_sha256": "d2ea76735f2db7223f86553d5f8e37b158117ad6e62d26823fc4423d0eb1b50f"
+          "source_sha256": "d4534471f322af2d9afeac0e700c571b40aba516a61942bb3a10a6d4af89975b"
         }
       ]
     },
@@ -4062,7 +4062,7 @@
           "package": "rmagna",
           "target": "weighted_noise_validation",
           "test": "zero_and_identity",
-          "source_sha256": "d2ea76735f2db7223f86553d5f8e37b158117ad6e62d26823fc4423d0eb1b50f"
+          "source_sha256": "d4534471f322af2d9afeac0e700c571b40aba516a61942bb3a10a6d4af89975b"
         }
       ]
     }

@@ -257,7 +257,7 @@ fn invalid_scales_and_scaled_support() {
     let cli = CliSite::new();
     for token in INVALID_SCALE_TOKENS {
         let value = cli.run(&["--noise-proposal-scale", token], 2);
-        assert_eq!(value["status"], "failed");
+        assert_eq!(value["status"], "invalid");
         let failures = value["failures"].as_array().unwrap();
         assert_eq!(failures.len(), 1);
         assert_eq!(failures[0]["phase"], "arguments");
@@ -275,7 +275,7 @@ fn invalid_scales_and_scaled_support() {
         assert!(message.contains(diagnostic), "{token}: {message}");
     }
     let unsupported = cli.run(&["--proposal-rate", "1/2"], 2);
-    assert_eq!(unsupported["status"], "failed");
+    assert_eq!(unsupported["status"], "invalid");
     assert_eq!(unsupported["failures"].as_array().unwrap().len(), 1);
     assert_eq!(unsupported["failures"][0]["phase"], "arguments");
     assert_eq!(unsupported["failures"][0]["type"], "CliError");
