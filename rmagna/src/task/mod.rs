@@ -1,5 +1,7 @@
 //! Task schema 1, exact output masks, and relative module identities.
 mod compose;
+mod floating;
+pub use floating::FloatingTaskDraw;
 mod export;
 pub use export::{
     BatchExportError, StreamExportError, export_batch_metrics, export_stream_metrics,

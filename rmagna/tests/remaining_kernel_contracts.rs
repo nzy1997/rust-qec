@@ -892,3 +892,97 @@ fn imported_boundary_queries_match_exhaustive_signed_complex_path_sums() {
         }
     }
 }
+
+#[test]
+fn original_floating_summaries_reject_all_four_nonfinite_and_shape_rows() {
+    use rmagna::field::{ExactField, FieldArithmetic};
+    use rmagna::statistics::StatisticsOptions;
+    use rmagna::task::{FloatingTaskDraw, TaskRunStatistics};
+    let row = |acceptance, error, moments| FloatingTaskDraw {
+        acceptance,
+        error,
+        moments,
+    };
+    for rows in [
+        vec![row(f64::NAN, None, vec![])],
+        vec![row(1.0, None, vec![]), row(1.0, Some(0.0), vec![])],
+        vec![row(1.0, None, vec![]), row(1.0, None, vec![0.0])],
+        vec![row(1.0, None, vec![f64::INFINITY])],
+    ] {
+        let error =
+            TaskRunStatistics::from_floating_draws(rows, StatisticsOptions::default()).unwrap_err();
+        assert!(error.field.starts_with("floating_draws."));
+        assert!(
+            error.message.contains("finite") || error.message.contains("match the first row"),
+            "{error}"
+        );
+    }
+    for value in [f64::NAN, f64::INFINITY, f64::NEG_INFINITY] {
+        for row in [
+            row(value, None, vec![]),
+            row(1.0, Some(value), vec![]),
+            row(1.0, None, vec![value]),
+        ] {
+            assert!(
+                TaskRunStatistics::from_floating_draws([row], StatisticsOptions::default())
+                    .unwrap_err()
+                    .message
+                    .contains("finite")
+            );
+        }
+    }
+    assert!(
+        TaskRunStatistics::from_floating_draws([], StatisticsOptions::default())
+            .unwrap()
+            .is_none()
+    );
+    let summary = TaskRunStatistics::from_floating_draws(
+        [
+            row(1.0, Some(0.0), vec![-1.0, 0.5]),
+            row(1.0, Some(1.0), vec![1.0, 0.5]),
+        ],
+        StatisticsOptions::default(),
+    )
+    .unwrap()
+    .unwrap();
+    let a = FieldArithmetic::default();
+    let half = a.from_rational("1/2".parse().unwrap()).unwrap();
+    let quarter = a.from_rational("1/4".parse().unwrap()).unwrap();
+    assert_eq!(summary.completed, 2);
+    assert_eq!(summary.accepted, ExactField::one());
+    assert_eq!(summary.error, Some(half.clone()));
+    assert_eq!(summary.conditional_error, Some(half.clone()));
+    assert_eq!(summary.moments, [ExactField::zero(), half]);
+    assert_eq!(summary.variances.accepted, Some(ExactField::zero()));
+    assert_eq!(summary.variances.error, Some(quarter.clone()));
+    assert_eq!(summary.variances.conditional_error, Some(quarter));
+    assert_eq!(
+        summary.variances.moments,
+        [Some(ExactField::one()), Some(ExactField::zero())]
+    );
+    assert_eq!(summary.mean_weight, ExactField::one());
+    assert_eq!(
+        summary.effective_sample_size,
+        a.from_rational("2".parse().unwrap()).unwrap()
+    );
+    let limited = StatisticsOptions {
+        max_dimensions: 2,
+        ..Default::default()
+    };
+    assert!(
+        TaskRunStatistics::from_floating_draws([row(1.0, None, vec![0.0])], limited)
+            .unwrap_err()
+            .message
+            .contains("limit")
+    );
+    let limited = StatisticsOptions {
+        arithmetic: FieldArithmetic::new(8),
+        ..Default::default()
+    };
+    assert!(
+        TaskRunStatistics::from_floating_draws([row(f64::from_bits(1), None, vec![])], limited)
+            .unwrap_err()
+            .message
+            .contains("bits")
+    );
+}
