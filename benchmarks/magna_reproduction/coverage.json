@@ -1028,7 +1028,7 @@
           "package": "rmagna",
           "target": "remaining_kernel_contracts",
           "test": "original_raw_boundary_sampling_rejects_invalid_distribution_and_shape",
-          "source_sha256": "bb1a3874331bc74d12b715ff2e2703296490f7193e03b280125c1f87d0cdbd6e"
+          "source_sha256": "9a739a7655e4d6af922d8c2f9b567195b71536412ec7b540e7c48c989051bb50"
         }
       ]
     },
@@ -1858,7 +1858,7 @@
           "package": "rmagna",
           "target": "remaining_kernel_contracts",
           "test": "original_boundary_sum_validates_every_term_width_and_duplicate_rhs",
-          "source_sha256": "bb1a3874331bc74d12b715ff2e2703296490f7193e03b280125c1f87d0cdbd6e"
+          "source_sha256": "9a739a7655e4d6af922d8c2f9b567195b71536412ec7b540e7c48c989051bb50"
         }
       ]
     },
@@ -1958,7 +1958,7 @@
           "package": "rmagna",
           "target": "remaining_kernel_contracts",
           "test": "original_wire_lifetime_is_checked_on_native_assignment_view",
-          "source_sha256": "bb1a3874331bc74d12b715ff2e2703296490f7193e03b280125c1f87d0cdbd6e"
+          "source_sha256": "9a739a7655e4d6af922d8c2f9b567195b71536412ec7b540e7c48c989051bb50"
         }
       ]
     },
@@ -1996,7 +1996,7 @@
           "package": "rmagna",
           "target": "remaining_kernel_contracts",
           "test": "original_immutable_native_plan_has_independent_concurrent_workspaces",
-          "source_sha256": "bb1a3874331bc74d12b715ff2e2703296490f7193e03b280125c1f87d0cdbd6e"
+          "source_sha256": "9a739a7655e4d6af922d8c2f9b567195b71536412ec7b540e7c48c989051bb50"
         }
       ]
     },
@@ -2829,7 +2829,7 @@
           "package": "rmagna",
           "target": "remaining_kernel_contracts",
           "test": "original_warm_prepared_query_validates_rhs_and_all_boundary_masks",
-          "source_sha256": "bb1a3874331bc74d12b715ff2e2703296490f7193e03b280125c1f87d0cdbd6e"
+          "source_sha256": "9a739a7655e4d6af922d8c2f9b567195b71536412ec7b540e7c48c989051bb50"
         }
       ]
     },
@@ -3148,7 +3148,7 @@
           "package": "rmagna",
           "target": "remaining_kernel_contracts",
           "test": "original_batched_inverse_keeps_free_coordinates_and_rejects_dependent_rows",
-          "source_sha256": "bb1a3874331bc74d12b715ff2e2703296490f7193e03b280125c1f87d0cdbd6e"
+          "source_sha256": "9a739a7655e4d6af922d8c2f9b567195b71536412ec7b540e7c48c989051bb50"
         }
       ]
     },
@@ -3161,7 +3161,7 @@
           "package": "rmagna",
           "target": "remaining_kernel_contracts",
           "test": "original_common_support_overlap_retains_all_shifts_and_global_phases",
-          "source_sha256": "bb1a3874331bc74d12b715ff2e2703296490f7193e03b280125c1f87d0cdbd6e"
+          "source_sha256": "9a739a7655e4d6af922d8c2f9b567195b71536412ec7b540e7c48c989051bb50"
         }
       ]
     },
@@ -3179,7 +3179,7 @@
           "package": "rmagna",
           "target": "remaining_kernel_contracts",
           "test": "original_control_callbacks_execute_fresh_with_unchanged_version_and_replacement",
-          "source_sha256": "bb1a3874331bc74d12b715ff2e2703296490f7193e03b280125c1f87d0cdbd6e"
+          "source_sha256": "9a739a7655e4d6af922d8c2f9b567195b71536412ec7b540e7c48c989051bb50"
         }
       ]
     },
@@ -3192,7 +3192,7 @@
           "package": "rmagna",
           "target": "remaining_kernel_contracts",
           "test": "original_sparse_contraction_matches_every_dependent_boundary_path_sum",
-          "source_sha256": "bb1a3874331bc74d12b715ff2e2703296490f7193e03b280125c1f87d0cdbd6e"
+          "source_sha256": "9a739a7655e4d6af922d8c2f9b567195b71536412ec7b540e7c48c989051bb50"
         }
       ]
     },
@@ -3210,7 +3210,7 @@
           "package": "rmagna",
           "target": "remaining_kernel_contracts",
           "test": "original_packed_pullback_matches_all_32_assignments_of_all_108_maps",
-          "source_sha256": "bb1a3874331bc74d12b715ff2e2703296490f7193e03b280125c1f87d0cdbd6e"
+          "source_sha256": "9a739a7655e4d6af922d8c2f9b567195b71536412ec7b540e7c48c989051bb50"
         }
       ]
     },

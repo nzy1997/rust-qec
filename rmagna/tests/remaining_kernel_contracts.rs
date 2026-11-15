@@ -1,6 +1,9 @@
 // SPDX-License-Identifier: MPL-2.0
 // Source-bound cases from itpyi/magna@56847478c840395735146ef1e1ccdc3d8aedc10f.
 // See fixtures/original_optimization_inputs.NOTICE for complete attribution.
+// Additional cases: tests/core/test_file_native.py and
+// tests/core/test_native_boundary_service.py at the same source pin.
+// License: fixtures/original_many_record_input.LICENSE.
 use rmagna::clifford::CliffordCircuit;
 use rmagna::gf2::{BitVector, LinearFactorization};
 use rmagna::instrument::*;
@@ -985,4 +988,179 @@ fn original_floating_summaries_reject_all_four_nonfinite_and_shape_rows() {
             .message
             .contains("bits")
     );
+}
+
+#[test]
+fn original_completed_marginal_two_schedules_keep_all_eight_seeds_and_rust_rng_state() {
+    use rmagna::noise::SplitMix64;
+    use rmagna::records::bernoulli_ratio;
+    let a = ScalarArithmetic::default();
+    // Literal two-qubit X-basis Walsh sums: (2 +/- sqrt(2))/4,
+    // or half of those masses when H/T makes the first report fair.
+    // Source: test_native_boundary_service.py, complete 2 x 8 seed method.
+    for extra in [false, true] {
+        let high = a
+            .scalar(
+                [2.into(), 1.into(), 0.into(), (-1).into()],
+                if extra { -3 } else { -2 },
+            )
+            .unwrap();
+        let low = a
+            .scalar(
+                [2.into(), (-1).into(), 0.into(), 1.into()],
+                if extra { -3 } else { -2 },
+            )
+            .unwrap();
+        let expected = if extra {
+            [high.clone(), high, low.clone(), low]
+        } else {
+            [high, ExactScalar::zero(), ExactScalar::zero(), low]
+        };
+        for strategy in [
+            CompilerStrategy::ParityCopies,
+            CompilerStrategy::SharedCommutingLayer,
+        ] {
+            let mut operations = vec![OriginalOperation {
+                id: "t".into(),
+                gate: OriginalGate::Phase {
+                    wires: vec![0, 1],
+                    turns: 1,
+                },
+            }];
+            if extra {
+                operations.extend([
+                    OriginalOperation {
+                        id: "h".into(),
+                        gate: OriginalGate::H(0),
+                    },
+                    OriginalOperation {
+                        id: "u".into(),
+                        gate: OriginalGate::Phase {
+                            wires: vec![0],
+                            turns: 1,
+                        },
+                    },
+                ]);
+            }
+            operations.extend([
+                OriginalOperation {
+                    id: "a".into(),
+                    gate: OriginalGate::Destructive {
+                        wire: 0,
+                        basis: ReadoutBasis::X,
+                        record: "a".into(),
+                    },
+                },
+                OriginalOperation {
+                    id: "b".into(),
+                    gate: OriginalGate::Destructive {
+                        wire: 1,
+                        basis: ReadoutBasis::X,
+                        record: "b".into(),
+                    },
+                },
+            ]);
+            let initial = AffineKet::new(
+                bits(2, 0),
+                vec![bits(2, 1), bits(2, 2)],
+                form(&[0, 0], &[0, 0]),
+                a.omega(0, -2).unwrap(),
+            )
+            .unwrap();
+            let ir = OriginalInstrument::new(
+                vec![0, 1],
+                vec![],
+                initial,
+                operations,
+                vec![],
+                Default::default(),
+                &a,
+            )
+            .unwrap();
+            let trace = ir.compile_trace(strategy, &a).unwrap();
+            let view = trace
+                .with_assignment(
+                    &OriginalTraceAssignment {
+                        faults: vec![OriginalFault {
+                            after: "t".into(),
+                            wire: 0,
+                            pauli: OriginalPauli::Y,
+                        }],
+                        report_flips: vec!["a".into()],
+                    },
+                    &a,
+                )
+                .unwrap();
+            let rows = ["a", "b"].map(|name| OriginalRecordParity {
+                records: vec![name.into()],
+                inverted: false,
+            });
+            let completed = view
+                .probability(&rows, &[], &OriginalTraceOptions::default(), &a)
+                .unwrap()
+                .distribution;
+            for (word, mass) in expected.iter().enumerate() {
+                assert_eq!(
+                    completed.value(&bits(2, word), &a).unwrap(),
+                    *mass,
+                    "extra={extra} word={word}"
+                );
+            }
+            assert_eq!(completed.total(&a).unwrap(), ExactScalar::one());
+            for seed in 0..8 {
+                let mut actual_rng = SplitMix64::new(seed);
+                let mut reference_rng = SplitMix64::new(seed);
+                let mut candidates = (0..4).collect::<Vec<_>>();
+                let mut entropy = 0;
+                if !extra {
+                    // Original commuting prepass is the parity a^b. It is
+                    // deterministically zero even with Y(t,0) and flip(a).
+                    // Rust has no getrandbits(0) call; both schedules spend zero
+                    // entropy here and leave the caller stream unchanged.
+                    let before = reference_rng.state();
+                    let zero = a.add(&expected[0], &expected[3]).unwrap();
+                    let draw =
+                        bernoulli_ratio(&zero, &ExactScalar::one(), &mut reference_rng, 64, &a)
+                            .unwrap();
+                    assert!(draw.selected);
+                    assert_eq!(draw.entropy_words, 0);
+                    assert_eq!(reference_rng.state(), before);
+                    candidates.retain(|&word| (word & 1) == (word >> 1));
+                }
+                let mut reference_word = 0;
+                for bit in 0..2 {
+                    let total = candidates.iter().fold(ExactScalar::zero(), |sum, &word| {
+                        a.add(&sum, &expected[word]).unwrap()
+                    });
+                    let zero = candidates
+                        .iter()
+                        .filter(|&&word| word >> bit & 1 == 0)
+                        .fold(ExactScalar::zero(), |sum, &word| {
+                            a.add(&sum, &expected[word]).unwrap()
+                        });
+                    let draw = bernoulli_ratio(&zero, &total, &mut reference_rng, 64 - entropy, &a)
+                        .unwrap();
+                    entropy += draw.entropy_words;
+                    let value = usize::from(!draw.selected);
+                    reference_word |= value << bit;
+                    candidates.retain(|&word| word >> bit & 1 == value);
+                }
+                let actual = completed
+                    .sample(&mut actual_rng, &CompletedSamplingOptions::default(), &a)
+                    .unwrap();
+                assert_eq!(
+                    mask(&actual.values),
+                    reference_word,
+                    "extra={extra} seed={seed}"
+                );
+                assert_eq!(actual.mass, expected[reference_word]);
+                assert_eq!(actual.condition_mass, ExactScalar::one());
+                assert_eq!(actual.entropy_words, entropy);
+                // CompletedProbability's typed sampler is the Rust counterpart
+                // of info.method == exact-global-marginals; no Python string ABI.
+                assert_eq!(actual.mass_queries, 3);
+                assert_eq!(actual_rng.state(), reference_rng.state());
+            }
+        }
+    }
 }

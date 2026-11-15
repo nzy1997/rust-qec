@@ -6778,3 +6778,14 @@ a partial summary. Empty input returns no summary. The import uses unit diagnost
 weight, so its ESS is the row count and does not estimate a producer's importance
 weights. The original four invalid-summary cases and literal valid mean/variance
 cases are covered in `remaining_kernel_contracts`.
+
+
+The original completed-marginal schedule witness keeps both original circuits
+and all eight seeds, under both Rust compilers. Exact closed-form two-qubit
+masses and a table-based reference schedule check each sampled word, joint mass,
+query count, entropy consumption and final SplitMix64 state. In the commuting
+fixture the original preliminary parity is deterministically zero and spends
+no entropy; the second fixture has no common commuting sector. Rust's typed
+`CompletedProbability` sampler replaces the original method-name diagnostic.
+This witness does not establish automatic commuting-sector discovery for other
+inputs or Python bit-stream identity.
