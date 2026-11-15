@@ -508,6 +508,29 @@ impl LinearFactorization {
         Ok(Some(solution))
     }
 
+    /// Columns of a right inverse, with the same zero free coordinates as
+    /// `solve`. Returns `None` when dependent rows make a right inverse
+    /// impossible. The existing factorization is shared by all unit right-hand
+    /// sides; no input matrix is refactored.
+    pub fn right_inverse(&self) -> Result<Option<Vec<BitVector>>, Gf2Error> {
+        let equations = self.num_equations();
+        if self.rank() != equations {
+            return Ok(None);
+        }
+        let mut columns = Vec::new();
+        columns
+            .try_reserve_exact(equations)
+            .map_err(|_| Gf2Error::AllocationFailed)?;
+        for j in 0..equations {
+            let rhs = BitVector::from_indices(equations, [j])?;
+            let Some(column) = self.solve(&rhs)? else {
+                return Ok(None);
+            };
+            columns.push(column);
+        }
+        Ok(Some(columns))
+    }
+
     pub fn nullspace(&self) -> Result<Vec<BitVector>, Gf2Error> {
         let mut basis = Vec::new();
         for free in 0..self.width {

@@ -1,0 +1,31 @@
+SPDX-License-Identifier: MPL-2.0
+
+The input schedules, test cases and direct tensor/quadratic oracles in
+original_optimization_inputs.json, remaining_kernel_contracts.rs and
+benchmarks/magna_reproduction/original_optimization_inputs.py are adapted from
+itpyi/magna, revision 56847478c840395735146ef1e1ccdc3d8aedc10f:
+
+tests/core/test_simulator_optimization.py
+tests/core/test_file_native.py
+tests/core/test_native_boundary_service.py
+tests/core/test_native_global_ownership.py
+tests/core/test_native_global_fastpath.py
+tests/core/test_query_reuse.py
+
+Original repository: https://github.com/itpyi/magna
+Original source is distributed under Mozilla Public License 2.0.
+The full license is in original_many_record_input.LICENSE in this directory.
+
+The generator executes the original four optimization methods with their full
+random schedules and assertions, capturing inputs at the operations under test.
+No trial loop is shortened. The identified prebuilt helper is used without
+recompilation. The fixture binds source, generator, frontend and helper hashes.
+Rust expectations for contraction, overlap and pullback use direct exhaustive
+path/coordinate evaluation, independent of the production elimination kernels.
+Inverse columns also compare with the exact original native result; zero free
+coordinates and the matrix product are checked separately.
+
+Rust uses typed packed bits and unsigned seeds. The invalid RHS value 2 and
+negative seed are rejected by packed-vector/unsigned conversion. Callback tables
+are owned: replacement constructs an immutable instrument with the same version.
+These substitutions do not claim Python object identity or Python RNG identity.

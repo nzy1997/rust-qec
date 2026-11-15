@@ -7,15 +7,15 @@ implement a simulator or claim reproduction of the paper's precision curves.
 
 ## Current coverage
 
-The source-bound ledger currently has 222 verified, 2 partial and 128 unmapped
+The source-bound ledger currently has 232 verified, 2 partial and 118 unmapped
 original methods, with zero architecture-specific core exclusions. It requires
-247 distinct Rust witnesses from 249 declarations across 104 targets. Strict
+257 distinct Rust witnesses from 259 declarations across 105 targets. Strict
 complete parity intentionally exits 2. The detailed per-change sections below
 retain their historical inventory snapshots; `coverage.json` is authoritative.
 
 ## Outstanding requirements and the first paper pilot
 
-`remaining-contracts.json` catalogs all 130 outstanding original methods without
+`remaining-contracts.json` catalogs all 120 outstanding original methods without
 promoting their parity status. It records the complete source-bound method,
 readable assertions and loops, module helper/import context, Rust owners and
 the linked issue DAG. The full pinned source manifest binds transitive helpers,
@@ -33,13 +33,42 @@ python3 benchmarks/magna_reproduction/remaining_contracts.py check \
 python3 -I -m unittest discover -s benchmarks/magna_reproduction -p test_remaining_contracts.py
 ```
 
-The first command prints `PASS`, 130 requirements, the unchanged ledger counts,
+The first command prints `PASS`, 120 requirements, the reconciled ledger counts,
 31 tasks, 435 paper files and 18 issue nodes. Without `--upstream`, it checks the
 catalog and local owners but explicitly reports `upstream_verified=false`.
 Changed source pins, missing methods, unsupported status promotions and cyclic
 dependencies are rejected. Reconcile this snapshot explicitly when later PRs
 close methods. The primary paper is v1, the public reference and historical
 deposit kernels are distinct, and v2 remains a separate, unassessed delta.
+
+### First R03 kernel contract batch
+
+`cargo test --locked -p rmagna --test remaining_kernel_contracts` covers ten
+complete original methods and supplemental admission/linear-sum controls. The
+four optimization schedules are unchanged: 157 inverse calls (including the
+dependent-row refusal), 140 common-support overlaps, 240 sparse contractions
+and 108 five-column pullbacks checked at all 32 assignments. Exact expectations
+use exhaustive tensor paths and direct quadratic evaluation. The public raw
+boundary importer and heterogeneous-width sum preserve signed/complex
+cancellation without an additional absolute square. Other original scenarios
+cover fresh callbacks with unchanged versions, four-worker Native query reuse,
+original wire lifetime and all warmed prepared-query invalid masks/RHS cases.
+
+The captured 71 KiB input fixture records source, generator and identified native
+binary hashes. Regeneration uses the retained source and prebuilt helper:
+
+```sh
+python3 benchmarks/magna_reproduction/original_optimization_inputs.py \
+  --upstream "$MAGNA_UPSTREAM" --native-helper "$MAGNA_TEST_HELPER" \
+  --out /absolute/path/to/new-optimization-inputs.json
+```
+
+The generator executes all original assertions before writing a fresh output;
+it never falls back to rebuilding the helper. Attribution and typed Rust
+substitutions are in `rmagna/tests/fixtures/original_optimization_inputs.NOTICE`.
+This batch leaves R03 open for six remaining methods, including raw floating
+summaries, complete resource-facade admission and completed-marginal scheduling.
+It makes no claim about paper curves or full Native API parity.
 
 `paper/pilot.json` selects eight representative tasks, eight physical-noise draws
 per engine/task, two same-assignment replays and a 45-second limit per child.
