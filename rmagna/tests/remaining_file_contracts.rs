@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: MPL-2.0
-// Source-bound detector cases from itpyi/magna@56847478c840395735146ef1e1ccdc3d8aedc10f,
+// Source-bound file cases from itpyi/magna@56847478c840395735146ef1e1ccdc3d8aedc10f,
 // tests/core/test_detector_feedback.py, test_quantum_output.py, test_query_reuse.py,
-// test_reference_networks.py and tests/support/readout_target.py.
+// test_reference_networks.py, test_file_reuse.py, test_user_interface.py and
+// tests/support/readout_target.py.
 // Also tests/core/test_incremental_history.py's interference-zero prefix case.
 // License: fixtures/original_many_record_input.LICENSE.
 use rmagna::circuit::{BitAtom, BitExpr, Operation, ParseOptions, parse_circuit};
