@@ -28,6 +28,12 @@ pub struct PhaseSelectionOptions {
     pub max_quotient_rank: usize,
     /// Four logical native bytes per core assignment, checked before allocation.
     pub max_core_table_bytes: usize,
+    /// Portable admission charge for a dense core plus its Fourier coefficient
+    /// workspace: `2^rank * (4 + 8 + 32 * ceil((rank+1)/64))` bytes.
+    /// The coefficient slots reserve four signed integer limb arrays and one
+    /// exponent word. This conservative charge also applies to database routes;
+    /// it is not allocator memory or the native C++ ABI's byte accounting.
+    pub max_table_and_coefficient_bytes: usize,
     /// Upper bound on signature scanning word work, documented on the receipt.
     pub max_signature_work: u128,
     pub max_transform_work: u128,
@@ -41,6 +47,7 @@ impl Default for PhaseSelectionOptions {
         Self {
             max_quotient_rank: 8,
             max_core_table_bytes: 64 << 20,
+            max_table_and_coefficient_bytes: usize::MAX,
             max_signature_work: 64 << 20,
             max_transform_work: 64 << 20,
             construction: CatalogueLimits::default(),
@@ -55,6 +62,7 @@ pub struct PhaseSelectionReceipt {
     pub quotient_rank: usize,
     pub table_values: usize,
     pub logical_core_table_bytes: usize,
+    pub logical_table_and_coefficient_bytes: u128,
     /// Retained certified indicators, including supplied cancelling indicators.
     pub retained_terms: usize,
     /// `n*(n+1)/2 * (input_terms + 2*n + 3) * ceil(n/64)`.
@@ -162,11 +170,6 @@ fn native_axes(
                         .xor_assign(row)
                         .map_err(|e| error("phase_selection.signature", e))?;
                 } else {
-                    limit(
-                        "phase_selection.max_quotient_rank",
-                        axes.len() as u128 + 1,
-                        options.max_quotient_rank as u128,
-                    )?;
                     pivots.insert(pivot, reduced);
                     axes.push(original);
                     break;
@@ -177,6 +180,14 @@ fn native_axes(
             }
         }
     }
+    // Geometry and full scanning work have already been admitted. Finish the
+    // bounded scan so the refusal reports the complete rank, not its first
+    // overflowing prefix (important when absorption changes the final rank).
+    limit(
+        "phase_selection.max_quotient_rank",
+        axes.len() as u128,
+        options.max_quotient_rank as u128,
+    )?;
     Ok((axes, work, scan_geometry))
 }
 fn factors_present(catalogue: &PhaseCatalogue, rank: usize) -> bool {
@@ -244,6 +255,16 @@ impl FrozenPhasePlan {
             "phase_selection.max_core_table_bytes",
             bytes,
             options.max_core_table_bytes as u128,
+        )?;
+        let coefficient_bytes = 8 + 32 * (rank as u128 + 1).div_ceil(64);
+        let table_and_coefficient_bytes = checked(
+            values.checked_mul(4 + coefficient_bytes),
+            "phase_selection.table_and_coefficient_capacity",
+        )?;
+        limit(
+            "phase_selection.max_table_and_coefficient_bytes",
+            table_and_coefficient_bytes,
+            options.max_table_and_coefficient_bytes as u128,
         )?;
         vector_capacity::<u8>("phase_selection.core_table_capacity", values)?;
         let n = reference.num_variables() as u128;
@@ -367,6 +388,7 @@ impl FrozenPhasePlan {
         .map_err(|e| route_error(phase_error("phase_selection.preparation", e), route))?;
         let geometry_words = coordinate_geometry.max(prepared.geometry_words() as u128) as usize;
         let receipt = PhaseSelectionReceipt {
+            logical_table_and_coefficient_bytes: table_and_coefficient_bytes,
             route,
             quotient_rank: rank,
             table_values: values as usize,

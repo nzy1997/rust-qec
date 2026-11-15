@@ -1,6 +1,10 @@
 // SPDX-License-Identifier: MPL-2.0
 // Source-bound cases from itpyi/magna@56847478c840395735146ef1e1ccdc3d8aedc10f.
 // See fixtures/original_optimization_inputs.NOTICE for complete attribution.
+// Additional cases: tests/core/test_file_native.py and
+// tests/core/test_native_boundary_service.py, test_kernel_contract.py,
+// test_native_global_fastpath.py and test_native_global_phase.py at that pin.
+// License: fixtures/original_many_record_input.LICENSE.
 use rmagna::clifford::CliffordCircuit;
 use rmagna::gf2::{BitVector, LinearFactorization};
 use rmagna::instrument::*;
@@ -891,4 +895,713 @@ fn imported_boundary_queries_match_exhaustive_signed_complex_path_sums() {
             );
         }
     }
+}
+
+#[test]
+fn original_floating_summaries_reject_all_four_nonfinite_and_shape_rows() {
+    use rmagna::field::{ExactField, FieldArithmetic};
+    use rmagna::statistics::StatisticsOptions;
+    use rmagna::task::{FloatingTaskDraw, TaskRunStatistics};
+    let row = |acceptance, error, moments| FloatingTaskDraw {
+        acceptance,
+        error,
+        moments,
+    };
+    for rows in [
+        vec![row(f64::NAN, None, vec![])],
+        vec![row(1.0, None, vec![]), row(1.0, Some(0.0), vec![])],
+        vec![row(1.0, None, vec![]), row(1.0, None, vec![0.0])],
+        vec![row(1.0, None, vec![f64::INFINITY])],
+    ] {
+        let error =
+            TaskRunStatistics::from_floating_draws(rows, StatisticsOptions::default()).unwrap_err();
+        assert!(error.field.starts_with("floating_draws."));
+        assert!(
+            error.message.contains("finite") || error.message.contains("match the first row"),
+            "{error}"
+        );
+    }
+    for value in [f64::NAN, f64::INFINITY, f64::NEG_INFINITY] {
+        for row in [
+            row(value, None, vec![]),
+            row(1.0, Some(value), vec![]),
+            row(1.0, None, vec![value]),
+        ] {
+            assert!(
+                TaskRunStatistics::from_floating_draws([row], StatisticsOptions::default())
+                    .unwrap_err()
+                    .message
+                    .contains("finite")
+            );
+        }
+    }
+    assert!(
+        TaskRunStatistics::from_floating_draws([], StatisticsOptions::default())
+            .unwrap()
+            .is_none()
+    );
+    let summary = TaskRunStatistics::from_floating_draws(
+        [
+            row(1.0, Some(0.0), vec![-1.0, 0.5]),
+            row(1.0, Some(1.0), vec![1.0, 0.5]),
+        ],
+        StatisticsOptions::default(),
+    )
+    .unwrap()
+    .unwrap();
+    let a = FieldArithmetic::default();
+    let half = a.from_rational("1/2".parse().unwrap()).unwrap();
+    let quarter = a.from_rational("1/4".parse().unwrap()).unwrap();
+    assert_eq!(summary.completed, 2);
+    assert_eq!(summary.accepted, ExactField::one());
+    assert_eq!(summary.error, Some(half.clone()));
+    assert_eq!(summary.conditional_error, Some(half.clone()));
+    assert_eq!(summary.moments, [ExactField::zero(), half]);
+    assert_eq!(summary.variances.accepted, Some(ExactField::zero()));
+    assert_eq!(summary.variances.error, Some(quarter.clone()));
+    assert_eq!(summary.variances.conditional_error, Some(quarter));
+    assert_eq!(
+        summary.variances.moments,
+        [Some(ExactField::one()), Some(ExactField::zero())]
+    );
+    assert_eq!(summary.mean_weight, ExactField::one());
+    assert_eq!(
+        summary.effective_sample_size,
+        a.from_rational("2".parse().unwrap()).unwrap()
+    );
+    let limited = StatisticsOptions {
+        max_dimensions: 2,
+        ..Default::default()
+    };
+    assert!(
+        TaskRunStatistics::from_floating_draws([row(1.0, None, vec![0.0])], limited)
+            .unwrap_err()
+            .message
+            .contains("limit")
+    );
+    let limited = StatisticsOptions {
+        arithmetic: FieldArithmetic::new(8),
+        ..Default::default()
+    };
+    assert!(
+        TaskRunStatistics::from_floating_draws([row(f64::from_bits(1), None, vec![])], limited)
+            .unwrap_err()
+            .message
+            .contains("bits")
+    );
+}
+
+#[test]
+fn original_completed_marginal_two_schedules_keep_all_eight_seeds_and_rust_rng_state() {
+    use rmagna::noise::SplitMix64;
+    use rmagna::records::bernoulli_ratio;
+    let a = ScalarArithmetic::default();
+    // Literal two-qubit X-basis Walsh sums: (2 +/- sqrt(2))/4,
+    // or half of those masses when H/T makes the first report fair.
+    // Source: test_native_boundary_service.py, complete 2 x 8 seed method.
+    for extra in [false, true] {
+        let high = a
+            .scalar(
+                [2.into(), 1.into(), 0.into(), (-1).into()],
+                if extra { -3 } else { -2 },
+            )
+            .unwrap();
+        let low = a
+            .scalar(
+                [2.into(), (-1).into(), 0.into(), 1.into()],
+                if extra { -3 } else { -2 },
+            )
+            .unwrap();
+        let expected = if extra {
+            [high.clone(), high, low.clone(), low]
+        } else {
+            [high, ExactScalar::zero(), ExactScalar::zero(), low]
+        };
+        for strategy in [
+            CompilerStrategy::ParityCopies,
+            CompilerStrategy::SharedCommutingLayer,
+        ] {
+            let mut operations = vec![OriginalOperation {
+                id: "t".into(),
+                gate: OriginalGate::Phase {
+                    wires: vec![0, 1],
+                    turns: 1,
+                },
+            }];
+            if extra {
+                operations.extend([
+                    OriginalOperation {
+                        id: "h".into(),
+                        gate: OriginalGate::H(0),
+                    },
+                    OriginalOperation {
+                        id: "u".into(),
+                        gate: OriginalGate::Phase {
+                            wires: vec![0],
+                            turns: 1,
+                        },
+                    },
+                ]);
+            }
+            operations.extend([
+                OriginalOperation {
+                    id: "a".into(),
+                    gate: OriginalGate::Destructive {
+                        wire: 0,
+                        basis: ReadoutBasis::X,
+                        record: "a".into(),
+                    },
+                },
+                OriginalOperation {
+                    id: "b".into(),
+                    gate: OriginalGate::Destructive {
+                        wire: 1,
+                        basis: ReadoutBasis::X,
+                        record: "b".into(),
+                    },
+                },
+            ]);
+            let initial = AffineKet::new(
+                bits(2, 0),
+                vec![bits(2, 1), bits(2, 2)],
+                form(&[0, 0], &[0, 0]),
+                a.omega(0, -2).unwrap(),
+            )
+            .unwrap();
+            let ir = OriginalInstrument::new(
+                vec![0, 1],
+                vec![],
+                initial,
+                operations,
+                vec![],
+                Default::default(),
+                &a,
+            )
+            .unwrap();
+            let trace = ir.compile_trace(strategy, &a).unwrap();
+            let view = trace
+                .with_assignment(
+                    &OriginalTraceAssignment {
+                        faults: vec![OriginalFault {
+                            after: "t".into(),
+                            wire: 0,
+                            pauli: OriginalPauli::Y,
+                        }],
+                        report_flips: vec!["a".into()],
+                    },
+                    &a,
+                )
+                .unwrap();
+            let rows = ["a", "b"].map(|name| OriginalRecordParity {
+                records: vec![name.into()],
+                inverted: false,
+            });
+            let completed = view
+                .probability(&rows, &[], &OriginalTraceOptions::default(), &a)
+                .unwrap()
+                .distribution;
+            for (word, mass) in expected.iter().enumerate() {
+                assert_eq!(
+                    completed.value(&bits(2, word), &a).unwrap(),
+                    *mass,
+                    "extra={extra} word={word}"
+                );
+            }
+            assert_eq!(completed.total(&a).unwrap(), ExactScalar::one());
+            for seed in 0..8 {
+                let mut actual_rng = SplitMix64::new(seed);
+                let mut reference_rng = SplitMix64::new(seed);
+                let mut candidates = (0..4).collect::<Vec<_>>();
+                let mut entropy = 0;
+                if !extra {
+                    // Original commuting prepass is the parity a^b. It is
+                    // deterministically zero even with Y(t,0) and flip(a).
+                    // Rust has no getrandbits(0) call; both schedules spend zero
+                    // entropy here and leave the caller stream unchanged.
+                    let before = reference_rng.state();
+                    let zero = a.add(&expected[0], &expected[3]).unwrap();
+                    let draw =
+                        bernoulli_ratio(&zero, &ExactScalar::one(), &mut reference_rng, 64, &a)
+                            .unwrap();
+                    assert!(draw.selected);
+                    assert_eq!(draw.entropy_words, 0);
+                    assert_eq!(reference_rng.state(), before);
+                    candidates.retain(|&word| (word & 1) == (word >> 1));
+                }
+                let mut reference_word = 0;
+                for bit in 0..2 {
+                    let total = candidates.iter().fold(ExactScalar::zero(), |sum, &word| {
+                        a.add(&sum, &expected[word]).unwrap()
+                    });
+                    let zero = candidates
+                        .iter()
+                        .filter(|&&word| word >> bit & 1 == 0)
+                        .fold(ExactScalar::zero(), |sum, &word| {
+                            a.add(&sum, &expected[word]).unwrap()
+                        });
+                    let draw = bernoulli_ratio(&zero, &total, &mut reference_rng, 64 - entropy, &a)
+                        .unwrap();
+                    entropy += draw.entropy_words;
+                    let value = usize::from(!draw.selected);
+                    reference_word |= value << bit;
+                    candidates.retain(|&word| word >> bit & 1 == value);
+                }
+                let actual = completed
+                    .sample(&mut actual_rng, &CompletedSamplingOptions::default(), &a)
+                    .unwrap();
+                assert_eq!(
+                    mask(&actual.values),
+                    reference_word,
+                    "extra={extra} seed={seed}"
+                );
+                assert_eq!(actual.mass, expected[reference_word]);
+                assert_eq!(actual.condition_mass, ExactScalar::one());
+                assert_eq!(actual.entropy_words, entropy);
+                // CompletedProbability's typed sampler is the Rust counterpart
+                // of info.method == exact-global-marginals; no Python string ABI.
+                assert_eq!(actual.mass_queries, 3);
+                assert_eq!(actual_rng.state(), reference_rng.state());
+            }
+        }
+    }
+}
+
+#[test]
+fn original_ordinary_record_import_rejects_every_invalid_map_and_empty_stream_does_no_work() {
+    use serde_json::json;
+    let a = ScalarArithmetic::default();
+    let ir = OriginalInstrument::new(
+        vec![0],
+        vec![0],
+        AffineKet::new(
+            bits(1, 0),
+            vec![bits(1, 1)],
+            form(&[0], &[0]),
+            a.omega(0, -1).unwrap(),
+        )
+        .unwrap(),
+        vec![
+            OriginalOperation {
+                id: "t".into(),
+                gate: OriginalGate::Phase {
+                    wires: vec![0],
+                    turns: 1,
+                },
+            },
+            OriginalOperation {
+                id: "m".into(),
+                gate: OriginalGate::Measure {
+                    factors: vec![(0, OriginalPauli::X)],
+                    inverted: false,
+                    record: "m".into(),
+                },
+            },
+        ],
+        vec![],
+        OriginalLimits::default(),
+        &a,
+    )
+    .unwrap();
+    let raw = |records: Vec<(&str, serde_json::Value)>| OriginalRecordAssignment {
+        records: records.into_iter().map(|(k, v)| (k.into(), v)).collect(),
+        ..Default::default()
+    };
+    for strategy in [
+        CompilerStrategy::ParityCopies,
+        CompilerStrategy::SharedCommutingLayer,
+    ] {
+        for invalid in [
+            raw(vec![]),
+            raw(vec![("m", json!(2))]),
+            raw(vec![("m", json!(true))]),
+            raw(vec![("m", json!(0)), ("extra", json!(0))]),
+            raw(vec![("m", json!(0)), ("m", json!(1))]),
+            raw(vec![("m", json!(0.0))]),
+            raw(vec![("m", json!(-1))]),
+            raw(vec![("m", json!(null))]),
+            raw(vec![("m", json!("0"))]),
+        ] {
+            assert!(ir.compile_record_assignment(invalid, strategy, &a).is_err());
+        }
+        let mut flip = raw(vec![("m", json!(0))]);
+        flip.report_flips.push("unknown".into());
+        assert!(ir.compile_record_assignment(flip, strategy, &a).is_err());
+        let mut fault = raw(vec![("m", json!(0))]);
+        fault.faults.push(OriginalFault {
+            after: "unknown".into(),
+            wire: 0,
+            pauli: OriginalPauli::Z,
+        });
+        assert!(ir.compile_record_assignment(fault, strategy, &a).is_err());
+        let mut empty = ir.evaluate_record_assignments(std::iter::empty(), strategy, &a);
+        assert!(empty.by_ref().collect::<Vec<_>>().is_empty());
+        assert_eq!(
+            empty.statistics(),
+            OriginalAssignmentStreamStatistics::default()
+        );
+        assert!(empty.next().is_none());
+        let mut stream = ir.evaluate_record_assignments(
+            [raw(vec![("m", json!(0))]), raw(vec![("m", json!(1))])],
+            strategy,
+            &a,
+        );
+        let values = stream.by_ref().collect::<Result<Vec<_>, _>>().unwrap();
+        assert_eq!(
+            values,
+            vec![
+                a.scalar([2, 1, 0, -1].map(Into::into), -2).unwrap(),
+                a.scalar([2, -1, 0, 1].map(Into::into), -2).unwrap()
+            ]
+        );
+        assert_eq!(
+            stream.statistics(),
+            OriginalAssignmentStreamStatistics {
+                inputs: 2,
+                compiled_branches: 2,
+                collected_callback_decisions: 0,
+                values: 2
+            }
+        );
+        // A rejected record must precede invalid report/fault lookup, and a
+        // stream must not pull the next item after this first error.
+        let mut first = raw(vec![("m", json!(true))]);
+        first.report_flips.push("unknown".into());
+        let pulled = AtomicUsize::new(0);
+        let source = [first, raw(vec![("m", json!(0))])]
+            .into_iter()
+            .inspect(|_| {
+                pulled.fetch_add(1, Ordering::SeqCst);
+            });
+        let mut stream = ir.evaluate_record_assignments(source, strategy, &a);
+        let error = stream.next().unwrap().unwrap_err().to_string();
+        assert!(
+            error.contains("record value must be integer zero or one"),
+            "{error}"
+        );
+        assert!(stream.next().is_none());
+        assert_eq!(pulled.load(Ordering::SeqCst), 1);
+        assert_eq!(
+            stream.statistics(),
+            OriginalAssignmentStreamStatistics {
+                inputs: 1,
+                ..Default::default()
+            }
+        );
+    }
+    eprintln!(
+        "ordinary records: original4 maps+2 unknown names; additional5 malformed maps;2 compilers;empty and fail-fast counters"
+    );
+}
+
+fn raw_phase_tensor(
+    n: usize,
+    boundary: &[(usize, bool)],
+    upper: &[usize],
+    terms: &[(usize, u8)],
+    constant: u8,
+    power: i64,
+    a: &ScalarArithmetic,
+) -> rmagna::phase::PhasePathTensor {
+    rmagna::phase::PhasePathTensor::new(
+        AffineKet::new(
+            BitVector::from_indices(
+                boundary.len(),
+                boundary
+                    .iter()
+                    .enumerate()
+                    .filter_map(|(j, (_, b))| b.then_some(j)),
+            )
+            .unwrap(),
+            (0..n)
+                .map(|j| {
+                    BitVector::from_indices(
+                        boundary.len(),
+                        boundary
+                            .iter()
+                            .enumerate()
+                            .filter_map(|(k, (m, _))| (m >> j & 1 != 0).then_some(k)),
+                    )
+                    .unwrap()
+                })
+                .collect(),
+            form(&vec![0; n], upper),
+            a.omega(0, power).unwrap(),
+        )
+        .unwrap(),
+        rmagna::phase::ParityPhase::new(n, constant, terms.iter().map(|(m, c)| (bits(n, *m), *c)))
+            .unwrap(),
+    )
+    .unwrap()
+}
+fn decomposed_vector<C>(
+    d: &rmagna::phase::PathDecomposition<C>,
+    a: &ScalarArithmetic,
+) -> Vec<ExactScalar> {
+    let tensor = d.tensor.tensor();
+    let Some(resource) = &d.resource else {
+        return vec![ExactScalar::zero(); 1 << tensor.boundary().width()];
+    };
+    let states = resource
+        .expand(tensor.phase(), tensor.boundary(), a)
+        .unwrap();
+    (0..1 << tensor.boundary().width())
+        .map(|label| {
+            states.iter().fold(ExactScalar::zero(), |sum, ket| {
+                a.add(
+                    &sum,
+                    &ket.prepare()
+                        .unwrap()
+                        .amplitude(&bits(tensor.boundary().width(), label), a)
+                        .unwrap(),
+                )
+                .unwrap()
+            })
+        })
+        .collect()
+}
+#[test]
+fn original_public_certificate_facades_preserve_forged_zero_one_backends_and_caller_order() {
+    use rmagna::catalogue::builtin_phase_catalogue;
+    use rmagna::phase::*;
+    let a = ScalarArithmetic::default();
+    let ten = raw_phase_tensor(
+        10,
+        &(0..10).map(|q| (1 << q, false)).collect::<Vec<_>>(),
+        &[0; 10],
+        &(0..10).map(|q| (1 << q, 1)).collect::<Vec<_>>(),
+        0,
+        -10,
+        &a,
+    );
+    let mut options = NativePhaseOptions::default();
+    options.selection.max_quotient_rank = 0;
+    let normal = CertifiedPathTensor::<serde_json::Value>::new(ten.clone());
+    assert!(normal.decompose(1024, options, None, None, &a).is_err());
+    let zero = PhasePathTensor::new(
+        AffineKet::new(
+            ten.boundary().offset().clone(),
+            ten.boundary().columns().to_vec(),
+            ten.boundary().phase().clone(),
+            ExactScalar::zero(),
+        )
+        .unwrap(),
+        ten.phase().clone(),
+    )
+    .unwrap();
+    options.selection.max_core_table_bytes = 0;
+    options.selection.max_table_and_coefficient_bytes = 0;
+    let zero = CertifiedPathTensor::<()>::new(zero)
+        .decompose(0, options, None, None, &a)
+        .unwrap();
+    assert!(zero.resource.is_none());
+    assert!(zero.report.zero);
+    assert_eq!(zero.report.constructive_terms, 0);
+    assert_eq!(zero.report.logical_table_and_coefficient_bytes, 0);
+    let one = CertifiedPathTensor::new(raw_phase_tensor(
+        1,
+        &[(1, false)],
+        &[0],
+        &[(1, 1)],
+        0,
+        -1,
+        &a,
+    ))
+    .with_caller_certificate(serde_json::json!({"stage":"caller-certificate"}));
+    for database in [Some(builtin_phase_catalogue().unwrap()), None] {
+        let d = one
+            .decompose(1024, Default::default(), database, None, &a)
+            .unwrap();
+        assert_eq!(
+            decomposed_vector(&d, &a),
+            vec![a.omega(0, -1).unwrap(), a.omega(1, -1).unwrap()]
+        );
+        assert!(!d.report.zero);
+        assert_eq!(
+            d.report.constructive_terms,
+            d.resource.as_ref().unwrap().num_terms()
+        );
+        let _: std::time::Duration = d.report.elapsed;
+        assert!(matches!(
+            (database.is_some(), d.report.terms),
+            (true, PathTermReport::StabilizerTerms(_)) | (false, PathTermReport::AmplitudeTerms(_))
+        ));
+    }
+    let absorbed = one.absorb_boundaries(Default::default(), &a).unwrap();
+    assert_eq!(
+        absorbed.certificates()[0],
+        PathCertificate::Caller(serde_json::json!({"stage":"caller-certificate"}))
+    );
+    assert_eq!(one.certificates().len(), 1);
+    eprintln!(
+        "public facade: width10 refusal;zero bypass;2 exact backend vectors/receipts;caller certificate order"
+    );
+}
+#[test]
+fn original_absorption_runs_before_final_rank_term_and_table_limits_and_reports_full_rank() {
+    use rmagna::phase::*;
+    let a = ScalarArithmetic::default();
+    let t = CertifiedPathTensor::new(raw_phase_tensor(
+        3,
+        &[(1, false), (2, true)],
+        &[4, 4, 0],
+        &[(1, 1), (2, 1)],
+        5,
+        -3,
+        &a,
+    ))
+    .with_caller_certificate("caller");
+    let mut options = NativePhaseOptions::default();
+    options.selection.max_quotient_rank = 0;
+    let error = match t.decompose(1, options, None, None, &a) {
+        Err(e) => e,
+        Ok(_) => panic!("unabsorbed rank2 must fail"),
+    };
+    let PathTensorError::Algebra(PhaseError::Catalogue(error)) = error else {
+        panic!("wrong error: {error}")
+    };
+    assert_eq!(error.field, "phase_selection.max_quotient_rank");
+    assert_eq!(error.message, "needs at least 2; configured limit is 0");
+    let d = t
+        .decompose(1, options, None, Some(Default::default()), &a)
+        .unwrap();
+    assert_eq!(
+        (
+            d.report.quotient_rank,
+            d.report.constructive_terms,
+            d.tensor.tensor().phase().num_variables()
+        ),
+        (0, 1, 1)
+    );
+    // Literal path oracle: x2 sums to zero unless x0=x1; the nonzero
+    // labels are 2 and1, with respective phases omega5 and omega7.
+    assert_eq!(
+        decomposed_vector(&d, &a),
+        vec![
+            ExactScalar::zero(),
+            a.omega(7, -1).unwrap(),
+            a.omega(5, -1).unwrap(),
+            ExactScalar::zero()
+        ]
+    );
+    assert!(matches!(
+        d.tensor.certificates()[0],
+        PathCertificate::Caller("caller")
+    ));
+    assert!(d.tensor.certificates().iter().any(|c| matches!(c, PathCertificate::GlobalRadicalContraction(stage) if stage.signature_rank == 2 && stage.output_paths == 1)));
+    assert!(
+        t.decompose(0, Default::default(), None, Some(Default::default()), &a)
+            .is_err()
+    );
+    options.selection.max_table_and_coefficient_bytes = 0;
+    assert!(
+        t.decompose(1, options, None, Some(Default::default()), &a)
+            .is_err()
+    );
+    eprintln!(
+        "absorption: exact rank2->0 tensor;fullrank error;one term;literal complex vector;certificate;zero term/table refusals"
+    );
+}
+#[test]
+fn original_rank_zero_empty_database_unit_requires_more_than_four_table_bytes_in_both_orders() {
+    use rmagna::catalogue::{CatalogueLimits, PhaseCatalogue};
+    use rmagna::phase::*;
+    let a = ScalarArithmetic::default();
+    let db = PhaseCatalogue::from_json(
+        r#"{"schema_version":1,"entries":[]}"#,
+        &CatalogueLimits::default(),
+        &a,
+    )
+    .unwrap();
+    assert_eq!(db.usage().entries, 0);
+    let t = CertifiedPathTensor::<()>::new(raw_phase_tensor(0, &[], &[], &[], 3, 0, &a));
+    for absorption in [None, Some(RadicalAbsorptionOptions::default())] {
+        let d = t
+            .decompose(1, Default::default(), Some(&db), absorption, &a)
+            .unwrap();
+        assert_eq!(
+            (d.report.quotient_rank, d.report.constructive_terms),
+            (0, 1)
+        );
+        let vector = decomposed_vector(&d, &a);
+        assert_eq!(vector, vec![a.omega(3, 0).unwrap()]);
+        assert_eq!(
+            a.multiply(&vector[0].conjugate(), &vector[0]).unwrap(),
+            ExactScalar::one()
+        );
+        assert_eq!(d.report.logical_table_and_coefficient_bytes, 44);
+        assert_eq!(d.report.terms, PathTermReport::StabilizerTerms(1));
+        assert_eq!(
+            d.resource
+                .as_ref()
+                .unwrap()
+                .native_resource()
+                .unwrap()
+                .receipt()
+                .route,
+            rmagna::catalogue::PhaseSelectionRoute::PositiveTProduct
+        );
+        let mut options = NativePhaseOptions::default();
+        options.selection.max_table_and_coefficient_bytes = 4;
+        let error = match t.decompose(1, options, Some(&db), absorption, &a) {
+            Err(e) => e,
+            Ok(_) => panic!("four bytes admit only the core value"),
+        };
+        assert!(
+            error
+                .to_string()
+                .contains("max_table_and_coefficient_bytes")
+        );
+        assert!(error.to_string().contains("configured limit is 4"));
+        options.selection.max_table_and_coefficient_bytes = 44;
+        assert!(t.decompose(1, options, Some(&db), absorption, &a).is_ok());
+    }
+    eprintln!(
+        "empty database: rank0 identity phase/norm;both absorption orderings;4-byte refusal and44-byte portable boundary success"
+    );
+}
+
+#[test]
+fn portable_coefficient_budget_is_bound_to_effective_preparation_configuration() {
+    use rmagna::instrument::QueryPreparation;
+    let mut options = NativePhaseOptions::default();
+    let default = QueryPreparation::Native(options).configuration();
+    assert!(
+        default["selection"]
+            .get("max_table_and_coefficient_bytes")
+            .is_none()
+    );
+    options.selection.max_table_and_coefficient_bytes = 4;
+    let bounded = QueryPreparation::Native(options).configuration();
+    assert_eq!(bounded["selection"]["max_table_and_coefficient_bytes"], 4);
+    assert_ne!(default, bounded);
+    let a = ScalarArithmetic::default();
+    let tensor = raw_phase_tensor(
+        3,
+        &[(1, false), (2, false), (4, false)],
+        &[0; 3],
+        &[(1, 1), (2, 1), (4, 1)],
+        0,
+        -3,
+        &a,
+    );
+    options.selection.max_table_and_coefficient_bytes = 351;
+    assert!(
+        tensor
+            .prepare_native_resource(8, options, None, &a)
+            .is_err()
+    );
+    options.selection.max_table_and_coefficient_bytes = 352;
+    let resource = tensor
+        .prepare_native_resource(8, options, None, &a)
+        .unwrap()
+        .unwrap();
+    assert_eq!(resource.quotient_rank(), 3);
+    assert_eq!(
+        resource
+            .native_resource()
+            .unwrap()
+            .receipt()
+            .logical_table_and_coefficient_bytes,
+        352
+    );
 }

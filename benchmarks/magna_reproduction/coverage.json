@@ -1028,7 +1028,7 @@
           "package": "rmagna",
           "target": "remaining_kernel_contracts",
           "test": "original_raw_boundary_sampling_rejects_invalid_distribution_and_shape",
-          "source_sha256": "c52af7ee13ad081f96fe08b7a8043a2bf596d6a22f3c41c5f5c3b563827f2420"
+          "source_sha256": "a2cb48fc836e08ce35ae88b475def2e4d0397ee824400fe67a618ab341496229"
         }
       ]
     },
@@ -1164,8 +1164,16 @@
     },
     {
       "id": "test_file_native.NativeFileRuntimeTests.test_summary_rejects_nonfinite_and_inconsistent_metrics",
-      "status": "unmapped",
-      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+      "status": "verified",
+      "contract": "Public FloatingTaskDraw import validates the complete original four raw-floating invalid row sets, all nonfinite fields, error-presence and moment-arity consistency before an exact summary can be returned. The declared Rust boundary converts finite binary64 values exactly, with literal summary values, empty input and dimension/arithmetic caps. Unit import weights give ESS equal to row count; this is not a producer importance-weight claim.",
+      "rust_tests": [
+        {
+          "package": "rmagna",
+          "target": "remaining_kernel_contracts",
+          "test": "original_floating_summaries_reject_all_four_nonfinite_and_shape_rows",
+          "source_sha256": "a2cb48fc836e08ce35ae88b475def2e4d0397ee824400fe67a618ab341496229"
+        }
+      ]
     },
     {
       "id": "test_file_reuse.FileReuseTests.test_batch_failure_keeps_completed_prefix_and_query_budget_contract",
@@ -1691,8 +1699,16 @@
     },
     {
       "id": "test_kernel_contract.KernelContractTests.test_public_certificate_facades_keep_budgets_and_zero_semantics",
-      "status": "unmapped",
-      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+      "status": "verified",
+      "contract": "Complete width10 positive-input T tensor refuses rank0; explicit-zero coefficient is the typed equivalent of the forged zero flag and bypasses final term/rank/table selection. The independently reconstructed logical-width1 forged tensor has exact [1,omega]/sqrt2 amplitudes for explicit database and Fourier routes, typed backend-specific retained-term counts and elapsed Duration. Owned caller certificates retain ordering through the public CertifiedPathTensor absorption facade.",
+      "rust_tests": [
+        {
+          "package": "rmagna",
+          "target": "remaining_kernel_contracts",
+          "test": "original_public_certificate_facades_preserve_forged_zero_one_backends_and_caller_order",
+          "source_sha256": "a2cb48fc836e08ce35ae88b475def2e4d0397ee824400fe67a618ab341496229"
+        }
+      ]
     },
     {
       "id": "test_kernel_contract.KernelContractTests.test_random_full_records_states_faults_and_moments_against_independent_matrices",
@@ -1858,7 +1874,7 @@
           "package": "rmagna",
           "target": "remaining_kernel_contracts",
           "test": "original_boundary_sum_validates_every_term_width_and_duplicate_rhs",
-          "source_sha256": "c52af7ee13ad081f96fe08b7a8043a2bf596d6a22f3c41c5f5c3b563827f2420"
+          "source_sha256": "a2cb48fc836e08ce35ae88b475def2e4d0397ee824400fe67a618ab341496229"
         }
       ]
     },
@@ -1869,8 +1885,16 @@
     },
     {
       "id": "test_native_boundary_service.NativeBoundaryServiceTests.test_completed_marginal_rng_and_mass_match_reference_schedule",
-      "status": "unmapped",
-      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+      "status": "verified",
+      "contract": "Complete two source circuits and all eight original seeds, under both Rust compiler strategies: actual Y fault after t and report flip a, all four literal exact masses, selected word/mass, total condition mass, three marginal queries, entropy words and final SplitMix state match a same-Rust-RNG reference schedule. The commuting fixture has deterministic zero parity a XOR b and consumes no sector RNG word; the noncommuting fixture has no common sector. No generic automatic sector-discovery claim or Python RNG sequence identity.",
+      "rust_tests": [
+        {
+          "package": "rmagna",
+          "target": "remaining_kernel_contracts",
+          "test": "original_completed_marginal_two_schedules_keep_all_eight_seeds_and_rust_rng_state",
+          "source_sha256": "a2cb48fc836e08ce35ae88b475def2e4d0397ee824400fe67a618ab341496229"
+        }
+      ]
     },
     {
       "id": "test_native_causal.NativeCausalTest.test_online_basis_without_cpython",
@@ -1946,8 +1970,16 @@
     },
     {
       "id": "test_native_global_fastpath.NativeGlobalFastpathTests.test_ordinary_record_validation_and_empty_stream",
-      "status": "unmapped",
-      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+      "status": "verified",
+      "contract": "Strict public OriginalRecordAssignment dynamic import rejects all four original ordinary maps (missing, integer2, booleantrue, extra name), unknown report flip and unknown fault anchor before probability work, under both compilers. Supplemental duplicate, float, negative, null and string records reject. Lazy evaluation preserves literal complete-record masses and zero input/branch/collected-callback/value counters for the original empty stream; a malformed first input terminates without pulling a successor. Counters replace Python feedback-fallback timing, not prepared-plan packing/cache claims.",
+      "rust_tests": [
+        {
+          "package": "rmagna",
+          "target": "remaining_kernel_contracts",
+          "test": "original_ordinary_record_import_rejects_every_invalid_map_and_empty_stream_does_no_work",
+          "source_sha256": "a2cb48fc836e08ce35ae88b475def2e4d0397ee824400fe67a618ab341496229"
+        }
+      ]
     },
     {
       "id": "test_native_global_fastpath.NativeGlobalFastpathTests.test_original_wire_lifetime_is_still_checked_by_native_kernel",
@@ -1958,7 +1990,7 @@
           "package": "rmagna",
           "target": "remaining_kernel_contracts",
           "test": "original_wire_lifetime_is_checked_on_native_assignment_view",
-          "source_sha256": "c52af7ee13ad081f96fe08b7a8043a2bf596d6a22f3c41c5f5c3b563827f2420"
+          "source_sha256": "a2cb48fc836e08ce35ae88b475def2e4d0397ee824400fe67a618ab341496229"
         }
       ]
     },
@@ -1996,14 +2028,22 @@
           "package": "rmagna",
           "target": "remaining_kernel_contracts",
           "test": "original_immutable_native_plan_has_independent_concurrent_workspaces",
-          "source_sha256": "c52af7ee13ad081f96fe08b7a8043a2bf596d6a22f3c41c5f5c3b563827f2420"
+          "source_sha256": "a2cb48fc836e08ce35ae88b475def2e4d0397ee824400fe67a618ab341496229"
         }
       ]
     },
     {
       "id": "test_native_global_phase.NativeGlobalPhaseTests.test_absorption_precedes_final_resource_budget",
-      "status": "unmapped",
-      "reason": "Numerical three-to-one-path/rank-two-to-zero absorption and post-absorption rank/term/table budgets are covered by original_radical_absorption. Complete native exception/certificate contract remains unmapped: native reports initial needed two while the existing Rust streaming selector reports the first rejected direction, needed one; full native certificate dictionaries are not reproduced."
+      "status": "verified",
+      "contract": "The full source three-path tensor, upper(4,4,0), two odd phases, constant5, sqrt2 power-3 and ordered output/environment boundary reduces rank2 to rank0 and one path before final selection. The public facade reports complete unabsorbed rank2 versus cap0, admits one retained term, preserves the literal complex dense vector and appends actual radical-contraction provenance after caller certificates. Zero final terms and zero portable table/coefficient bytes refuse; independent Rust budget names/logical charges are explicit rather than C++ ABI byte identity.",
+      "rust_tests": [
+        {
+          "package": "rmagna",
+          "target": "remaining_kernel_contracts",
+          "test": "original_absorption_runs_before_final_rank_term_and_table_limits_and_reports_full_rank",
+          "source_sha256": "a2cb48fc836e08ce35ae88b475def2e4d0397ee824400fe67a618ab341496229"
+        }
+      ]
     },
     {
       "id": "test_native_global_phase.NativeGlobalPhaseTests.test_actual_absorption_and_decomposition_against_independent_dense_sums",
@@ -2014,7 +2054,7 @@
           "package": "rmagna",
           "target": "original_radical_absorption",
           "test": "original_actual_absorption_and_decomposition_against_independent_dense_sums",
-          "source_sha256": "469d4f673e5151805d11d3850007bec4032739b6fc92c81b1b038d5c7b6f55bf"
+          "source_sha256": "39201c81d38de55a463b08b280ff807822dd9db421fbb9b3513f6ac96ee1ffda"
         }
       ]
     },
@@ -2075,8 +2115,16 @@
     },
     {
       "id": "test_native_global_phase.NativeGlobalPhaseTests.test_rank_zero_empty_database_identity_obeys_byte_budget",
-      "status": "unmapped",
-      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+      "status": "verified",
+      "contract": "The validated empty database has zero entries. Original rankzero constant3 tensor decomposes to one exact omega3 unit term of norm1; both absorption orderings refuse a four-byte portable table/coefficient workspace budget and admit its declared exact44-byte boundary. This admission reserves the dense core plus Fourier coefficient limb/exponent slots before allocation, conservatively on all routes; it is not native C++ ABI storage or total allocator-memory equivalence.",
+      "rust_tests": [
+        {
+          "package": "rmagna",
+          "target": "remaining_kernel_contracts",
+          "test": "original_rank_zero_empty_database_unit_requires_more_than_four_table_bytes_in_both_orders",
+          "source_sha256": "a2cb48fc836e08ce35ae88b475def2e4d0397ee824400fe67a618ab341496229"
+        }
+      ]
     },
     {
       "id": "test_native_proposals.NativeProposalTests.test_estimator_matches_independent_decimal_operations",
@@ -2829,7 +2877,7 @@
           "package": "rmagna",
           "target": "remaining_kernel_contracts",
           "test": "original_warm_prepared_query_validates_rhs_and_all_boundary_masks",
-          "source_sha256": "c52af7ee13ad081f96fe08b7a8043a2bf596d6a22f3c41c5f5c3b563827f2420"
+          "source_sha256": "a2cb48fc836e08ce35ae88b475def2e4d0397ee824400fe67a618ab341496229"
         }
       ]
     },
@@ -3148,7 +3196,7 @@
           "package": "rmagna",
           "target": "remaining_kernel_contracts",
           "test": "original_batched_inverse_keeps_free_coordinates_and_rejects_dependent_rows",
-          "source_sha256": "c52af7ee13ad081f96fe08b7a8043a2bf596d6a22f3c41c5f5c3b563827f2420"
+          "source_sha256": "a2cb48fc836e08ce35ae88b475def2e4d0397ee824400fe67a618ab341496229"
         }
       ]
     },
@@ -3161,7 +3209,7 @@
           "package": "rmagna",
           "target": "remaining_kernel_contracts",
           "test": "original_common_support_overlap_retains_all_shifts_and_global_phases",
-          "source_sha256": "c52af7ee13ad081f96fe08b7a8043a2bf596d6a22f3c41c5f5c3b563827f2420"
+          "source_sha256": "a2cb48fc836e08ce35ae88b475def2e4d0397ee824400fe67a618ab341496229"
         }
       ]
     },
@@ -3179,7 +3227,7 @@
           "package": "rmagna",
           "target": "remaining_kernel_contracts",
           "test": "original_control_callbacks_execute_fresh_with_unchanged_version_and_replacement",
-          "source_sha256": "c52af7ee13ad081f96fe08b7a8043a2bf596d6a22f3c41c5f5c3b563827f2420"
+          "source_sha256": "a2cb48fc836e08ce35ae88b475def2e4d0397ee824400fe67a618ab341496229"
         }
       ]
     },
@@ -3192,7 +3240,7 @@
           "package": "rmagna",
           "target": "remaining_kernel_contracts",
           "test": "original_sparse_contraction_matches_every_dependent_boundary_path_sum",
-          "source_sha256": "c52af7ee13ad081f96fe08b7a8043a2bf596d6a22f3c41c5f5c3b563827f2420"
+          "source_sha256": "a2cb48fc836e08ce35ae88b475def2e4d0397ee824400fe67a618ab341496229"
         }
       ]
     },
@@ -3210,7 +3258,7 @@
           "package": "rmagna",
           "target": "remaining_kernel_contracts",
           "test": "original_packed_pullback_matches_all_32_assignments_of_all_108_maps",
-          "source_sha256": "c52af7ee13ad081f96fe08b7a8043a2bf596d6a22f3c41c5f5c3b563827f2420"
+          "source_sha256": "a2cb48fc836e08ce35ae88b475def2e4d0397ee824400fe67a618ab341496229"
         }
       ]
     },

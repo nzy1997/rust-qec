@@ -31,7 +31,7 @@ impl QueryPreparation {
             QueryPreparation::Native(options) => {
                 let s = options.selection;
                 let c = s.construction;
-                json!({
+                let mut value = json!({
                     "mode": mode.name(),
                     "selection": {
                         "max_quotient_rank": s.max_quotient_rank,
@@ -61,7 +61,14 @@ impl QueryPreparation {
                         "max_geometry_words": options.transport.limits.max_geometry_words,
                         "max_construction_work": options.transport.limits.max_construction_work.to_string(),
                     },
-                })
+                });
+                // Preserve existing default fingerprints while binding every
+                // opt-in portable coefficient-table admission cap.
+                if s.max_table_and_coefficient_bytes != usize::MAX {
+                    value["selection"]["max_table_and_coefficient_bytes"] =
+                        json!(s.max_table_and_coefficient_bytes);
+                }
+                value
             }
             QueryPreparation::FixedCatalogue(options) => json!({
                 "mode": "catalogue",

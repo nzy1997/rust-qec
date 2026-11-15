@@ -4,15 +4,15 @@
   "upstream_commit": "56847478c840395735146ef1e1ccdc3d8aedc10f",
   "parity_claim": "static_requirements_only",
   "ledger_snapshot": {
-    "unmapped": 93,
-    "verified": 257,
+    "unmapped": 87,
+    "verified": 263,
     "partial": 2
   },
   "category_counts": {
     "G": 6,
     "P": 32,
+    "V": 0,
     "E": 49,
-    "V": 6,
     "U": 2
   },
   "category_meanings": {
@@ -1632,66 +1632,6 @@
       ]
     },
     {
-      "id": "test_file_native.NativeFileRuntimeTests.test_summary_rejects_nonfinite_and_inconsistent_metrics",
-      "ledger_status": "unmapped",
-      "category": "V",
-      "issue": "R03",
-      "source": {
-        "path": "tests/core/test_file_native.py",
-        "source_sha256": "b078965d22ae894eb7b1bb9d16000d49ae43f7ccd5727074d05802d7b572e4a1",
-        "line": 149,
-        "end_line": 153
-      },
-      "method": {
-        "method_sha256": "0425be9ed103bfc9e36136f0599423e5854f194b3628049a3ccbc8e154358374",
-        "required_checks": [
-          "self.assertRaises(ValueError)"
-        ],
-        "loops": [
-          {
-            "line": 150,
-            "target": "rows",
-            "iterable": "([(float('nan'), None, ())], [(1.0, None, ()), (1.0, 0.0, ())], [(1.0, None, ()), (1.0, None, (0.0,))], [(1.0, None, (float('inf'),))])"
-          }
-        ],
-        "module_helpers": [
-          "ket"
-        ],
-        "module_imports": [
-          "from decimal import Decimal, localcontext",
-          "from magna import _native",
-          "from tests.support import native_testing",
-          "import math",
-          "import statistics",
-          "import unittest"
-        ]
-      },
-      "remaining_requirement": "The boundary is raw floating draw summaries containing NaN/infinity/inconsistent metric shapes. ExactField statistics cannot contain NaN; reject such values at any public import/export boundary and document the equivalent.",
-      "assessment": "Exact scalar/GF(2)/quadratic/stabilizer/resource/boundary operations, typed validation or immutable concurrency have corresponding Rust implementations. Add full source-bound finite witnesses and negative inputs, including all original loops and helper requirements. This is a validation-first classification, not a new verified ledger entry or a guarantee no defect will be found.",
-      "rust_owners": [
-        {
-          "path": "rmagna/tests/stabilizer.rs",
-          "anchor": "fn dependent_and_hidden_path"
-        },
-        {
-          "path": "rmagna/tests/quadratic.rs",
-          "anchor": "fn affine_restriction"
-        },
-        {
-          "path": "rmagna/tests/gf2.rs",
-          "anchor": "fn every_small_binary_system"
-        },
-        {
-          "path": "rmagna/tests/original_boundary_events.rs",
-          "anchor": "fn boundary_event_shapes"
-        },
-        {
-          "path": "rmagna/tests/original_scalar_thread_safety.rs",
-          "anchor": "fn "
-        }
-      ]
-    },
-    {
       "id": "test_file_reuse.FileReuseTests.test_equivalent_resolved_histories_share_only_preparation",
       "ledger_status": "unmapped",
       "category": "P",
@@ -2707,77 +2647,6 @@
       ]
     },
     {
-      "id": "test_kernel_contract.KernelContractTests.test_public_certificate_facades_keep_budgets_and_zero_semantics",
-      "ledger_status": "unmapped",
-      "category": "V",
-      "issue": "R03",
-      "source": {
-        "path": "tests/core/test_kernel_contract.py",
-        "source_sha256": "8118024904c89019028d756dc412974f67347ba7c5809efdfd05b5ac26ec4307",
-        "line": 27,
-        "end_line": 47
-      },
-      "method": {
-        "method_sha256": "9ce327eff145b33cc949f7b80f1082977a47580878040f794833e8e6038caae6",
-        "required_checks": [
-          "self.assertEqual(zero.terms, ())",
-          "self.assertTrue(resource['zero'])",
-          "self.assertEqual(absorb_boundaries(replace(one, certificates=(marker,))).certificates[0], marker)",
-          "self.assertRaises(ResourceLimit)",
-          "self.assertIn('seconds', resource)",
-          "self.assertIn('stabilizer_terms' if resource['database_hit'] else 'amplitude_terms', resource)"
-        ],
-        "loops": [
-          {
-            "line": 40,
-            "target": "backend",
-            "iterable": "('database', 'fourier')"
-          }
-        ],
-        "module_helpers": [],
-        "module_imports": [
-          "from dataclasses import replace",
-          "from magna import _native",
-          "from magna.evaluate import decompose_resource",
-          "from magna.file_api import ResourceLimit",
-          "from magna.ir import instantiate_branch",
-          "from magna.normal import normalize_fixed_input, absorb_boundaries",
-          "from magna.operations import Simulator, Options, InstrumentIR, SampleAssignment, StabilizerKet, ControlNode, PhaseFeedback",
-          "from magna.scalar import ExactScalar, ONE",
-          "from test_unified_simulator import physical_vector, expansion_vector",
-          "from unittest.mock import patch",
-          "import itertools",
-          "import numpy as np",
-          "import random",
-          "import unittest"
-        ]
-      },
-      "remaining_requirement": "Retain the forged zero/one reduced-tensor cases, backend-specific resource report and caller certificate ordering; current algebra is only a candidate anchor.",
-      "assessment": "Exact scalar/GF(2)/quadratic/stabilizer/resource/boundary operations, typed validation or immutable concurrency have corresponding Rust implementations. Add full source-bound finite witnesses and negative inputs, including all original loops and helper requirements. This is a validation-first classification, not a new verified ledger entry or a guarantee no defect will be found.",
-      "rust_owners": [
-        {
-          "path": "rmagna/tests/stabilizer.rs",
-          "anchor": "fn dependent_and_hidden_path"
-        },
-        {
-          "path": "rmagna/tests/quadratic.rs",
-          "anchor": "fn affine_restriction"
-        },
-        {
-          "path": "rmagna/tests/gf2.rs",
-          "anchor": "fn every_small_binary_system"
-        },
-        {
-          "path": "rmagna/tests/original_boundary_events.rs",
-          "anchor": "fn boundary_event_shapes"
-        },
-        {
-          "path": "rmagna/tests/original_scalar_thread_safety.rs",
-          "anchor": "fn "
-        }
-      ]
-    },
-    {
       "id": "test_kernel_contract.KernelContractTests.test_unexpected_kernel_errors_are_never_retried_on_another_backend",
       "ledger_status": "unmapped",
       "category": "E",
@@ -3122,74 +2991,6 @@
       ]
     },
     {
-      "id": "test_native_boundary_service.NativeBoundaryServiceTests.test_completed_marginal_rng_and_mass_match_reference_schedule",
-      "ledger_status": "unmapped",
-      "category": "V",
-      "issue": "R03",
-      "source": {
-        "path": "tests/core/test_native_boundary_service.py",
-        "source_sha256": "24959774374e0ea4dab4f102cdfa71f61db9757fce03b800b479866d8e6c1359",
-        "line": 66,
-        "end_line": 78
-      },
-      "method": {
-        "method_sha256": "d75d46fd62c12870aed9b8ee98ff59aec674156bdb4862519e77a451e9877bdf",
-        "required_checks": [
-          "self.assertEqual((word, mass, info['method']), expected)",
-          "self.assertEqual(actual_rng.getstate(), reference_rng.getstate())"
-        ],
-        "loops": [
-          {
-            "line": 67,
-            "target": "extra",
-            "iterable": "((), (dict(id='h', kind='H', qubits=[0]), dict(id='u', kind='T', qubits=[0])))"
-          },
-          {
-            "line": 72,
-            "target": "seed",
-            "iterable": "range(8)"
-          }
-        ],
-        "module_helpers": [
-          "reference_sample"
-        ],
-        "module_imports": [
-          "from magna import _native",
-          "from magna.native import term_data",
-          "from magna.operations import InstrumentIR, NativeBoundaryTrace, StabilizerKet, BoundarySampler, BoundaryTask, ControlNode, PhaseFeedback",
-          "from magna.scalar import ONE, ExactScalar",
-          "from random import Random",
-          "from tests.support import native_testing",
-          "from tests.support.boundary_sampler import ReferenceBoundarySampler",
-          "import unittest"
-        ]
-      },
-      "remaining_requirement": "Retain both commuting and noncommuting completed marginal schedules, faults/flips, exact masses and same-Rust-RNG reference schedule.",
-      "assessment": "Exact scalar/GF(2)/quadratic/stabilizer/resource/boundary operations, typed validation or immutable concurrency have corresponding Rust implementations. Add full source-bound finite witnesses and negative inputs, including all original loops and helper requirements. This is a validation-first classification, not a new verified ledger entry or a guarantee no defect will be found.",
-      "rust_owners": [
-        {
-          "path": "rmagna/tests/stabilizer.rs",
-          "anchor": "fn dependent_and_hidden_path"
-        },
-        {
-          "path": "rmagna/tests/quadratic.rs",
-          "anchor": "fn affine_restriction"
-        },
-        {
-          "path": "rmagna/tests/gf2.rs",
-          "anchor": "fn every_small_binary_system"
-        },
-        {
-          "path": "rmagna/tests/original_boundary_events.rs",
-          "anchor": "fn boundary_event_shapes"
-        },
-        {
-          "path": "rmagna/tests/original_scalar_thread_safety.rs",
-          "anchor": "fn "
-        }
-      ]
-    },
-    {
       "id": "test_native_causal.NativeCausalTest.test_online_basis_without_cpython",
       "ledger_status": "unmapped",
       "category": "U",
@@ -3394,73 +3195,6 @@
         {
           "path": "rmagna/tests/original_reentrant_callbacks.rs",
           "anchor": "fn original_reentrant"
-        }
-      ]
-    },
-    {
-      "id": "test_native_global_fastpath.NativeGlobalFastpathTests.test_ordinary_record_validation_and_empty_stream",
-      "ledger_status": "unmapped",
-      "category": "V",
-      "issue": "R03",
-      "source": {
-        "path": "tests/core/test_native_global_fastpath.py",
-        "source_sha256": "ee4b59147bd36e0bdfd5d871c740c699094bf450324be46313c410f983285ac5",
-        "line": 80,
-        "end_line": 93
-      },
-      "method": {
-        "method_sha256": "505f5feff0d2c43dc80539ef8281247279ec778bfa497b98da204fa0c2c20766",
-        "required_checks": [
-          "self.assertEqual(values, [])",
-          "self.assertEqual(count, 0)",
-          "self.assertEqual(timings['feedback_fallback_seconds'], 0)",
-          "self.assertRaises(ValueError)",
-          "self.assertRaises(ValueError)",
-          "self.assertRaises(ValueError)"
-        ],
-        "loops": [
-          {
-            "line": 82,
-            "target": "records",
-            "iterable": "({}, {'m': 2}, {'m': True}, {'m': 0, 'extra': 0})"
-          }
-        ],
-        "module_helpers": [
-          "NativeGlobalFastpathTests.instrument",
-          "NativeGlobalFastpathTests.simulator"
-        ],
-        "module_imports": [
-          "from fractions import Fraction",
-          "from magna import _native",
-          "from magna.batch import CompactAssignment",
-          "from magna.operations import InstrumentIR, StabilizerKet, Simulator, Options, SampleAssignment, NoiseModel, NoiseSite",
-          "from unittest.mock import patch",
-          "import unittest",
-          "import weakref"
-        ]
-      },
-      "remaining_requirement": "Empty stream and unknown/missing/nonbinary records/fault/report names must all retain validation ordering.",
-      "assessment": "Exact scalar/GF(2)/quadratic/stabilizer/resource/boundary operations, typed validation or immutable concurrency have corresponding Rust implementations. Add full source-bound finite witnesses and negative inputs, including all original loops and helper requirements. This is a validation-first classification, not a new verified ledger entry or a guarantee no defect will be found.",
-      "rust_owners": [
-        {
-          "path": "rmagna/tests/stabilizer.rs",
-          "anchor": "fn dependent_and_hidden_path"
-        },
-        {
-          "path": "rmagna/tests/quadratic.rs",
-          "anchor": "fn affine_restriction"
-        },
-        {
-          "path": "rmagna/tests/gf2.rs",
-          "anchor": "fn every_small_binary_system"
-        },
-        {
-          "path": "rmagna/tests/original_boundary_events.rs",
-          "anchor": "fn boundary_event_shapes"
-        },
-        {
-          "path": "rmagna/tests/original_scalar_thread_safety.rs",
-          "anchor": "fn "
         }
       ]
     },
@@ -3740,76 +3474,6 @@
       ]
     },
     {
-      "id": "test_native_global_phase.NativeGlobalPhaseTests.test_absorption_precedes_final_resource_budget",
-      "ledger_status": "unmapped",
-      "category": "V",
-      "issue": "R03",
-      "source": {
-        "path": "tests/core/test_native_global_phase.py",
-        "source_sha256": "b9d596e34dd777a83ac9aa8feb81e4a246d56bd4fae9db9be663f091927d6b50",
-        "line": 84,
-        "end_line": 101
-      },
-      "method": {
-        "method_sha256": "1f5b4b400841ab93d1f3d2316206de5f4ac572e5618956c10a74210290322714",
-        "required_checks": [
-          "self.assertEqual((stop.exception.option, stop.exception.limit, stop.exception.needed), ('max_quotient_rank', 0, 2))",
-          "self.assertEqual(resource['quotient_rank'], 0)",
-          "self.assertEqual(resource['constructive_terms'], 1)",
-          "self.assertEqual(result['n'], 1)",
-          "self.assertEqual(dense_states(states), dense_tensor(t))",
-          "self.assertIn('global_radical_contraction', [c['stage'] for c in result['certificates']])",
-          "self.assertRaises(ResourceLimit)",
-          "self.assertRaisesRegex(ResourceLimit, 'max_terms = 0')",
-          "self.assertRaisesRegex(ResourceLimit, 'max_table_bytes = 0')"
-        ],
-        "loops": [],
-        "module_helpers": [
-          "dense_states",
-          "dense_tensor",
-          "NativeGlobalPhaseTests.database"
-        ],
-        "module_imports": [
-          "from copy import deepcopy",
-          "from dataclasses import asdict",
-          "from magna import _native",
-          "from magna.file_api import ResourceLimit",
-          "from magna.operations import ExactScalar, Simulator, Options, InstrumentIR, StabilizerKet, SampleAssignment",
-          "from magna.phase_tensor import QuadraticPhaseTensor",
-          "from pathlib import Path",
-          "from tests.support import native_testing",
-          "from tests.support.operation_hooks import scalar",
-          "import json",
-          "import random",
-          "import unittest"
-        ]
-      },
-      "remaining_requirement": "Retain the exact absorbed rank-two to rank-zero tensor, ordering before final rank budget, one-term success and table-byte/zero-term refusals.",
-      "assessment": "Exact scalar/GF(2)/quadratic/stabilizer/resource/boundary operations, typed validation or immutable concurrency have corresponding Rust implementations. Add full source-bound finite witnesses and negative inputs, including all original loops and helper requirements. This is a validation-first classification, not a new verified ledger entry or a guarantee no defect will be found.",
-      "rust_owners": [
-        {
-          "path": "rmagna/tests/stabilizer.rs",
-          "anchor": "fn dependent_and_hidden_path"
-        },
-        {
-          "path": "rmagna/tests/quadratic.rs",
-          "anchor": "fn affine_restriction"
-        },
-        {
-          "path": "rmagna/tests/gf2.rs",
-          "anchor": "fn every_small_binary_system"
-        },
-        {
-          "path": "rmagna/tests/original_boundary_events.rs",
-          "anchor": "fn boundary_event_shapes"
-        },
-        {
-          "path": "rmagna/tests/original_scalar_thread_safety.rs",
-          "anchor": "fn "
-        }
-      ]
-    },
-    {
       "id": "test_native_global_phase.NativeGlobalPhaseTests.test_environment_surrogate_preserves_python_conversion_exception",
       "ledger_status": "unmapped",
       "category": "E",
@@ -3929,79 +3593,6 @@
         {
           "path": "rmagna/tests/original_reentrant_callbacks.rs",
           "anchor": "fn original_reentrant"
-        }
-      ]
-    },
-    {
-      "id": "test_native_global_phase.NativeGlobalPhaseTests.test_rank_zero_empty_database_identity_obeys_byte_budget",
-      "ledger_status": "unmapped",
-      "category": "V",
-      "issue": "R03",
-      "source": {
-        "path": "tests/core/test_native_global_phase.py",
-        "source_sha256": "b9d596e34dd777a83ac9aa8feb81e4a246d56bd4fae9db9be663f091927d6b50",
-        "line": 103,
-        "end_line": 116
-      },
-      "method": {
-        "method_sha256": "6b70e1008a89026dc97dc9b29ac3920bf0b788234f11343e685c651cee598a96",
-        "required_checks": [
-          "self.assertEqual(native_testing.load().phase_database_validate(database), 0)",
-          "self.assertEqual(resource['quotient_rank'], 0)",
-          "self.assertEqual(resource['constructive_terms'], 1)",
-          "self.assertEqual(dense_states(states), dense_tensor(t))",
-          "self.assertEqual(ExactScalar(tuple(value[0]), value[1]), ExactScalar((1, 0, 0, 0)))",
-          "self.assertRaisesRegex(ResourceLimit, 'max_table_bytes = 4')"
-        ],
-        "loops": [
-          {
-            "line": 113,
-            "target": "absorb_first",
-            "iterable": "(False, True)"
-          }
-        ],
-        "module_helpers": [
-          "dense_states",
-          "dense_tensor",
-          "NativeGlobalPhaseTests.database"
-        ],
-        "module_imports": [
-          "from copy import deepcopy",
-          "from dataclasses import asdict",
-          "from magna import _native",
-          "from magna.file_api import ResourceLimit",
-          "from magna.operations import ExactScalar, Simulator, Options, InstrumentIR, StabilizerKet, SampleAssignment",
-          "from magna.phase_tensor import QuadraticPhaseTensor",
-          "from pathlib import Path",
-          "from tests.support import native_testing",
-          "from tests.support.operation_hooks import scalar",
-          "import json",
-          "import random",
-          "import unittest"
-        ]
-      },
-      "remaining_requirement": "An empty rank-zero database must succeed at ordinary budget but reject a 4-byte table budget with both absorption orderings.",
-      "assessment": "Exact scalar/GF(2)/quadratic/stabilizer/resource/boundary operations, typed validation or immutable concurrency have corresponding Rust implementations. Add full source-bound finite witnesses and negative inputs, including all original loops and helper requirements. This is a validation-first classification, not a new verified ledger entry or a guarantee no defect will be found.",
-      "rust_owners": [
-        {
-          "path": "rmagna/tests/stabilizer.rs",
-          "anchor": "fn dependent_and_hidden_path"
-        },
-        {
-          "path": "rmagna/tests/quadratic.rs",
-          "anchor": "fn affine_restriction"
-        },
-        {
-          "path": "rmagna/tests/gf2.rs",
-          "anchor": "fn every_small_binary_system"
-        },
-        {
-          "path": "rmagna/tests/original_boundary_events.rs",
-          "anchor": "fn boundary_event_shapes"
-        },
-        {
-          "path": "rmagna/tests/original_scalar_thread_safety.rs",
-          "anchor": "fn "
         }
       ]
     },

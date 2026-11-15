@@ -11,6 +11,8 @@ tests/core/test_native_boundary_service.py
 tests/core/test_native_global_ownership.py
 tests/core/test_native_global_fastpath.py
 tests/core/test_query_reuse.py
+tests/core/test_kernel_contract.py
+tests/core/test_native_global_phase.py
 
 Original repository: https://github.com/itpyi/magna
 Original source is distributed under Mozilla Public License 2.0.

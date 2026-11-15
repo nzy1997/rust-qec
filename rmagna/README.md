@@ -6768,3 +6768,24 @@ query-resource counters. Explicit expression-map construction has no circuit
 context and starts with an empty dependency list; replacing that map preserves
 the dependency snapshot. The source-bound witness checks literal dependency
 order and distinguishing callback tuples, rather than deduplicating in test code.
+
+`TaskRunStatistics::from_floating_draws` imports external already weighted rows
+through an explicit finite-f64 boundary. Every finite value is converted to its
+exact binary rational; this preserves that f64 value without recovering earlier
+rounding loss. Error presence and moment count must remain constant. NaN,
+infinities, shape changes and arithmetic/dimension limits return errors without
+a partial summary. Empty input returns no summary. The import uses unit diagnostic
+weight, so its ESS is the row count and does not estimate a producer's importance
+weights. The original four invalid-summary cases and literal valid mean/variance
+cases are covered in `remaining_kernel_contracts`.
+
+
+The original completed-marginal schedule witness keeps both original circuits
+and all eight seeds, under both Rust compilers. Exact closed-form two-qubit
+masses and a table-based reference schedule check each sampled word, joint mass,
+query count, entropy consumption and final SplitMix64 state. In the commuting
+fixture the original preliminary parity is deterministically zero and spends
+no entropy; the second fixture has no common commuting sector. Rust's typed
+`CompletedProbability` sampler replaces the original method-name diagnostic.
+This witness does not establish automatic commuting-sector discovery for other
+inputs or Python bit-stream identity.

@@ -205,15 +205,22 @@ impl Accumulator {
         Ok(())
     }
     fn summarize(&self) -> Result<Option<TaskRunStatistics>, TaskError> {
-        let Some(summary) = self
-            .statistics
+        TaskRunStatistics::from_statistics(&self.statistics, self.has_error)
+    }
+}
+impl TaskRunStatistics {
+    pub(crate) fn from_statistics(
+        statistics: &ExactStatistics,
+        has_error: bool,
+    ) -> Result<Option<Self>, TaskError> {
+        let Some(summary) = statistics
             .summarize()
             .map_err(|e| error("run.statistics", e))?
         else {
             return Ok(None);
         };
-        let ratio = if self.has_error {
-            self.statistics
+        let ratio = if has_error {
+            statistics
                 .paired_ratio(1, 0)
                 .map_err(|e| error("run.conditional_error", e))?
         } else {
@@ -223,12 +230,12 @@ impl Accumulator {
         Ok(Some(TaskRunStatistics {
             completed: summary.count,
             accepted: summary.means[0].clone(),
-            error: self.has_error.then(|| summary.means[1].clone()),
+            error: has_error.then(|| summary.means[1].clone()),
             conditional_error: ratio.as_ref().map(|r| r.ratio.clone()),
             moments: summary.means[2..].to_vec(),
             variances: TaskVariances {
                 accepted: variance(0),
-                error: if self.has_error { variance(1) } else { None },
+                error: if has_error { variance(1) } else { None },
                 conditional_error: ratio.and_then(|r| r.variance),
                 moments: (2..summary.means.len()).map(variance).collect(),
             },

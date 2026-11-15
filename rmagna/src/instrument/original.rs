@@ -87,6 +87,12 @@ pub use record_sampling::{
     OriginalRecordSamplingLimits, OriginalRecordSamplingStatistics, PreparedOriginalRecordSampling,
 };
 
+#[path = "original_assignment_stream.rs"]
+mod assignment_stream;
+pub use assignment_stream::{
+    OriginalAssignmentStream, OriginalAssignmentStreamStatistics, OriginalRecordAssignment,
+};
+
 pub type OriginalWire = i64;
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum OriginalPauli {
