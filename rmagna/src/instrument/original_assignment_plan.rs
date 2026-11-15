@@ -229,6 +229,9 @@ impl OriginalAssignmentPlan {
     pub fn records(&self) -> &[String] {
         &self.0.instrument.records
     }
+    pub(super) fn instrument(&self) -> &OriginalInstrument {
+        &self.0.instrument
+    }
     /// Snapshot group metadata without invoking a controller or a quantum
     /// kernel. Physical wire lifetimes are still checked at branch compilation.
     pub fn shared_faults(
@@ -275,7 +278,11 @@ impl OriginalAssignmentPlan {
             shared,
         }))
     }
-    fn admit_group(&self, faults: &[OriginalFault], flips: &[String]) -> Result<(), OriginalError> {
+    pub(super) fn admit_group(
+        &self,
+        faults: &[OriginalFault],
+        flips: &[String],
+    ) -> Result<(), OriginalError> {
         let instrument = &self.0.instrument;
         admit(
             "max_faults",

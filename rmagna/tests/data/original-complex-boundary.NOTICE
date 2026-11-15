@@ -1,0 +1,23 @@
+SPDX-License-Identifier: MPL-2.0
+
+The fixture and corresponding original_complex_boundary.rs scenarios are adapted
+from itpyi/magna at56847478c840395735146ef1e1ccdc3d8aedc10f. Sources:
+- tests/core/test_boundary_sampling.py
+- tests/core/test_native_boundary_service.py
+- tests/support/boundary_sampler.py
+Original repository: https://github.com/itpyi/magna
+Full license: ../fixtures/original_many_record_input.LICENSE.
+Producer: benchmarks/magna_reproduction/original_complex_boundary.py.
+
+The producer runs all five complete unchanged original methods, including
+constructor/runtime failures, the independent reference sampler, RNG equality
+and full literal branch-sum assertions. It captures50 original sampler draws,
+six full source-generated literal tables, and a supplemental literal table of
+the fifth method's exact source fixture. Frontend/helper/source/producer hashes
+are retained; the entire pinned source is verified before/after capture.
+The supplemental table uses the unchanged original exhaustive helper. It does
+not replace execution of the complete fifth method. No Native core rebuild or
+environment copy is performed.
+
+Rust compares prescribed branch sums and explicit caller-owned word-stream
+replay. Python Random seed/implementation identity is not a promised Rust API.
