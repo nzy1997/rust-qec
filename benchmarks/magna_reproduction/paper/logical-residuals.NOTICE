@@ -1,0 +1,17 @@
+The finite logical-residual classifier is adapted from the matching recovery
+and patch geometry in itpyi/magna at commit56847478c840395735146ef1e1ccdc3d8aedc10f.
+Source hashes, dependency versions and all262144 pattern counts are recorded in
+the JSON. Original repository: https://github.com/itpyi/magna .
+The upstream code is MPL-2.0; a full copy is retained at
+../../../rmagna/tests/fixtures/original_many_record_input.LICENSE.
+Patch geometry follows the upstream MIT-licensed Chen implementation; its
+attribution remains in examples/logical-distillation/decoder/patch.py and
+CHEN_LICENSE in that pinned source. This fixture contains numerical geometry
+and recovery-classification results, not a copy of that implementation.
+
+Historical settings and exact numerical oracles are extracted from the paper's
+data deposit at https://doi.org/10.5281/zenodo.23386778 . The six original JSON
+paths and full hashes, plus archive identity, are recorded. Those values are
+reference numerical data, not newly executed Rust benchmark results. Only
+selected parameters/counts/exact values are retained, not original prose.
+Regenerate with original_logical_residuals.py in benchmarks/magna_reproduction.

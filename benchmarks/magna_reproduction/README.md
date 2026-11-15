@@ -3596,3 +3596,72 @@ C++ test with observation logging; all assertions remain enabled. Both check the
 full pinned source before/after execution, refuse unsafe/existing destinations
 before capture, and emit strict JSON. Native extensions and environments are
 neither rebuilt nor copied. These contracts establish no paper throughput claim.
+
+
+### Paper-specific proposal layer (B02)
+
+`paper_proposals.py` reconstructs the v1 experiment-side probability laws. The
+historical sampling drivers are identified by hashes in the deposit; their
+source and exact random streams are not available. The reconstruction therefore
+specifies a complete normalized distribution, rather than claiming identical
+historical draws. Its parameters are checked against the pinned deposited data.
+
+For cultivation, sample independent occupied locations at `q = p + 3/N`.
+Draw ordinary channels for all but the last occupied location (last two for
+RP2 d5). For that tail, mix its ordinary channel distribution with probability
+`1/20` and its detector-passing conditional distribution with probability
+`19/20`. Both branch masses contribute to the final proposal density. The
+conditional normalizer includes all passing channel tuples with their original
+weights. If none passes, use the ordinary tail law. With no occupied locations,
+the empty pattern is unchanged. The ordinary mixture branch preserves support
+when a proxy constraint is imperfect. Proxy signatures are input to this layer;
+constructing and validating signatures for each complete physical task belongs
+to the cultivation campaign, not these small distribution tests.
+
+For logical distillation, enumerate all `4^9` physical Pauli patterns through the
+pinned d3 matching recovery rule, with only syndromes given to that rule. The
+resulting IXZY weight counts match the historical deposit exactly. Assign total
+nonidentity residual probability `1/5`, split the three nonidentity classes in
+their physical proportions at `p0=1/100`. Within each class, draw from the exact
+conditional physical law at that rate. Weight selection and uniform selection
+within each weight bucket reproduce every conditional pattern probability.
+One set of fifteen physical patches can then be reweighted to `1/1000`, `3/1000`
+and `1/100` by the product of physical-over-proposal factors. Residual classes
+are offline proposal data; they are never runtime decoder inputs.
+
+Build the small probe in the existing shared Cargo target, then run the required
+entry point. Set `MAGNA_PAPER_PROPOSAL_PROBE` to that existing executable (or pass
+`--rust-probe`); the Python entry point never starts a nested Cargo build.
+
+```sh
+cargo build --locked -p rmagna --example paper_proposal_probe
+export MAGNA_PAPER_PROPOSAL_PROBE="${CARGO_TARGET_DIR:-target}/debug/examples/paper_proposal_probe"
+python3 benchmarks/magna_reproduction/paper_benchmark.py proposal-check --manifest benchmarks/magna_reproduction/paper/proposals.json
+cargo test --locked -p rmagna --test paper_proposal_integration
+```
+
+Successful validation requires both the finite distribution checks and the actual
+Rust probe. Six finite cultivation cases cover 304 patterns, nonuniform channel
+weights, impossible closure, one/two closing sites and all three reweighting
+rates. The logical check classifies all 262144 physical patterns, verifies exact
+support and normalization, and agrees with all three deposited exact logical
+oracles and their leading coefficients. The Rust probe applies 128 patterns
+under three rates and two causal strategies (768 evaluations), checks exact
+weighted acceptance/error and physical noise masses, and observes all 768
+decoder calls; 384 have distinct true/reported outcomes. The same probe runs
+as an owning integration test in CI. Its source/fixture identities are checked
+when invoked from Python, preventing reuse of an obsolete probe result.
+
+Regenerate the small data to fresh paths without copying the environment:
+
+```sh
+python3 benchmarks/magna_reproduction/original_logical_residuals.py --upstream "$MAGNA_REFERENCE" --paper-archive "$MAGNA_PAPER_ARCHIVE" --out "$NEW_RESIDUAL_JSON"
+python3 benchmarks/magna_reproduction/paper_proposal_runtime_vectors.py --out "$NEW_RUNTIME_JSON"
+```
+
+The classifier capture needs the existing Stim/NumPy/PyMatching environment.
+It verifies the entire pinned source and archive identity, reads only the six
+needed deposited JSON files, and removes its import cache afterward. Ordinary
+PR checks use committed small data and do not import these optional packages.
+This deliverable adds no original-method promotions and executes no paper-scale
+precision or timing campaign; those remain B03/B04/B05/B06.

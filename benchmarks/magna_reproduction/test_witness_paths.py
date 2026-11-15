@@ -19,10 +19,11 @@ import original_noise_reference as noise
 import original_ratio_rounding_vectors as ratio
 import original_numeric_contracts as numeric
 import original_numeric_512 as numeric512
+import original_logical_residuals as logical
 import witness_paths
 
 
-CLIENTS = {"ratio": ratio, "noise": noise, "contracts": contracts, "core": core, "numeric": numeric, "numeric512": numeric512}
+CLIENTS = {"ratio": ratio, "noise": noise, "contracts": contracts, "core": core, "numeric": numeric, "numeric512": numeric512, "logical": logical}
 
 
 def snapshot(root):
@@ -70,6 +71,8 @@ class WitnessDestinationTests(unittest.TestCase):
                      "--helper-record", str(layout.record)]
         elif kind == "numeric":
             args += ["--native-helper", str(layout.helper)]
+        elif kind == "logical":
+            args += ["--paper-archive", str(layout.helper)]
         elif kind == "core":
             args += ["--manifest", str(layout.root / "fake-manifest.json")]
         return args
