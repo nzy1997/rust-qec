@@ -3677,3 +3677,70 @@ needed deposited JSON files, and removes its import cache afterward. Ordinary
 PR checks use committed small data and do not import these optional packages.
 This deliverable adds no original-method promotions and executes no paper-scale
 precision or timing campaign; those remain B03/B04/B05/B06.
+
+
+### Original-operation complex feedback boundaries (R07)
+
+`OriginalFeedbackBoundaryProgram` owns an R04 assignment-plan snapshot and
+classifies authoritative control rules before sampling. Structurally affine
+rules keep the existing direct static boundary route; controlled odd phase
+arithmetic and general callbacks use an explicit bounded literal-prefix route.
+This classification does not catch resource errors and retry another backend.
+The existing `OriginalStaticTrace` API remains available for advanced direct
+resource/catalogue policies; the general wrapper uses its default direct policy.
+
+Opaque callbacks require `OriginalPhaseFeedback` metadata. Its live-wire set and
+implicit single-wire axes, plus explicit extra even/odd parity axes, define a
+fixed odd phase signature. Actual emissions are validated after normalized
+phase aggregation: Pauli-frame conjugation changes phase signs but not parity.
+Missing declarations fail at construction; non-Pauli/phase gates, undeclared
+wires/axes or changed parity produce an explicit `FeedbackMismatch`. Typed
+`OriginalDeclaredControl` rules are authoritative unitary declarations and need
+no separate opaque-family metadata, including when their odd phase depends on
+reports.
+
+Prepare a program from the source, a map from opaque control IDs to families,
+`OriginalFeedbackBoundaryOptions`, and `ScalarArithmetic`. Then call
+`program.prepare_task(&task)` and `sampler.sample(&assignment, &mut rng)`.
+The result owns the joint history mass, accepted joint mass, joint signed
+moments, required reported/true bits, and actual compilation/query/callback/
+entropy counters. The boundary task declares Pauli effects rather than a target
+error metric. Do not divide the joint results implicitly; the caller knows the
+sampling/likelihood contract. Source callbacks execute once per actual control,
+with declared parent order. Earlier sampled reports are reused, and unrequested
+final records (including junk in postselection) are integrated out.
+
+Complex prefix queries stop before the next actual callback. Prior emissions
+are frozen into pure literal extractors; exhaustive kernels never replay the
+source callbacks or execute a future callback early. Prefix distributions are
+physical and unconditioned on future postselection. Final acceptance and moments
+apply postselection only after all callbacks. The service uses full exact
+literal-prefix tables rather than a common-axis affine proposal shortcut; it
+exports no Native common-axis certificate or private plan-cache counter and
+retains no prefix-plan cache. This is a correctness route, with no matched
+Native throughput or automatic fallback claim. Original scalar/kernel limits
+still apply, together with prospective literal-record, branch/query, metadata,
+source/gate-visit and cumulative entropy budgets. Metadata admission excludes
+arbitrary-precision limbs, which have their existing arithmetic limit.
+
+`cargo test --locked -p rmagna --test original_complex_boundary` exercises all
+five assigned original methods through complete pinned Native branch tables and
+explicit Rust word-stream replay. Python Random implementation/seed identity is
+not promised. The owning suite covers even/odd routing, two callbacks with
+future postselection/faults/report flips, omitted junk, the noncommuting T/H/T
+reference, constructor/runtime declaration errors, normalized phase signatures,
+limits before callbacks/entropy, and owned results after program drop. One
+fixed-word counterexample distinguishes the unconditioned first decoder input
+from the incorrectly future-conditioned law. Actual source mutations of family
+validation, future-conditioning and callback freezing are all detected.
+
+The portable producer runs all five unchanged original methods (50 sampler
+draws), captures six full literal tables from their original exhaustive helper,
+and adds a full literal table of the fifth method's exact source fixture. That
+method's independent-reference/controller-order/RNG assertions still execute.
+Source/frontend/helper/producer identities and attribution are retained. No
+Native rebuild or environment copy is needed:
+
+```sh
+python3 benchmarks/magna_reproduction/original_complex_boundary.py --upstream "$MAGNA_REFERENCE" --native-helper "$MAGNA_NATIVE_HELPER" --out "$NEW_COMPLEX_JSON"
+```

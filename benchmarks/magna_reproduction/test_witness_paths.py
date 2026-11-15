@@ -20,10 +20,11 @@ import original_ratio_rounding_vectors as ratio
 import original_numeric_contracts as numeric
 import original_numeric_512 as numeric512
 import original_logical_residuals as logical
+import original_complex_boundary as complex_boundary
 import witness_paths
 
 
-CLIENTS = {"ratio": ratio, "noise": noise, "contracts": contracts, "core": core, "numeric": numeric, "numeric512": numeric512, "logical": logical}
+CLIENTS = {"ratio": ratio, "noise": noise, "contracts": contracts, "core": core, "numeric": numeric, "numeric512": numeric512, "logical": logical, "complex": complex_boundary}
 
 
 def snapshot(root):
@@ -69,7 +70,7 @@ class WitnessDestinationTests(unittest.TestCase):
         if kind == "ratio":
             args += ["--receipt", str(receipt), "--helper", str(layout.helper),
                      "--helper-record", str(layout.record)]
-        elif kind == "numeric":
+        elif kind in {"numeric", "complex"}:
             args += ["--native-helper", str(layout.helper)]
         elif kind == "logical":
             args += ["--paper-archive", str(layout.helper)]

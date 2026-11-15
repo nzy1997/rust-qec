@@ -84,8 +84,28 @@
   "cases": [
     {
       "id": "test_boundary_sampling.BoundarySamplingTests.test_affine_phase_arithmetic_is_direct_and_odd_control_is_complex",
-      "status": "unmapped",
-      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+      "status": "verified",
+      "contract": "Complete pinned even coefficients2/4 direct and odd1 complex scenarios, both compiler strategies and all three source seeds with exact literal full tables. Required reports, unconditional and accepted joint masses, signed moments, reported/true flip mapping and caller-owned Rust RNG replay agree; direct paths use no entropy/callbacks. Odd authoritative typed phase rules use bounded complex literal prefixes. Python seed/stream identity and Native private common-axis/caching policy are not claimed.",
+      "rust_tests": [
+        {
+          "package": "rmagna",
+          "target": "original_complex_boundary",
+          "test": "all_original_even_and_odd_phase_cases_keep_routes_masses_moments_and_rng",
+          "source_sha256": "b7a8af3c1a368f015fe390c55fb0ad4368f6e46666f208a17638a45d30460979"
+        },
+        {
+          "package": "rmagna",
+          "target": "original_complex_boundary",
+          "test": "limits_and_invalid_shared_inputs_refuse_before_entropy_or_external_callbacks",
+          "source_sha256": "b7a8af3c1a368f015fe390c55fb0ad4368f6e46666f208a17638a45d30460979"
+        },
+        {
+          "package": "rmagna",
+          "target": "original_complex_boundary",
+          "test": "owned_draws_survive_program_drop_without_retaining_its_callback_owner",
+          "source_sha256": "b7a8af3c1a368f015fe390c55fb0ad4368f6e46666f208a17638a45d30460979"
+        }
+      ]
     },
     {
       "id": "test_boundary_sampling.BoundarySamplingTests.test_all_affine_cliffords_keep_exact_acceptance_and_effects",
@@ -121,13 +141,65 @@
     },
     {
       "id": "test_boundary_sampling.BoundarySamplingTests.test_complex_feedback_global_queries_with_future_postselection",
-      "status": "unmapped",
-      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+      "status": "verified",
+      "contract": "Complete pinned nonlinear two-controller source and both original fault/report-flip configurations under both compilers and12 word-stream seeds. Actual callbacks execute once in causal order with ordered parents; previously sampled a is reused, required a/b/s reports and true bits agree, junk remains integrated out. Independent full Native branch tables determine unconditional history, future-postselected acceptance and joint signed moments; exact physical-prefix RNG replay excludes future conditioning. Complementary future-selection sectors preserve earlier reports/RNG. A fixed-word physical versus future-conditioned counterexample and actual source mutations detect earlier-decoder bias and callback replay. Literal work/entropy/metadata caps apply; no affine common-axis shortcut/certificate or private cache claim.",
+      "rust_tests": [
+        {
+          "package": "rmagna",
+          "target": "original_complex_boundary",
+          "test": "two_original_callbacks_sample_causally_and_integrate_future_postselection_and_junk",
+          "source_sha256": "b7a8af3c1a368f015fe390c55fb0ad4368f6e46666f208a17638a45d30460979"
+        },
+        {
+          "package": "rmagna",
+          "target": "original_complex_boundary",
+          "test": "future_selection_sectors_preserve_the_same_earlier_reports_and_rng",
+          "source_sha256": "b7a8af3c1a368f015fe390c55fb0ad4368f6e46666f208a17638a45d30460979"
+        },
+        {
+          "package": "rmagna",
+          "target": "original_complex_boundary",
+          "test": "future_postselection_cannot_reweight_the_first_controller_input",
+          "source_sha256": "b7a8af3c1a368f015fe390c55fb0ad4368f6e46666f208a17638a45d30460979"
+        },
+        {
+          "package": "rmagna",
+          "target": "original_complex_boundary",
+          "test": "limits_and_invalid_shared_inputs_refuse_before_entropy_or_external_callbacks",
+          "source_sha256": "b7a8af3c1a368f015fe390c55fb0ad4368f6e46666f208a17638a45d30460979"
+        },
+        {
+          "package": "rmagna",
+          "target": "original_complex_boundary",
+          "test": "owned_draws_survive_program_drop_without_retaining_its_callback_owner",
+          "source_sha256": "b7a8af3c1a368f015fe390c55fb0ad4368f6e46666f208a17638a45d30460979"
+        }
+      ]
     },
     {
       "id": "test_boundary_sampling.BoundarySamplingTests.test_noncommuting_reference_uses_exact_global_queries",
-      "status": "unmapped",
-      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+      "status": "verified",
+      "contract": "Complete pinned opaque phase feedback on the noncommuting T/H/T source, both compiler strategies and all five source seeds. Full independent Native literal tables determine physical prefix conditionals and final postselected joint masses/moments, with exactly one actual callback, owned true/reported bits and explicit Rust word-stream replay. No Python RNG identity, matched Native preparation policy or throughput claim.",
+      "rust_tests": [
+        {
+          "package": "rmagna",
+          "target": "original_complex_boundary",
+          "test": "original_noncommuting_and_reference_schedule_cases_use_unconditioned_global_prefixes",
+          "source_sha256": "b7a8af3c1a368f015fe390c55fb0ad4368f6e46666f208a17638a45d30460979"
+        },
+        {
+          "package": "rmagna",
+          "target": "original_complex_boundary",
+          "test": "limits_and_invalid_shared_inputs_refuse_before_entropy_or_external_callbacks",
+          "source_sha256": "b7a8af3c1a368f015fe390c55fb0ad4368f6e46666f208a17638a45d30460979"
+        },
+        {
+          "package": "rmagna",
+          "target": "original_complex_boundary",
+          "test": "owned_draws_survive_program_drop_without_retaining_its_callback_owner",
+          "source_sha256": "b7a8af3c1a368f015fe390c55fb0ad4368f6e46666f208a17638a45d30460979"
+        }
+      ]
     },
     {
       "id": "test_boundary_sampling.BoundarySamplingTests.test_scalar_residual_and_zero_postselection",
@@ -144,8 +216,34 @@
     },
     {
       "id": "test_boundary_sampling.BoundarySamplingTests.test_undeclared_callback_and_invalid_family_fail",
-      "status": "unmapped",
-      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+      "status": "verified",
+      "contract": "Complete pinned source has distinct constructor rejection for an undeclared opaque callback and runtime FeedbackMismatch for H outside a declared phase family. Additional normalized phase/Pauli conjugation, fixed odd signature, nonlocal axes, duplicate/undeclared axes, changed parity/wire and no-callback-replay checks establish the typed family contract. Actual family-validation bypass is detected. Authoritative typed control rules require no opaque-family declaration.",
+      "rust_tests": [
+        {
+          "package": "rmagna",
+          "target": "original_complex_boundary",
+          "test": "original_missing_family_constructor_and_out_of_family_runtime_fail_separately",
+          "source_sha256": "b7a8af3c1a368f015fe390c55fb0ad4368f6e46666f208a17638a45d30460979"
+        },
+        {
+          "package": "rmagna",
+          "target": "original_complex_boundary",
+          "test": "phase_families_check_normalized_parity_and_nonlocal_axes_without_replaying_callbacks",
+          "source_sha256": "b7a8af3c1a368f015fe390c55fb0ad4368f6e46666f208a17638a45d30460979"
+        },
+        {
+          "package": "rmagna",
+          "target": "original_complex_boundary",
+          "test": "limits_and_invalid_shared_inputs_refuse_before_entropy_or_external_callbacks",
+          "source_sha256": "b7a8af3c1a368f015fe390c55fb0ad4368f6e46666f208a17638a45d30460979"
+        },
+        {
+          "package": "rmagna",
+          "target": "original_complex_boundary",
+          "test": "owned_draws_survive_program_drop_without_retaining_its_callback_owner",
+          "source_sha256": "b7a8af3c1a368f015fe390c55fb0ad4368f6e46666f208a17638a45d30460979"
+        }
+      ]
     },
     {
       "id": "test_boundary_sampling.BoundarySamplingTests.test_unused_t_subcircuits_trace_before_resource_budget",
@@ -2073,8 +2171,34 @@
     },
     {
       "id": "test_native_boundary_service.NativeBoundaryServiceTests.test_causal_controller_order_rng_and_terminal_masses",
-      "status": "unmapped",
-      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+      "status": "verified",
+      "contract": "Complete pinned T/MX/phase-feedback/MX/discard source with original Y fault and report flip a. All12 source seeds and both compilers use the actual once-only causal callback, no junk reports, exact full Native terminal table and same-Rust-word-stream reference schedule. Joint X/Z masses and moments, reported/true values and final RNG state agree. All five unchanged original methods execute in the protected pinned Native environment (50draws total); a supplemental literal table of this exact fifth source is retained. Full physical-prefix literal queries replace the Native common-axis proposal optimization explicitly; Python random implementation identity, private plan reuse counters and matched throughput remain unclaimed.",
+      "rust_tests": [
+        {
+          "package": "rmagna",
+          "target": "original_complex_boundary",
+          "test": "original_noncommuting_and_reference_schedule_cases_use_unconditioned_global_prefixes",
+          "source_sha256": "b7a8af3c1a368f015fe390c55fb0ad4368f6e46666f208a17638a45d30460979"
+        },
+        {
+          "package": "rmagna",
+          "target": "original_complex_boundary",
+          "test": "future_postselection_cannot_reweight_the_first_controller_input",
+          "source_sha256": "b7a8af3c1a368f015fe390c55fb0ad4368f6e46666f208a17638a45d30460979"
+        },
+        {
+          "package": "rmagna",
+          "target": "original_complex_boundary",
+          "test": "limits_and_invalid_shared_inputs_refuse_before_entropy_or_external_callbacks",
+          "source_sha256": "b7a8af3c1a368f015fe390c55fb0ad4368f6e46666f208a17638a45d30460979"
+        },
+        {
+          "package": "rmagna",
+          "target": "original_complex_boundary",
+          "test": "owned_draws_survive_program_drop_without_retaining_its_callback_owner",
+          "source_sha256": "b7a8af3c1a368f015fe390c55fb0ad4368f6e46666f208a17638a45d30460979"
+        }
+      ]
     },
     {
       "id": "test_native_boundary_service.NativeBoundaryServiceTests.test_completed_marginal_rng_and_mass_match_reference_schedule",
