@@ -7,6 +7,7 @@ pub use enumeration::{EnumeratedHistories, HistoryEnumerationOptions};
 use enumeration::{ExecutionError, HistoryMode};
 mod registry;
 mod resolve;
+mod zero_prefix;
 use crate::circuit::{BitAtom, BitExpr, Circuit, LocatedOperation, Operation};
 use crate::costs::{CostError, ExecutionMeter, OperationKind, observe};
 use crate::gf2::BitVector;
@@ -178,6 +179,9 @@ pub struct RuntimeOptions {
     pub sampling: SamplingOptions,
     pub max_history_inputs: usize,
     pub max_prefix_compiles: usize,
+    /// Conservative eight-byte storage units for a classical completion after
+    /// an exactly certified interference-zero prefix. Excludes scalar limbs.
+    pub max_zero_prefix_words: usize,
 }
 impl Default for RuntimeOptions {
     fn default() -> Self {
@@ -190,6 +194,7 @@ impl Default for RuntimeOptions {
             sampling: SamplingOptions::default(),
             max_history_inputs: 1_000_000,
             max_prefix_compiles: 100_000,
+            max_zero_prefix_words: 16 << 20,
         }
     }
 }
@@ -905,6 +910,7 @@ impl CausalProgram {
             proposal_mass: (self.options.history_sampler == HistorySampler::AffineSupport
                 && mode.groups().is_none())
             .then_some(ExactScalar::one()),
+            zero_prefix: false,
         };
         for (end, located) in self.circuit.operations().iter().enumerate() {
             match &located.operation {
@@ -1040,6 +1046,7 @@ struct PathState<'a> {
     mode: HistoryMode<'a>,
     next_group: usize,
     proposal_mass: Option<ExactScalar>,
+    zero_prefix: bool,
 }
 impl PathState<'_> {
     fn resolved(&self, end: usize) -> Result<Vec<LocatedOperation>, RuntimeError> {
@@ -1243,15 +1250,59 @@ impl PathState<'_> {
                 (draw.values, draw.entropy_words)
             }
             HistorySampler::AffineSupport => {
-                let draw = propose_affine_reported_observed(
-                    &instrument,
-                    &query,
-                    &faults,
-                    random,
-                    &options,
-                    arithmetic,
-                    self.meter,
-                )?;
+                let draw = if self.zero_prefix {
+                    self.complete_zero_prefix(inputs, random, &options, arithmetic)?
+                } else {
+                    match propose_affine_reported_observed(
+                        &instrument,
+                        &query,
+                        &faults,
+                        random,
+                        &options,
+                        arithmetic,
+                        self.meter,
+                    ) {
+                        Ok(draw) => draw,
+                        Err(SamplingError::ImpossibleSupport) => {
+                            // A later decomposition may have a smaller affine
+                            // envelope than the one that proposed this prefix.
+                            // Only an exact zero-mass certificate permits a
+                            // classical completion; a positive prefix still
+                            // propagates the structural-support failure.
+                            let rows = self
+                                .conditions
+                                .iter()
+                                .map(|(p, _)| p.clone())
+                                .collect::<Vec<_>>();
+                            let rhs = BitVector::from_indices(
+                                rows.len(),
+                                self.conditions
+                                    .iter()
+                                    .enumerate()
+                                    .filter_map(|(j, (_, v))| v.then_some(j)),
+                            )
+                            .map_err(InstrumentError::from)?;
+                            let mass = observe(self.meter, OperationKind::Query, || {
+                                instrument
+                                    .reported_probability(
+                                        &rows,
+                                        &rhs,
+                                        &faults,
+                                        options.max_terms,
+                                        arithmetic,
+                                    )
+                                    .map_err(RuntimeError::from)
+                            })?
+                            .value;
+                            if !mass.is_zero() {
+                                return Err(SamplingError::ImpossibleSupport.into());
+                            }
+                            self.zero_prefix = true;
+                            self.complete_zero_prefix(inputs, random, &options, arithmetic)?
+                        }
+                        Err(error) => return Err(error.into()),
+                    }
+                };
                 let previous = self.proposal_mass.as_ref().expect("actual affine proposal");
                 self.proposal_mass = Some(
                     arithmetic

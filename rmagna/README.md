@@ -2124,6 +2124,18 @@ conditioned certified affine envelope. `ExactMarginal` remains the current Rust
 default. Both choices retain causal reported inputs and atomic controller
 decisions; neither includes selection predicates or silently changes methods.
 
+If a later affine envelope excludes an already proposed prefix, the runtime
+first checks that prefix's exact physical mass. Only a certified zero permits
+a classical affine completion of subsequent inputs. It preserves earlier
+observations, duplicate and inverted parities, and callback/guard execution;
+the completed history still has zero weight. Positive-mass structural failures
+and resource refusals propagate. `RuntimeOptions::max_zero_prefix_words` bounds
+the completion's conservative eight-byte geometry units (default 16,777,216,
+excluding scalar limbs). Nondefault caps enter the options fingerprint; the
+default preserves existing fingerprints. The existing Rust RNG convention
+draws potential categorical faults before histories, with no entropy for a
+deterministic category; Python's inter-callback RNG schedule is separate.
+
 The runtime multiplies the exact group proposal masses, then evaluates the
 physical history mass at the end. `history_proposal_mass` is present only for
 actual affine proposals. Interference-zero histories are retained and may invoke
