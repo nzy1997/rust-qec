@@ -98,6 +98,16 @@ pub(crate) fn observed() -> Option<u64> {
 }
 
 pub(crate) fn checkpoint(kind: SafePoint) -> Result<(), ScalarError> {
+    checkpoint_with_cleanup(kind, || Ok(()))
+}
+
+/// A managed process must be terminated/reaped before cancellation is reported
+/// as observed. Cleanup errors retain their original error and do not set a
+/// cancellation marker that could hide a live child or an OS failure.
+pub(crate) fn checkpoint_with_cleanup<E: From<ScalarError>>(
+    kind: SafePoint,
+    cleanup: impl FnOnce() -> Result<(), E>,
+) -> Result<(), E> {
     let state = ACTIVE.with(|active| active.borrow().clone());
     let Some(state) = state else { return Ok(()) };
     let sequence = state.checkpoints.get().saturating_add(1);
@@ -108,8 +118,9 @@ pub(crate) fn checkpoint(kind: SafePoint) -> Result<(), ScalarError> {
         observer(Checkpoint { kind, sequence });
     }
     if state.token.is_cancelled() {
+        cleanup()?;
         state.observed.set(sequence);
-        Err(ScalarError::Cancelled)
+        Err(ScalarError::Cancelled.into())
     } else {
         Ok(())
     }

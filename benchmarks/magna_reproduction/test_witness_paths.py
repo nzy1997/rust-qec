@@ -21,10 +21,11 @@ import original_numeric_contracts as numeric
 import original_numeric_512 as numeric512
 import original_logical_residuals as logical
 import original_complex_boundary as complex_boundary
+import original_long_operation_cancellation as cancellation
 import witness_paths
 
 
-CLIENTS = {"ratio": ratio, "noise": noise, "contracts": contracts, "core": core, "numeric": numeric, "numeric512": numeric512, "logical": logical, "complex": complex_boundary}
+CLIENTS = {"ratio": ratio, "noise": noise, "contracts": contracts, "core": core, "numeric": numeric, "numeric512": numeric512, "logical": logical, "complex": complex_boundary, "cancellation": cancellation}
 
 
 def snapshot(root):

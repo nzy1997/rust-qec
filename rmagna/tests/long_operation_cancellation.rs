@@ -282,3 +282,351 @@ fn a_cancelled_inflight_row_is_distinct_from_committed_failed_and_unattempted_ro
         "committed1/failed0/interrupted1/unattempted0or3;first-row statistics and reported record preserved"
     );
 }
+
+fn blocked_process(files: &Files) -> rmagna::runtime::process::ControllerProcess {
+    use rmagna::runtime::process::{ControllerProcess, ProcessOptions};
+    let mut command = std::process::Command::new("python3");
+    command.args(["-I","-B","-u","-c",concat!(
+        "import os,sys,json,time,pathlib\n",
+        "print(json.dumps({'protocol':'rmagna.controller.v1','bindings':{'toy':'1'},'manifest':{'pid':os.getpid()}}),flush=True)\n",
+        "sys.stdin.readline()\npathlib.Path('entered').write_text('request received')\n",
+        "while True: time.sleep(1)\n")]).current_dir(&files.0);
+    ControllerProcess::spawn(
+        command,
+        ProcessOptions {
+            timeout: Duration::from_secs(5),
+            ..Default::default()
+        },
+    )
+    .unwrap()
+}
+fn wait_for_request(files: &Files) {
+    let started = std::time::Instant::now();
+    while !files.0.join("entered").exists() {
+        assert!(
+            started.elapsed() < Duration::from_secs(10),
+            "managed worker never received its request"
+        );
+        std::thread::sleep(Duration::from_millis(1));
+    }
+}
+fn assert_reaped(worker: &rmagna::runtime::process::ControllerProcess, pid: u64) {
+    assert!(
+        worker.try_wait().unwrap().is_some(),
+        "managed decoder was not reaped"
+    );
+    #[cfg(unix)]
+    {
+        let output=std::process::Command::new("python3").args(["-I","-B","-c",
+        "import os,sys\ntry: os.kill(int(sys.argv[1]),0)\nexcept ProcessLookupError: sys.exit(0)\nelse: sys.exit(1)",
+        &pid.to_string()]).status().unwrap();
+        assert!(
+            output.success(),
+            "managed decoder survived claimed successful cancellation"
+        );
+    }
+    #[cfg(not(unix))]
+    let _ = pid;
+}
+
+#[test]
+fn blocked_process_response_is_cancelled_only_after_the_managed_child_is_reaped() {
+    let files = Files::new();
+    let worker = blocked_process(&files);
+    let pid = worker.manifest()["pid"].as_u64().unwrap();
+    let token = CancellationToken::new();
+    let captured = token.clone();
+    let running = worker.clone();
+    let (tx, rx) = mpsc::channel();
+    let thread = std::thread::spawn(move || {
+        let report = captured.with_cooperative_scope(None, || running.evaluate("toy", &[false]));
+        tx.send(report).unwrap();
+    });
+    wait_for_request(&files);
+    token.cancel();
+    let report = rx.recv_timeout(Duration::from_secs(10)).unwrap();
+    thread.join().unwrap();
+    assert!(report.interrupted);
+    assert!(report.checkpoints >= 2);
+    assert!(
+        report
+            .value
+            .unwrap_err()
+            .to_string()
+            .contains("cancelled at a safe point")
+    );
+    assert_reaped(&worker, pid);
+    assert!(worker.evaluate("toy", &[]).is_err());
+    println!(
+        "blocked response cancelled;actual managed PID{pid} reaped and shared session poisoned"
+    );
+}
+
+#[test]
+fn cancellation_while_waiting_for_the_session_lock_terminates_the_shared_worker() {
+    let files = Files::new();
+    let worker = blocked_process(&files);
+    let pid = worker.manifest()["pid"].as_u64().unwrap();
+    let running = worker.clone();
+    let (tx, rx) = mpsc::channel();
+    let owner = std::thread::spawn(move || {
+        tx.send(running.evaluate("toy", &[])).unwrap();
+    });
+    wait_for_request(&files);
+    let token = CancellationToken::new();
+    token.cancel();
+    let report = token.with_cooperative_scope(None, || worker.evaluate("toy", &[]));
+    assert!(report.interrupted);
+    assert!(report.value.is_err());
+    assert!(rx.recv_timeout(Duration::from_secs(10)).unwrap().is_err());
+    owner.join().unwrap();
+    assert_reaped(&worker, pid);
+    assert!(worker.evaluate("toy", &[]).is_err());
+    println!(
+        "contending scoped caller terminated/reaped shared PID{pid};original exchange also failed without retry"
+    );
+}
+
+#[test]
+fn registered_process_cancellation_preserves_typed_batch_interruption_after_string_errors() {
+    use rmagna::{
+        runtime::ControllerRegistry,
+        task::{RunStatus, TaskRunOptions},
+    };
+    let files = Files::new();
+    let worker = blocked_process(&files);
+    let pid = worker.manifest()["pid"].as_u64().unwrap();
+    let mut registry = ControllerRegistry::default();
+    worker.register_all(&mut registry).unwrap();
+    let task = files.compile(
+        "H 0\nM 0\nDETECTOR rec[-1]\nCONTROL[toy] det[0] -> ctrl[0]\nCX ctrl[0] 1\n",
+        &registry,
+    );
+    let token = CancellationToken::new();
+    let captured = token.clone();
+    let (tx, rx) = mpsc::channel();
+    let running = std::thread::spawn(move || {
+        tx.send(captured.with_cooperative_scope(None, || {
+            task.run_cancellable(
+                &TaskRunOptions {
+                    shots: 3,
+                    seed: 19,
+                    ..Default::default()
+                },
+                &captured,
+            )
+        }))
+        .unwrap();
+    });
+    wait_for_request(&files);
+    token.cancel();
+    let report = rx.recv_timeout(Duration::from_secs(10)).unwrap();
+    running.join().unwrap();
+    assert!(report.interrupted);
+    let report = report.value.unwrap();
+    let raw = report.raw_result();
+    assert_eq!(raw.status, RunStatus::Cancelled);
+    assert_eq!(
+        (
+            raw.completed,
+            raw.interrupted,
+            raw.failed,
+            raw.not_attempted
+        ),
+        (0, 1, 0, 2)
+    );
+    assert!(raw.failures.is_empty());
+    assert!(raw.sampled_records.as_ref().unwrap().is_empty());
+    assert_eq!(raw.execution_costs.decoder.attempted, 1);
+    assert_eq!(raw.execution_costs.decoder.failed, 1);
+    assert!(report.to_json().is_ok());
+    assert_reaped(&worker, pid);
+    println!(
+        "registered decoder cancellation survives String boundary;no fake row/callback retry;managed PID{pid} reaped"
+    );
+}
+
+#[test]
+fn a_safe_point_after_the_actual_callback_consumes_no_more_caller_owned_entropy() {
+    use rmagna::{
+        circuit::{ParseOptions, parse_circuit},
+        noise::{RandomSource, SplitMix64},
+        runtime::{CausalProgram, ControllerRegistry, HistorySampler, RuntimeOptions},
+    };
+    struct Counted {
+        rng: SplitMix64,
+        words: Arc<AtomicUsize>,
+    }
+    impl RandomSource for Counted {
+        fn next_u64(&mut self) -> u64 {
+            self.words.fetch_add(1, Ordering::SeqCst);
+            self.rng.next_u64()
+        }
+    }
+    let token = CancellationToken::new();
+    let captured = token.clone();
+    let words = Arc::new(AtomicUsize::new(0));
+    let seen = Arc::clone(&words);
+    let at_callback = Arc::new(AtomicUsize::new(0));
+    let saved = Arc::clone(&at_callback);
+    let calls = Arc::new(AtomicUsize::new(0));
+    let count = Arc::clone(&calls);
+    let mut registry = ControllerRegistry::default();
+    registry
+        .register("echo", "1", move |bits: &[bool]| {
+            count.fetch_add(1, Ordering::SeqCst);
+            saved.store(seen.load(Ordering::SeqCst), Ordering::SeqCst);
+            captured.cancel();
+            Ok(bits.to_vec())
+        })
+        .unwrap();
+    let circuit = parse_circuit(
+        "H 0\nT 0\nH 0\nM 0\nDETECTOR rec[-1]\nCONTROL[echo] det[0] -> ctrl[0]\nCX ctrl[0] 1\n",
+        &ParseOptions {
+            controllers: registry.names(),
+            ..Default::default()
+        },
+    )
+    .unwrap();
+    let arithmetic = ScalarArithmetic::default();
+    let mut options = RuntimeOptions::default();
+    options.history_sampler = HistorySampler::ExactMarginal;
+    let program = CausalProgram::new(&circuit, &registry, options, &arithmetic).unwrap();
+    let mut random = Counted {
+        rng: SplitMix64::new(2012),
+        words: Arc::clone(&words),
+    };
+    let report =
+        token.with_cooperative_scope(None, || program.resolve(&[], &mut random, &arithmetic));
+    assert!(report.interrupted);
+    assert!(report.value.is_err());
+    assert_eq!(calls.load(Ordering::SeqCst), 1);
+    assert_eq!(
+        words.load(Ordering::SeqCst),
+        at_callback.load(Ordering::SeqCst)
+    );
+    assert!(words.load(Ordering::SeqCst) > 0);
+    let mut replay = SplitMix64::new(2012);
+    for _ in 0..words.load(Ordering::SeqCst) {
+        replay.next_u64();
+    }
+    assert_eq!(random.rng.state(), replay.state());
+    println!(
+        "actual callback1;{} caller words consumed before cancellation;no further word/retry/rewind",
+        words.load(Ordering::SeqCst)
+    );
+}
+
+#[test]
+fn a_decoder_error_after_requesting_cancellation_remains_a_failed_draw() {
+    use rmagna::{
+        runtime::ControllerRegistry,
+        task::{RunStatus, TaskRunOptions},
+    };
+    let files = Files::new();
+    let token = CancellationToken::new();
+    let captured = token.clone();
+    let mut registry = ControllerRegistry::default();
+    registry
+        .register("toy", "1", move |_: &[bool]| {
+            captured.cancel();
+            Err("deliberate decoder failure wins".into())
+        })
+        .unwrap();
+    let task = files.compile(
+        "H 0\nM 0\nDETECTOR rec[-1]\nCONTROL[toy] det[0] -> ctrl[0]\nCX ctrl[0] 1\n",
+        &registry,
+    );
+    let report = token.with_cooperative_scope(None, || {
+        task.run_cancellable(
+            &TaskRunOptions {
+                shots: 3,
+                ..Default::default()
+            },
+            &token,
+        )
+    });
+    assert!(
+        !report.interrupted,
+        "a token request alone is not an observed safe-point refusal"
+    );
+    let report = report.value.unwrap();
+    let raw = report.raw_result();
+    assert_eq!(raw.status, RunStatus::Failed);
+    assert_eq!(
+        (
+            raw.completed,
+            raw.failed,
+            raw.interrupted,
+            raw.not_attempted
+        ),
+        (0, 1, 0, 2)
+    );
+    assert_eq!(raw.failures.len(), 1);
+    assert!(
+        raw.failures[0]
+            .message
+            .contains("deliberate decoder failure wins")
+    );
+    assert!(report.to_json().is_ok());
+}
+
+#[test]
+fn complete_original_signal_reference_keeps_the_separate_python_exception_contract_explicit() {
+    use sha2::{Digest, Sha256};
+    let raw = include_bytes!("data/original-long-operation-cancellation.json");
+    assert_eq!(
+        format!("{:x}", Sha256::digest(raw)),
+        "92298b8c71b2a93d48031621791898ef5ba3a2f142d84693770e74153444c88c"
+    );
+    let data: serde_json::Value = serde_json::from_slice(raw).unwrap();
+    let manifest: serde_json::Value = serde_json::from_str(include_str!(
+        "../../benchmarks/magna_reproduction/reference.json"
+    ))
+    .unwrap();
+    assert_eq!(data["upstream_commit"], manifest["upstream"]["commit"]);
+    assert_eq!(
+        data["reference_sha256"],
+        format!(
+            "{:x}",
+            Sha256::digest(include_bytes!(
+                "../../benchmarks/magna_reproduction/reference.json"
+            ))
+        )
+    );
+    assert_eq!(
+        data["producer_sha256"],
+        format!(
+            "{:x}",
+            Sha256::digest(include_bytes!(
+                "../../benchmarks/magna_reproduction/original_long_operation_cancellation.py"
+            ))
+        )
+    );
+    for (name, value) in data["source_sha256"].as_object().unwrap() {
+        assert_eq!(*value, manifest["upstream"]["files"][name]);
+    }
+    assert_eq!(data["original_methods_passed"], 1);
+    assert_eq!(
+        data["methods"][0],
+        "test_file_api.FileApiTests.test_signal_handlers_run_during_one_long_native_batch"
+    );
+    assert_eq!(data["original_shots"], 10_000_000);
+    assert_eq!(data["original_progress_every"], 10_000_000);
+    assert_eq!(data["original_alarm_seconds"], "1/5");
+    assert_eq!(data["original_exception"], "Stop");
+    assert_eq!(data["requests"].as_array().unwrap().len(), 4);
+    assert_eq!(data["requests"][0]["callable"], true);
+    assert_eq!(data["requests"][1]["delay"], "1/5");
+    assert_eq!(data["requests"][2]["delay"], "0");
+    assert_eq!(data["requests"][3]["restores_previous"], true);
+    assert_eq!(data["signal_handler_restored"], true);
+    assert_eq!(data["timer_disabled"], true);
+    assert_eq!(
+        data["scope"],
+        "unchanged_original_signal_contract_not_Rust_Python_ABI"
+    );
+    println!(
+        "unchanged original10million-draw request/0.2secondSIGALRM/Stop passed in Native;handler/timer restored;Rust exposes separate cooperative scope"
+    );
+}

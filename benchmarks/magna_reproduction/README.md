@@ -3744,3 +3744,66 @@ Native rebuild or environment copy is needed:
 ```sh
 python3 benchmarks/magna_reproduction/original_complex_boundary.py --upstream "$MAGNA_REFERENCE" --native-helper "$MAGNA_NATIVE_HELPER" --out "$NEW_COMPLEX_JSON"
 ```
+
+
+### Cooperative cancellation of long work (R08)
+
+`CancellationToken` remains available from `rmagna::task` and now from
+`rmagna::cancellation`. A token by itself retains the existing between-draw
+contract. Opt into same-thread synchronous kernel safe points explicitly:
+
+```rust,ignore
+let observed = token.with_cooperative_scope(None, || {
+    compiled.run_cancellable(&run_options, &token)
+});
+let report = observed.value?;
+```
+
+The scope covers phase terms, cold/prepared quadratic elimination steps,
+Clifford fibers, and bounded chunks of signature work. Requests become observed
+cancellation only at an actual safe point. Existing kernel errors propagate
+through typed `ScalarError::Cancelled`; no panic drives cancellation. The
+scope restores its previous context on return, error or unwind. Nested scopes
+replace the parent temporarily; spawned threads need their own scope. Optional
+`CheckpointObserver` instrumentation supports deterministic rendezvous and must
+return. Arbitrary blocked in-process callbacks and individual OS or big-integer
+calls are outside cooperative preemption. There is no hard wall-time guarantee
+or automatic preparation cancellation unless preparation is inside the scope.
+
+A cancelled in-flight row is `interrupted=1`, distinct from `completed`, `failed`
+and `not_attempted`. Their sum equals `requested`. Only fully committed rows,
+records, statistics and completed-resource counts survive. Actual attempted
+work and consumed entropy are retained; nothing rewinds the caller's RNG or
+invents a completed row. An ordinary decoder error remains a failure when no
+safe point refused work, even if that decoder requested token cancellation.
+Finalization errors retain their failure status rather than being hidden by
+cancellation.
+
+Managed process decoders poll active scopes while waiting for their session lock
+or response. Poll waits are at most 10 ms; the positive exchange timeout remains
+an absolute deadline including lock acquisition, serialization, I/O and
+validation. This is a safe-point policy, not a real-time latency claim. A
+termination handle independent of the session lock kills and reaps the direct
+managed child before recording successful cancellation. Cleanup errors remain
+errors. Termination poisons the whole shared worker and all bindings, including
+another caller's in-flight exchange; no request is retried. Descendant process
+management is outside this direct-child contract. `ControllerProcess::try_wait`
+inspects the actual managed child without taking the exchange lock.
+
+`cargo test --locked -p rmagna --test long_operation_cancellation -- --show-output`
+checks a single4096-term contraction at term4, cold/warm elimination at step3,
+context restoration, committed prefixes and JSON counters, actual caller-owned
+entropy after a callback, decoder-error precedence, blocked process response,
+contended lock and registered-process batch cancellation. The process tests
+check the actual child exit status (and PID absence on Unix), not a stopped flag.
+No uncontrolled ten-million-row Rust workload or timing threshold is needed.
+
+The pinned original SIGALRM method separately executes unchanged, including its
+own ten-million-draw request, 0.2-second alarm, `Stop` exception assertion and
+original time bound. Its actual timer/handler setter protocol and restoration
+are captured; Rust does not claim that Python signal/exception ABI. Regenerate
+the small original receipt in a fresh POSIX Python process:
+
+```sh
+python3 benchmarks/magna_reproduction/original_long_operation_cancellation.py --upstream "$MAGNA_REFERENCE" --out "$NEW_CANCELLATION_JSON"
+```

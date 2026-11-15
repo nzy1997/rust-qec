@@ -4,12 +4,12 @@
   "upstream_commit": "56847478c840395735146ef1e1ccdc3d8aedc10f",
   "parity_claim": "static_requirements_only",
   "ledger_snapshot": {
-    "verified": 307,
-    "partial": 8,
+    "verified": 308,
+    "partial": 7,
     "unmapped": 37
   },
   "category_counts": {
-    "G": 1,
+    "G": 0,
     "P": 32,
     "V": 0,
     "E": 10,
@@ -1195,62 +1195,6 @@
         {
           "path": "rmagna/tests/sampling_preparation.rs",
           "anchor": "fn feedback_prefixes"
-        }
-      ]
-    },
-    {
-      "id": "test_file_api.FileApiTests.test_signal_handlers_run_during_one_long_native_batch",
-      "ledger_status": "partial",
-      "category": "G",
-      "issue": "R08",
-      "source": {
-        "path": "tests/core/test_file_api.py",
-        "source_sha256": "03e38048973e84253d6df3f90e8672bb4ae1f07f7f5b0168c3057530e0256e30",
-        "line": 120,
-        "end_line": 136
-      },
-      "method": {
-        "method_sha256": "835512e8743f522259f5bb8c2b3912546a856e4da7b1dc44cb15ace2796aa02a",
-        "required_checks": [
-          "self.assertLess(time.monotonic() - started, 5)",
-          "self.assertRaises(Stop)"
-        ],
-        "loops": [],
-        "module_helpers": [
-          "controlled",
-          "moments",
-          "FileApiTests.assert_unitary"
-        ],
-        "module_imports": [
-          "from fractions import Fraction",
-          "from magna import _native",
-          "from magna import compile_circuit",
-          "from magna.circuit_file import ControllerRegistry, parse_circuit",
-          "from magna.file_api import NoiseDraw",
-          "from magna.file_api import compile_circuit, run",
-          "from magna.low_weight import enumerate_errors",
-          "from random import Random",
-          "from tests.support import file_hooks as hooks",
-          "from tests.support import native_testing",
-          "from tests.support.readout_target import ZERO_TARGET",
-          "import math",
-          "import numpy as np",
-          "import signal, time",
-          "import stim",
-          "import threading",
-          "import unittest"
-        ]
-      },
-      "remaining_requirement": "Preserve every original helper/loop/assertion shown in the source-bound method, not only the test name.",
-      "assessment": "CancellationToken explicitly checks between draws and cannot interrupt a running contraction or blocked decoder. The ten-million-request witness covers responsiveness between draws, not the Python SIGALRM exception contract. Define cooperative kernel cancellation and separate process-decoder cancellation; do not promise preemption of arbitrary in-process callbacks.",
-      "rust_owners": [
-        {
-          "path": "rmagna/src/task/evaluate/run/cancellation.rs",
-          "anchor": "It cannot interrupt"
-        },
-        {
-          "path": "rmagna/tests/file_runtime_control.rs",
-          "anchor": "fn original_long_batch_request"
         }
       ]
     },

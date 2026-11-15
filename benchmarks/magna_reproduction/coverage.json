@@ -1011,10 +1011,69 @@
     },
     {
       "id": "test_file_api.FileApiTests.test_signal_handlers_run_during_one_long_native_batch",
-      "status": "partial",
-      "contract": "The unchanged complete native original method passes in an isolated reference process. Rust preserves its literal H/T/H/M/postselection circuit, ten-million-draw request, ten-million progress interval and bounded child-process responsiveness under a shareable cancellation token. Deterministic callback rendezvous verifies a one-row committed prefix with no failed row or next callback, partial-only statistics/records/efficiency, plus zero-row and prepared-reuse cases. A counted-RNG unit witness verifies no extra entropy or callback after boundary observation.",
-      "remaining_gap": "Rust batch cancellation is polled between draws and cannot verify Python SIGALRM handler identity or Python exception delivery, nor interrupt a single long contraction/blocked decoder. These original Python assertions remain unported. No architecture exclusion, full compatibility or paper performance claim; this is an explicit documented Rust/Python architecture distinction.",
+      "status": "verified",
+      "contract": "Complete unchanged original SIGALRM/Stop method executes its ten-million-draw request,0.2-second alarm and original time assertion, with exact timer/handler setter protocol and restored process state. Independent Rust equivalent is explicitly a sticky token plus opt-in same-thread cooperative safe-point scope, not Python signal/exception ABI or an invented wall-time bound. Real4096-term contraction rendezvous cancels at term4; cold/prepared Gaussian elimination cancels at step3. Nested scopes, other-thread isolation and unwind restoration preserve context. Cancelled in-flight rows are interrupted rather than completed/failed/unattempted; committed records/partial exact statistics and actual work counters remain. Actual callback/caller RNG replay proves no entropy after observed refusal and no rewind; ordinary decoder error wins when only cancellation was requested. Blocked process response, contended session lock and registered-process batch cases terminate/reap the actual managed child before reporting cancellation, poison shared bindings and do not retry. Existing between-draw semantics remain. Arbitrary blocked in-process callbacks, individual OS/big-integer calls, descendant management, Python ABI and real-time preemption remain outside this typed contract.",
       "rust_tests": [
+        {
+          "package": "rmagna",
+          "target": "long_operation_cancellation",
+          "test": "one_inflight_phase_contraction_stops_at_a_deterministic_rendezvous",
+          "source_sha256": "e832dd5082b62a9d84f7d7d29ef910730c2abc1c7225235e213084496955c93b"
+        },
+        {
+          "package": "rmagna",
+          "target": "long_operation_cancellation",
+          "test": "cold_and_prepared_quadratic_work_refuse_inside_elimination",
+          "source_sha256": "e832dd5082b62a9d84f7d7d29ef910730c2abc1c7225235e213084496955c93b"
+        },
+        {
+          "package": "rmagna",
+          "target": "long_operation_cancellation",
+          "test": "nested_scopes_unwinding_and_other_threads_restore_their_own_contexts",
+          "source_sha256": "e832dd5082b62a9d84f7d7d29ef910730c2abc1c7225235e213084496955c93b"
+        },
+        {
+          "package": "rmagna",
+          "target": "long_operation_cancellation",
+          "test": "a_cancelled_inflight_row_is_distinct_from_committed_failed_and_unattempted_rows",
+          "source_sha256": "e832dd5082b62a9d84f7d7d29ef910730c2abc1c7225235e213084496955c93b"
+        },
+        {
+          "package": "rmagna",
+          "target": "long_operation_cancellation",
+          "test": "blocked_process_response_is_cancelled_only_after_the_managed_child_is_reaped",
+          "source_sha256": "e832dd5082b62a9d84f7d7d29ef910730c2abc1c7225235e213084496955c93b"
+        },
+        {
+          "package": "rmagna",
+          "target": "long_operation_cancellation",
+          "test": "cancellation_while_waiting_for_the_session_lock_terminates_the_shared_worker",
+          "source_sha256": "e832dd5082b62a9d84f7d7d29ef910730c2abc1c7225235e213084496955c93b"
+        },
+        {
+          "package": "rmagna",
+          "target": "long_operation_cancellation",
+          "test": "registered_process_cancellation_preserves_typed_batch_interruption_after_string_errors",
+          "source_sha256": "e832dd5082b62a9d84f7d7d29ef910730c2abc1c7225235e213084496955c93b"
+        },
+        {
+          "package": "rmagna",
+          "target": "long_operation_cancellation",
+          "test": "a_safe_point_after_the_actual_callback_consumes_no_more_caller_owned_entropy",
+          "source_sha256": "e832dd5082b62a9d84f7d7d29ef910730c2abc1c7225235e213084496955c93b"
+        },
+        {
+          "package": "rmagna",
+          "target": "long_operation_cancellation",
+          "test": "a_decoder_error_after_requesting_cancellation_remains_a_failed_draw",
+          "source_sha256": "e832dd5082b62a9d84f7d7d29ef910730c2abc1c7225235e213084496955c93b"
+        },
+        {
+          "package": "rmagna",
+          "target": "long_operation_cancellation",
+          "test": "complete_original_signal_reference_keeps_the_separate_python_exception_contract_explicit",
+          "source_sha256": "e832dd5082b62a9d84f7d7d29ef910730c2abc1c7225235e213084496955c93b"
+        },
         {
           "package": "rmagna",
           "target": "file_runtime_control",
@@ -1155,7 +1214,7 @@
           "package": "rmagna",
           "target": "original_native_and_importance",
           "test": "original_categories_zero_one_residual_and_large_rational_inputs",
-          "source_sha256": "6da10da310c7c5c2dbb27213c8d29267ee219e36ac68f9a7d752678c451857cf"
+          "source_sha256": "452edbf9338585d11a01ea34126799544a487a0d99373b14ff43d807d3e0d876"
         }
       ]
     },
@@ -1168,7 +1227,7 @@
           "package": "rmagna",
           "target": "original_native_and_importance",
           "test": "original_category_rejects_invalid_fraction",
-          "source_sha256": "6da10da310c7c5c2dbb27213c8d29267ee219e36ac68f9a7d752678c451857cf"
+          "source_sha256": "452edbf9338585d11a01ea34126799544a487a0d99373b14ff43d807d3e0d876"
         }
       ]
     },
@@ -1207,7 +1266,7 @@
           "package": "rmagna",
           "target": "original_native_and_importance",
           "test": "original_native_summary_matches_paired_delta_method",
-          "source_sha256": "6da10da310c7c5c2dbb27213c8d29267ee219e36ac68f9a7d752678c451857cf"
+          "source_sha256": "452edbf9338585d11a01ea34126799544a487a0d99373b14ff43d807d3e0d876"
         }
       ]
     },
@@ -1272,7 +1331,7 @@
           "package": "rmagna",
           "target": "original_native_and_importance",
           "test": "original_summary_missing_metrics_single_draw_and_zero_acceptance",
-          "source_sha256": "6da10da310c7c5c2dbb27213c8d29267ee219e36ac68f9a7d752678c451857cf"
+          "source_sha256": "452edbf9338585d11a01ea34126799544a487a0d99373b14ff43d807d3e0d876"
         }
       ]
     },
@@ -1615,7 +1674,7 @@
           "package": "rmagna",
           "target": "original_native_and_importance",
           "test": "original_complex_terminal_recovery_keeps_true_born_sampling",
-          "source_sha256": "6da10da310c7c5c2dbb27213c8d29267ee219e36ac68f9a7d752678c451857cf"
+          "source_sha256": "452edbf9338585d11a01ea34126799544a487a0d99373b14ff43d807d3e0d876"
         }
       ]
     },
@@ -1628,7 +1687,7 @@
           "package": "rmagna",
           "target": "original_native_and_importance",
           "test": "original_huge_and_tiny_weights_remain_range_safe",
-          "source_sha256": "6da10da310c7c5c2dbb27213c8d29267ee219e36ac68f9a7d752678c451857cf"
+          "source_sha256": "452edbf9338585d11a01ea34126799544a487a0d99373b14ff43d807d3e0d876"
         }
       ]
     },
@@ -1654,7 +1713,7 @@
           "package": "rmagna",
           "target": "original_native_and_importance",
           "test": "original_native_draws_return_exact_likelihood_products",
-          "source_sha256": "6da10da310c7c5c2dbb27213c8d29267ee219e36ac68f9a7d752678c451857cf"
+          "source_sha256": "452edbf9338585d11a01ea34126799544a487a0d99373b14ff43d807d3e0d876"
         }
       ]
     },
@@ -1667,7 +1726,7 @@
           "package": "rmagna",
           "target": "original_native_and_importance",
           "test": "original_reproducibility_and_physical_mode_unchanged",
-          "source_sha256": "6da10da310c7c5c2dbb27213c8d29267ee219e36ac68f9a7d752678c451857cf"
+          "source_sha256": "452edbf9338585d11a01ea34126799544a487a0d99373b14ff43d807d3e0d876"
         }
       ]
     },
@@ -1693,7 +1752,7 @@
           "package": "rmagna",
           "target": "original_native_and_importance",
           "test": "original_weighted_summary_uses_joint_means_and_paired_ratio_errors",
-          "source_sha256": "6da10da310c7c5c2dbb27213c8d29267ee219e36ac68f9a7d752678c451857cf"
+          "source_sha256": "452edbf9338585d11a01ea34126799544a487a0d99373b14ff43d807d3e0d876"
         }
       ]
     },
