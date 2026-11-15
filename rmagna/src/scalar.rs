@@ -17,6 +17,7 @@ pub struct ExactScalar {
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum ScalarError {
+    Cancelled,
     EmptyBitBudget,
     CoefficientLimit { required: u64, limit: u64 },
     CoefficientSizeOverflow,
@@ -27,6 +28,7 @@ pub enum ScalarError {
 impl fmt::Display for ScalarError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
+            Self::Cancelled => write!(f, "cooperative operation cancelled at a safe point"),
             Self::EmptyBitBudget => write!(f, "scalar coefficient bit budget must be positive"),
             Self::CoefficientLimit { required, limit } => {
                 write!(

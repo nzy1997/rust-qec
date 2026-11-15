@@ -256,6 +256,7 @@ impl QuadraticForm {
     pub fn gauss_sum(&self, arithmetic: &ScalarArithmetic) -> Result<ExactScalar, QuadraticError> {
         let mut state = QuadraticElimination::new(self)?;
         loop {
+            crate::cancellation::checkpoint(crate::cancellation::SafePoint::QuadraticStep)?;
             let next = (0..state.active.len())
                 .find(|&i| state.active[i] && state.values.linear[i] & 1 != 0)
                 .or_else(|| state.active.iter().position(|&bit| bit));

@@ -1,28 +1,4 @@
-use std::sync::{
-    Arc,
-    atomic::{AtomicBool, Ordering},
-};
-
-/// Sticky, shareable cancellation of a seeded batch between draws.
-///
-/// Cancellation is checked before each new draw, independently of progress
-/// intervals. It cannot interrupt a running contraction or blocked decoder.
-/// Use a new token for a new cancellation session; cancelling one clone cancels
-/// every clone, without resetting or changing a prepared task's identity.
-#[derive(Clone, Debug, Default)]
-pub struct CancellationToken(Arc<AtomicBool>);
-
-impl CancellationToken {
-    pub fn new() -> Self {
-        Self::default()
-    }
-    pub fn cancel(&self) {
-        self.0.store(true, Ordering::Release);
-    }
-    pub fn is_cancelled(&self) -> bool {
-        self.0.load(Ordering::Acquire)
-    }
-}
+pub use crate::cancellation::CancellationToken;
 
 #[cfg(test)]
 mod tests {

@@ -1,5 +1,6 @@
 #![doc = include_str!("../README.md")]
 
+pub mod cancellation;
 pub mod catalogue;
 pub mod circuit;
 pub mod clifford;

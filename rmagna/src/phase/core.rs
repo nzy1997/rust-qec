@@ -111,6 +111,9 @@ impl CanonicalPhaseCore {
             .collect::<Result<Vec<_>, _>>()?;
         let clifford = QuadraticForm::new(0, linear, upper)?;
         for (index, coefficient) in polynomial.iter_mut().enumerate() {
+            if index % 256 == 0 {
+                crate::cancellation::checkpoint(crate::cancellation::SafePoint::SignatureWork)?;
+            }
             match index.count_ones() {
                 1 => *coefficient &= 1,
                 2 => *coefficient &= 3,
@@ -121,6 +124,9 @@ impl CanonicalPhaseCore {
         // Boolean word. Its order does not select an affine-fiber convention.
         for bit in 0..dimension {
             for word in 0..count {
+                if word % 256 == 0 {
+                    crate::cancellation::checkpoint(crate::cancellation::SafePoint::SignatureWork)?;
+                }
                 if word & (1 << bit) != 0 {
                     polynomial[word] = (polynomial[word] + polynomial[word ^ (1 << bit)]) & 7;
                 }
