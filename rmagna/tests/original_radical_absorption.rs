@@ -292,7 +292,7 @@ fn original_example(physical: bool, a: &ScalarArithmetic) -> PhasePathTensor {
     .unwrap()
 }
 #[test]
-fn absorption_precedes_final_resource_selection_without_claiming_full_native_exception_contract() {
+fn absorption_precedes_final_resource_selection_on_the_low_level_tensor() {
     let a = ScalarArithmetic::default();
     let tensor = original_example(true, &a);
     assert_eq!(tensor.phase().quotient().unwrap().rank(), 2);
@@ -303,9 +303,9 @@ fn absorption_precedes_final_resource_selection_without_claiming_full_native_exc
         },
         ..Default::default()
     };
-    // Existing streaming selection rejects the first independent direction.
-    // Native reports needed=2, so its complete exception/certificate method
-    // remains unmapped even though the numerical absorption is reproduced.
+    // The complete original facade, full-rank diagnostic, certificate and byte
+    // boundary are checked in remaining_kernel_contracts; retain this lower-level
+    // selection and absorption regression independently.
     assert!(tensor.prepare_native_resource(1, caps, None, &a).is_err());
     let result = tensor
         .absorb_clifford_radical(Default::default(), &a)

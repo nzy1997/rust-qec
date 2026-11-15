@@ -7,15 +7,15 @@ implement a simulator or claim reproduction of the paper's precision curves.
 
 ## Current coverage
 
-The source-bound ledger currently has 232 verified, 2 partial and 118 unmapped
+The source-bound ledger currently has 263 verified, 2 partial and 87 unmapped
 original methods, with zero architecture-specific core exclusions. It requires
-257 distinct Rust witnesses from 259 declarations across 105 targets. Strict
+288 distinct Rust witnesses from 290 declarations across 106 targets. Strict
 complete parity intentionally exits 2. The detailed per-change sections below
 retain their historical inventory snapshots; `coverage.json` is authoritative.
 
 ## Outstanding requirements and the first paper pilot
 
-`remaining-contracts.json` catalogs all 120 outstanding original methods without
+`remaining-contracts.json` catalogs all 89 outstanding original methods without
 promoting their parity status. It records the complete source-bound method,
 readable assertions and loops, module helper/import context, Rust owners and
 the linked issue DAG. The full pinned source manifest binds transitive helpers,
@@ -33,13 +33,53 @@ python3 benchmarks/magna_reproduction/remaining_contracts.py check \
 python3 -I -m unittest discover -s benchmarks/magna_reproduction -p test_remaining_contracts.py
 ```
 
-The first command prints `PASS`, 120 requirements, the reconciled ledger counts,
+The first command prints `PASS`, 89 requirements, the reconciled ledger counts,
 31 tasks, 435 paper files and 18 issue nodes. Without `--upstream`, it checks the
 catalog and local owners but explicitly reports `upstream_verified=false`.
 Changed source pins, missing methods, unsupported status promotions and cyclic
 dependencies are rejected. Reconcile this snapshot explicitly when later PRs
 close methods. The primary paper is v1, the public reference and historical
 deposit kernels are distinct, and v2 remains a separate, unassessed delta.
+
+### Completed R03 boundary and resource facades
+
+The remaining six R03 methods are covered in the same
+`remaining_kernel_contracts` target (19 tests total). `FloatingTaskDraw` is the
+public finite-binary64 summary import. `OriginalRecordAssignment` is the dynamic
+ordinary-record import: only JSON integer 0/1 is accepted, including rejection
+of boolean `true` and floating `0.0`. `evaluate_record_assignments` is lazy and
+stops on the first error; its empty-stream input, compiled-branch, collected
+callback-decision and value counters are all zero. These counters replace the
+original empty-stream feedback timing; this does not establish packing or cache
+reuse contracts owned by later roadmap issues.
+
+`CertifiedPathTensor` preserves ordered caller provenance and appends executed
+radical-contraction stages. Its decomposition facade selects an explicit
+catalogue or Fourier backend, returns elapsed `Duration` and typed term reports,
+and can absorb before final resource admission. The full original forged
+zero/one cases, exact rank-two to rank-zero tensor and rank-zero empty-database
+unit are checked. Quotient refusals now report the complete rank after the
+already-admitted bounded scan. Explicit zero bypasses final selection.
+
+`PhaseSelectionOptions::max_table_and_coefficient_bytes` adds an opt-in portable
+admission model: `2^rank * (4 + 8 + 32 * ceil((rank+1)/64))` bytes for core values
+and dense Fourier numerator-limb/exponent slots. This conservative charge also
+applies to database routes and is checked before core/coefficient allocation.
+It excludes allocator headers, certificate geometry and other memory already
+covered by separate bounds; it does not reproduce native C++ ABI bytes. A
+rank-zero unit therefore refuses the original four-byte limit and admits the
+Rust model's 44-byte boundary under either absorption ordering. The old
+`max_core_table_bytes` remains the separate four-bytes-per-value bound. Opt-in
+limits appear in effective preparation configuration; default fingerprints
+remain unchanged.
+
+Both completed-marginal source circuits retain all eight seeds, actual physical
+faults/report flips and literal exact masses under both compilers. A same-Rust-
+RNG reference schedule compares words, masses, query/entropy counts and final
+RNG state. The commuting source fixture has deterministic sector `a XOR b=0`,
+which consumes no sector RNG word; the other fixture has no common sector. This
+is full coverage of those source schedules, without a generic automatic
+commuting-sector discovery claim or Python RNG sequence identity.
 
 ### First R03 kernel contract batch
 
@@ -66,7 +106,7 @@ python3 benchmarks/magna_reproduction/original_optimization_inputs.py \
 The generator executes all original assertions before writing a fresh output;
 it never falls back to rebuilding the helper. Attribution and typed Rust
 substitutions are in `rmagna/tests/fixtures/original_optimization_inputs.NOTICE`.
-This batch leaves R03 open for six remaining methods, including raw floating
+At that historical merge, R03 remained open for six methods, including raw floating
 summaries, complete resource-facade admission and completed-marginal scheduling.
 It makes no claim about paper curves or full Native API parity.
 

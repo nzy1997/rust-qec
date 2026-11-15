@@ -1,9 +1,14 @@
 //! Third-hierarchy parity phases, the Clifford radical, and prepared exact sums.
 
 mod absorption;
+mod certified;
 mod core;
 mod resource;
 mod tensor;
+pub use certified::{
+    CertifiedPathTensor, PathCertificate, PathDecomposition, PathDecompositionReport,
+    PathTermReport,
+};
 mod transport;
 pub use absorption::{
     CliffordRadicalAbsorption, RadicalAbsorptionDiagnostics, RadicalAbsorptionOptions,

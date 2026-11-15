@@ -65,9 +65,12 @@ def check_contracts(catalog, ledger, manifest, *, root=ROOT, upstream=None):
     rows = catalog["methods"]
     require(len(rows) == len(outstanding) and {r["id"] for r in rows} == set(outstanding),
             "missing, duplicate or unknown outstanding method")
-    require(dict(Counter(r["category"] for r in rows)) == catalog["category_counts"],
+    categories = {"G", "P", "V", "E", "U"}
+    require(set(catalog["category_counts"]) == categories, "unknown category")
+    observed = Counter(r["category"] for r in rows)
+    require(set(observed) <= categories, "unknown category")
+    require({key: observed[key] for key in categories} == catalog["category_counts"],
             "contract category counts changed")
-    require(set(catalog["category_counts"]) == {"G", "P", "V", "E", "U"}, "unknown category")
     require(catalog["parity_claim"] == "static_requirements_only", "static catalog cannot certify parity")
     require(catalog["helper_source_scope"] == manifest["upstream"]["files"], "helper source closure changed")
     require(catalog["author_decoder_files"] == manifest["upstream"].get("decoder_files", {}),

@@ -2,7 +2,8 @@
 // Source-bound cases from itpyi/magna@56847478c840395735146ef1e1ccdc3d8aedc10f.
 // See fixtures/original_optimization_inputs.NOTICE for complete attribution.
 // Additional cases: tests/core/test_file_native.py and
-// tests/core/test_native_boundary_service.py at the same source pin.
+// tests/core/test_native_boundary_service.py, test_kernel_contract.py,
+// test_native_global_fastpath.py and test_native_global_phase.py at that pin.
 // License: fixtures/original_many_record_input.LICENSE.
 use rmagna::clifford::CliffordCircuit;
 use rmagna::gf2::{BitVector, LinearFactorization};
@@ -1163,4 +1164,433 @@ fn original_completed_marginal_two_schedules_keep_all_eight_seeds_and_rust_rng_s
             }
         }
     }
+}
+
+#[test]
+fn original_ordinary_record_import_rejects_every_invalid_map_and_empty_stream_does_no_work() {
+    use serde_json::json;
+    let a = ScalarArithmetic::default();
+    let ir = OriginalInstrument::new(
+        vec![0],
+        vec![0],
+        AffineKet::new(
+            bits(1, 0),
+            vec![bits(1, 1)],
+            form(&[0], &[0]),
+            a.omega(0, -1).unwrap(),
+        )
+        .unwrap(),
+        vec![
+            OriginalOperation {
+                id: "t".into(),
+                gate: OriginalGate::Phase {
+                    wires: vec![0],
+                    turns: 1,
+                },
+            },
+            OriginalOperation {
+                id: "m".into(),
+                gate: OriginalGate::Measure {
+                    factors: vec![(0, OriginalPauli::X)],
+                    inverted: false,
+                    record: "m".into(),
+                },
+            },
+        ],
+        vec![],
+        OriginalLimits::default(),
+        &a,
+    )
+    .unwrap();
+    let raw = |records: Vec<(&str, serde_json::Value)>| OriginalRecordAssignment {
+        records: records.into_iter().map(|(k, v)| (k.into(), v)).collect(),
+        ..Default::default()
+    };
+    for strategy in [
+        CompilerStrategy::ParityCopies,
+        CompilerStrategy::SharedCommutingLayer,
+    ] {
+        for invalid in [
+            raw(vec![]),
+            raw(vec![("m", json!(2))]),
+            raw(vec![("m", json!(true))]),
+            raw(vec![("m", json!(0)), ("extra", json!(0))]),
+            raw(vec![("m", json!(0)), ("m", json!(1))]),
+            raw(vec![("m", json!(0.0))]),
+            raw(vec![("m", json!(-1))]),
+            raw(vec![("m", json!(null))]),
+            raw(vec![("m", json!("0"))]),
+        ] {
+            assert!(ir.compile_record_assignment(invalid, strategy, &a).is_err());
+        }
+        let mut flip = raw(vec![("m", json!(0))]);
+        flip.report_flips.push("unknown".into());
+        assert!(ir.compile_record_assignment(flip, strategy, &a).is_err());
+        let mut fault = raw(vec![("m", json!(0))]);
+        fault.faults.push(OriginalFault {
+            after: "unknown".into(),
+            wire: 0,
+            pauli: OriginalPauli::Z,
+        });
+        assert!(ir.compile_record_assignment(fault, strategy, &a).is_err());
+        let mut empty = ir.evaluate_record_assignments(std::iter::empty(), strategy, &a);
+        assert!(empty.by_ref().collect::<Vec<_>>().is_empty());
+        assert_eq!(
+            empty.statistics(),
+            OriginalAssignmentStreamStatistics::default()
+        );
+        assert!(empty.next().is_none());
+        let mut stream = ir.evaluate_record_assignments(
+            [raw(vec![("m", json!(0))]), raw(vec![("m", json!(1))])],
+            strategy,
+            &a,
+        );
+        let values = stream.by_ref().collect::<Result<Vec<_>, _>>().unwrap();
+        assert_eq!(
+            values,
+            vec![
+                a.scalar([2, 1, 0, -1].map(Into::into), -2).unwrap(),
+                a.scalar([2, -1, 0, 1].map(Into::into), -2).unwrap()
+            ]
+        );
+        assert_eq!(
+            stream.statistics(),
+            OriginalAssignmentStreamStatistics {
+                inputs: 2,
+                compiled_branches: 2,
+                collected_callback_decisions: 0,
+                values: 2
+            }
+        );
+        // A rejected record must precede invalid report/fault lookup, and a
+        // stream must not pull the next item after this first error.
+        let mut first = raw(vec![("m", json!(true))]);
+        first.report_flips.push("unknown".into());
+        let pulled = AtomicUsize::new(0);
+        let source = [first, raw(vec![("m", json!(0))])]
+            .into_iter()
+            .inspect(|_| {
+                pulled.fetch_add(1, Ordering::SeqCst);
+            });
+        let mut stream = ir.evaluate_record_assignments(source, strategy, &a);
+        let error = stream.next().unwrap().unwrap_err().to_string();
+        assert!(
+            error.contains("record value must be integer zero or one"),
+            "{error}"
+        );
+        assert!(stream.next().is_none());
+        assert_eq!(pulled.load(Ordering::SeqCst), 1);
+        assert_eq!(
+            stream.statistics(),
+            OriginalAssignmentStreamStatistics {
+                inputs: 1,
+                ..Default::default()
+            }
+        );
+    }
+    eprintln!(
+        "ordinary records: original4 maps+2 unknown names; additional5 malformed maps;2 compilers;empty and fail-fast counters"
+    );
+}
+
+fn raw_phase_tensor(
+    n: usize,
+    boundary: &[(usize, bool)],
+    upper: &[usize],
+    terms: &[(usize, u8)],
+    constant: u8,
+    power: i64,
+    a: &ScalarArithmetic,
+) -> rmagna::phase::PhasePathTensor {
+    rmagna::phase::PhasePathTensor::new(
+        AffineKet::new(
+            BitVector::from_indices(
+                boundary.len(),
+                boundary
+                    .iter()
+                    .enumerate()
+                    .filter_map(|(j, (_, b))| b.then_some(j)),
+            )
+            .unwrap(),
+            (0..n)
+                .map(|j| {
+                    BitVector::from_indices(
+                        boundary.len(),
+                        boundary
+                            .iter()
+                            .enumerate()
+                            .filter_map(|(k, (m, _))| (m >> j & 1 != 0).then_some(k)),
+                    )
+                    .unwrap()
+                })
+                .collect(),
+            form(&vec![0; n], upper),
+            a.omega(0, power).unwrap(),
+        )
+        .unwrap(),
+        rmagna::phase::ParityPhase::new(n, constant, terms.iter().map(|(m, c)| (bits(n, *m), *c)))
+            .unwrap(),
+    )
+    .unwrap()
+}
+fn decomposed_vector<C>(
+    d: &rmagna::phase::PathDecomposition<C>,
+    a: &ScalarArithmetic,
+) -> Vec<ExactScalar> {
+    let tensor = d.tensor.tensor();
+    let Some(resource) = &d.resource else {
+        return vec![ExactScalar::zero(); 1 << tensor.boundary().width()];
+    };
+    let states = resource
+        .expand(tensor.phase(), tensor.boundary(), a)
+        .unwrap();
+    (0..1 << tensor.boundary().width())
+        .map(|label| {
+            states.iter().fold(ExactScalar::zero(), |sum, ket| {
+                a.add(
+                    &sum,
+                    &ket.prepare()
+                        .unwrap()
+                        .amplitude(&bits(tensor.boundary().width(), label), a)
+                        .unwrap(),
+                )
+                .unwrap()
+            })
+        })
+        .collect()
+}
+#[test]
+fn original_public_certificate_facades_preserve_forged_zero_one_backends_and_caller_order() {
+    use rmagna::catalogue::builtin_phase_catalogue;
+    use rmagna::phase::*;
+    let a = ScalarArithmetic::default();
+    let ten = raw_phase_tensor(
+        10,
+        &(0..10).map(|q| (1 << q, false)).collect::<Vec<_>>(),
+        &[0; 10],
+        &(0..10).map(|q| (1 << q, 1)).collect::<Vec<_>>(),
+        0,
+        -10,
+        &a,
+    );
+    let mut options = NativePhaseOptions::default();
+    options.selection.max_quotient_rank = 0;
+    let normal = CertifiedPathTensor::<serde_json::Value>::new(ten.clone());
+    assert!(normal.decompose(1024, options, None, None, &a).is_err());
+    let zero = PhasePathTensor::new(
+        AffineKet::new(
+            ten.boundary().offset().clone(),
+            ten.boundary().columns().to_vec(),
+            ten.boundary().phase().clone(),
+            ExactScalar::zero(),
+        )
+        .unwrap(),
+        ten.phase().clone(),
+    )
+    .unwrap();
+    options.selection.max_core_table_bytes = 0;
+    options.selection.max_table_and_coefficient_bytes = 0;
+    let zero = CertifiedPathTensor::<()>::new(zero)
+        .decompose(0, options, None, None, &a)
+        .unwrap();
+    assert!(zero.resource.is_none());
+    assert!(zero.report.zero);
+    assert_eq!(zero.report.constructive_terms, 0);
+    assert_eq!(zero.report.logical_table_and_coefficient_bytes, 0);
+    let one = CertifiedPathTensor::new(raw_phase_tensor(
+        1,
+        &[(1, false)],
+        &[0],
+        &[(1, 1)],
+        0,
+        -1,
+        &a,
+    ))
+    .with_caller_certificate(serde_json::json!({"stage":"caller-certificate"}));
+    for database in [Some(builtin_phase_catalogue().unwrap()), None] {
+        let d = one
+            .decompose(1024, Default::default(), database, None, &a)
+            .unwrap();
+        assert_eq!(
+            decomposed_vector(&d, &a),
+            vec![a.omega(0, -1).unwrap(), a.omega(1, -1).unwrap()]
+        );
+        assert!(!d.report.zero);
+        assert_eq!(
+            d.report.constructive_terms,
+            d.resource.as_ref().unwrap().num_terms()
+        );
+        let _: std::time::Duration = d.report.elapsed;
+        assert!(matches!(
+            (database.is_some(), d.report.terms),
+            (true, PathTermReport::StabilizerTerms(_)) | (false, PathTermReport::AmplitudeTerms(_))
+        ));
+    }
+    let absorbed = one.absorb_boundaries(Default::default(), &a).unwrap();
+    assert_eq!(
+        absorbed.certificates()[0],
+        PathCertificate::Caller(serde_json::json!({"stage":"caller-certificate"}))
+    );
+    assert_eq!(one.certificates().len(), 1);
+    eprintln!(
+        "public facade: width10 refusal;zero bypass;2 exact backend vectors/receipts;caller certificate order"
+    );
+}
+#[test]
+fn original_absorption_runs_before_final_rank_term_and_table_limits_and_reports_full_rank() {
+    use rmagna::phase::*;
+    let a = ScalarArithmetic::default();
+    let t = CertifiedPathTensor::new(raw_phase_tensor(
+        3,
+        &[(1, false), (2, true)],
+        &[4, 4, 0],
+        &[(1, 1), (2, 1)],
+        5,
+        -3,
+        &a,
+    ))
+    .with_caller_certificate("caller");
+    let mut options = NativePhaseOptions::default();
+    options.selection.max_quotient_rank = 0;
+    let error = match t.decompose(1, options, None, None, &a) {
+        Err(e) => e,
+        Ok(_) => panic!("unabsorbed rank2 must fail"),
+    };
+    let PathTensorError::Algebra(PhaseError::Catalogue(error)) = error else {
+        panic!("wrong error: {error}")
+    };
+    assert_eq!(error.field, "phase_selection.max_quotient_rank");
+    assert_eq!(error.message, "needs at least 2; configured limit is 0");
+    let d = t
+        .decompose(1, options, None, Some(Default::default()), &a)
+        .unwrap();
+    assert_eq!(
+        (
+            d.report.quotient_rank,
+            d.report.constructive_terms,
+            d.tensor.tensor().phase().num_variables()
+        ),
+        (0, 1, 1)
+    );
+    // Literal path oracle: x2 sums to zero unless x0=x1; the nonzero
+    // labels are 2 and1, with respective phases omega5 and omega7.
+    assert_eq!(
+        decomposed_vector(&d, &a),
+        vec![
+            ExactScalar::zero(),
+            a.omega(7, -1).unwrap(),
+            a.omega(5, -1).unwrap(),
+            ExactScalar::zero()
+        ]
+    );
+    assert!(matches!(
+        d.tensor.certificates()[0],
+        PathCertificate::Caller("caller")
+    ));
+    assert!(d.tensor.certificates().iter().any(|c| matches!(c, PathCertificate::GlobalRadicalContraction(stage) if stage.signature_rank == 2 && stage.output_paths == 1)));
+    assert!(
+        t.decompose(0, Default::default(), None, Some(Default::default()), &a)
+            .is_err()
+    );
+    options.selection.max_table_and_coefficient_bytes = 0;
+    assert!(
+        t.decompose(1, options, None, Some(Default::default()), &a)
+            .is_err()
+    );
+    eprintln!(
+        "absorption: exact rank2->0 tensor;fullrank error;one term;literal complex vector;certificate;zero term/table refusals"
+    );
+}
+#[test]
+fn original_rank_zero_empty_database_unit_requires_more_than_four_table_bytes_in_both_orders() {
+    use rmagna::catalogue::{CatalogueLimits, PhaseCatalogue};
+    use rmagna::phase::*;
+    let a = ScalarArithmetic::default();
+    let db = PhaseCatalogue::from_json(
+        r#"{"schema_version":1,"entries":[]}"#,
+        &CatalogueLimits::default(),
+        &a,
+    )
+    .unwrap();
+    assert_eq!(db.usage().entries, 0);
+    let t = CertifiedPathTensor::<()>::new(raw_phase_tensor(0, &[], &[], &[], 3, 0, &a));
+    for absorption in [None, Some(RadicalAbsorptionOptions::default())] {
+        let d = t
+            .decompose(1, Default::default(), Some(&db), absorption, &a)
+            .unwrap();
+        assert_eq!(
+            (d.report.quotient_rank, d.report.constructive_terms),
+            (0, 1)
+        );
+        let vector = decomposed_vector(&d, &a);
+        assert_eq!(vector, vec![a.omega(3, 0).unwrap()]);
+        assert_eq!(
+            a.multiply(&vector[0].conjugate(), &vector[0]).unwrap(),
+            ExactScalar::one()
+        );
+        assert_eq!(d.report.logical_table_and_coefficient_bytes, 44);
+        let mut options = NativePhaseOptions::default();
+        options.selection.max_table_and_coefficient_bytes = 4;
+        let error = match t.decompose(1, options, Some(&db), absorption, &a) {
+            Err(e) => e,
+            Ok(_) => panic!("four bytes admit only the core value"),
+        };
+        assert!(
+            error
+                .to_string()
+                .contains("max_table_and_coefficient_bytes")
+        );
+        assert!(error.to_string().contains("configured limit is 4"));
+        options.selection.max_table_and_coefficient_bytes = 44;
+        assert!(t.decompose(1, options, Some(&db), absorption, &a).is_ok());
+    }
+    eprintln!(
+        "empty database: rank0 identity phase/norm;both absorption orderings;4-byte refusal and44-byte portable boundary success"
+    );
+}
+
+#[test]
+fn portable_coefficient_budget_is_bound_to_effective_preparation_configuration() {
+    use rmagna::instrument::QueryPreparation;
+    let mut options = NativePhaseOptions::default();
+    let default = QueryPreparation::Native(options).configuration();
+    assert!(
+        default["selection"]
+            .get("max_table_and_coefficient_bytes")
+            .is_none()
+    );
+    options.selection.max_table_and_coefficient_bytes = 4;
+    let bounded = QueryPreparation::Native(options).configuration();
+    assert_eq!(bounded["selection"]["max_table_and_coefficient_bytes"], 4);
+    assert_ne!(default, bounded);
+    let a = ScalarArithmetic::default();
+    let tensor = raw_phase_tensor(
+        3,
+        &[(1, false), (2, false), (4, false)],
+        &[0; 3],
+        &[(1, 1), (2, 1), (4, 1)],
+        0,
+        -3,
+        &a,
+    );
+    options.selection.max_table_and_coefficient_bytes = 351;
+    assert!(
+        tensor
+            .prepare_native_resource(8, options, None, &a)
+            .is_err()
+    );
+    options.selection.max_table_and_coefficient_bytes = 352;
+    let resource = tensor
+        .prepare_native_resource(8, options, None, &a)
+        .unwrap()
+        .unwrap();
+    assert_eq!(resource.quotient_rank(), 3);
+    assert_eq!(
+        resource
+            .native_resource()
+            .unwrap()
+            .receipt()
+            .logical_table_and_coefficient_bytes,
+        352
+    );
 }
