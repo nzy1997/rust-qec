@@ -454,7 +454,8 @@ fn human_comparison_reports_partial_draws_export_failures_and_unstarted_sampling
         args.extend(limits);
         let out = f.run(&args);
         assert_eq!(out.status.code(), Some(1));
-        let text = String::from_utf8(out.stdout).unwrap();
+        assert!(out.stdout.is_empty());
+        let text = String::from_utf8(out.stderr).unwrap();
         args.push("--json");
         let value = f.json(&args, 1);
         assert!(text.contains(&format!(
@@ -497,7 +498,8 @@ fn human_comparison_reports_partial_draws_export_failures_and_unstarted_sampling
         "1",
     ]);
     assert_eq!(out.status.code(), Some(1));
-    let text = String::from_utf8(out.stdout).unwrap();
+    assert!(out.stdout.is_empty());
+    let text = String::from_utf8(out.stderr).unwrap();
     assert!(text.contains(
         "affine_support: complete; draws: requested 2, completed 2, failed 0, not attempted 0"
     ));

@@ -2,6 +2,7 @@
 use super::*;
 use crate::unitary::{DensityBoundary, DensityLayout, PreparedDensityOverlap};
 use std::sync::Mutex;
+use std::sync::atomic::{AtomicU64, Ordering};
 
 struct Entry {
     left_outputs: Vec<usize>,
@@ -29,6 +30,7 @@ pub(super) struct DensityQueries {
     mode: QueryPreparation,
     limit: usize,
     entries: Mutex<Vec<Entry>>,
+    reused_evaluations: AtomicU64,
 }
 impl DensityQueries {
     pub(super) fn new(mode: QueryPreparation, limit: usize) -> Result<Self, InstrumentError> {
@@ -43,6 +45,7 @@ impl DensityQueries {
             mode,
             limit,
             entries: Mutex::new(Vec::new()),
+            reused_evaluations: AtomicU64::new(0),
         })
     }
     pub(super) fn statistics(&self) -> Result<PreparedQueryStatistics, InstrumentError> {
@@ -56,6 +59,9 @@ impl DensityQueries {
                 .iter()
                 .filter_map(|entry| entry.plan.fixed_phase_resource()),
         ))
+    }
+    pub(super) fn reused_evaluations(&self) -> u64 {
+        self.reused_evaluations.load(Ordering::Relaxed)
     }
     pub(super) fn evaluate(
         &self,
@@ -74,7 +80,7 @@ impl DensityQueries {
         {
             return Err(UnitaryError::DimensionMismatch.into());
         }
-        let (plan, _) = self.plan(
+        let (plan, outcome) = self.plan(
             left,
             boundary.layout(),
             right,
@@ -82,14 +88,22 @@ impl DensityQueries {
             max_terms,
             arithmetic,
         )?;
-        Ok(plan.evaluate(
+        let value = plan.evaluate(
             left,
             right,
             boundary.outcomes,
             target.outcomes,
             max_terms,
             arithmetic,
-        )?)
+        )?;
+        if outcome == QueryPreparationOutcome::Reused {
+            let _ = self.reused_evaluations.fetch_update(
+                Ordering::Relaxed,
+                Ordering::Relaxed,
+                |value| Some(value.saturating_add(1)),
+            );
+        }
+        Ok(value)
     }
     pub(super) fn prepare(
         &self,

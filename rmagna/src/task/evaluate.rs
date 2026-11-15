@@ -335,6 +335,14 @@ impl TaskEvaluator {
                 .map_err(|e| error("prepared_densities", e))?,
         })
     }
+    /// Successful target-frame cache reuses, cumulative for the retained
+    /// reference owner. Cold-prefix execution has no shared reference cache.
+    pub fn prepared_density_reuses(&self) -> Option<u64> {
+        match &self.execution {
+            Execution::Linear { instrument, .. } => Some(instrument.prepared_density_reuses()),
+            Execution::Causal(program) => program.prepared_density_reuses(),
+        }
+    }
     pub fn prepared_moment_statistics(
         &self,
     ) -> Result<Option<crate::instrument::PreparedQueryStatistics>, TaskError> {
@@ -386,6 +394,50 @@ impl TaskEvaluator {
     }
     pub fn sample(&self, random: &mut impl RandomSource) -> Result<TaskEvaluation, TaskError> {
         self.sample_observed(random, None)
+    }
+    /// Lazily evaluate a bounded batch using this prepared evaluator and one
+    /// caller-owned RNG. No environment, evaluator or RNG is copied. The first
+    /// error is returned once and terminates the iterator; a new iterator may
+    /// explicitly continue from the caller's current stream state.
+    pub fn samples<'a, R: RandomSource + 'a>(
+        &'a self,
+        random: &'a mut R,
+        count: usize,
+    ) -> impl Iterator<Item = Result<TaskEvaluation, TaskError>> + std::iter::FusedIterator + 'a
+    {
+        self.samples_observed(random, count, None)
+    }
+    /// The same lazy batch with caller-owned cumulative work/quotas. Counts
+    /// include failed attempts and are never reset between iterator items.
+    pub fn samples_with_costs<'a, R: RandomSource + 'a>(
+        &'a self,
+        random: &'a mut R,
+        count: usize,
+        meter: &'a ExecutionMeter,
+    ) -> impl Iterator<Item = Result<TaskEvaluation, TaskError>> + std::iter::FusedIterator + 'a
+    {
+        self.samples_observed(random, count, Some(meter))
+    }
+    fn samples_observed<'a, R: RandomSource + 'a>(
+        &'a self,
+        random: &'a mut R,
+        count: usize,
+        meter: Option<&'a ExecutionMeter>,
+    ) -> impl Iterator<Item = Result<TaskEvaluation, TaskError>> + std::iter::FusedIterator + 'a
+    {
+        let mut remaining = count;
+        std::iter::from_fn(move || {
+            if remaining == 0 {
+                return None;
+            }
+            remaining -= 1;
+            let next = self.sample_observed(random, meter);
+            if next.is_err() {
+                remaining = 0;
+            }
+            Some(next)
+        })
+        .fuse()
     }
     /// Record logical work, including errors, without changing the draw stream.
     pub fn sample_with_costs(

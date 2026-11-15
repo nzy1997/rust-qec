@@ -292,7 +292,7 @@ fn cli_conflicts_limits_and_read_failures_precede_loading_quantum_inputs() {
         assert_eq!(out.status.code(), Some(2));
         assert!(out.stderr.is_empty());
         let failure: Value = serde_json::from_slice(&out.stdout).unwrap();
-        assert_eq!(failure["status"], "failed");
+        assert_eq!(failure["status"], "invalid");
         assert_eq!(failure["failures"][0]["phase"], "arguments");
         let message = failure["failures"][0]["message"].as_str().unwrap();
         assert!(message.contains("--sampling"), "{message}");
@@ -311,16 +311,18 @@ fn cli_conflicts_limits_and_read_failures_precede_loading_quantum_inputs() {
         "100",
     ]);
     assert_eq!(out.status.code(), Some(2));
-    assert!(String::from_utf8(out.stdout).unwrap().contains("conflicts"));
+    assert!(String::from_utf8(out.stderr).unwrap().contains("conflicts"));
     let out = files.run(&[
         "enumerate",
+        "--max-weight",
+        "1",
         "absent-circuit.magna",
         "--sampling",
         "physical.json",
     ]);
     assert_eq!(out.status.code(), Some(2));
     assert!(
-        String::from_utf8(out.stdout)
+        String::from_utf8(out.stderr)
             .unwrap()
             .contains("unavailable in enumerate")
     );

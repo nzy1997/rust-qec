@@ -400,6 +400,7 @@ enum ReferenceSet {
     All,
     Records,
     Decisions,
+    QuantumControl,
 }
 impl Builder<'_> {
     fn fail(&self, text: &Text, repeat: &[u64], message: impl Into<String>) -> ParseError {
@@ -520,6 +521,10 @@ impl Builder<'_> {
                 })?;
             BitExpr::atom(BitAtom::Record(self.circuit.num_records - distance))
         } else if let Some(index) = token.strip_prefix("det[").and_then(|t| t.strip_suffix(']')) {
+            if matches!(allowed, ReferenceSet::QuantumControl) {
+                return Err(self.fail(text, repeat,
+                    "quantum controls require rec[...] or ctrl[...]; pass det[...] through CONTROL first"));
+            }
             if matches!(allowed, ReferenceSet::Records) {
                 return Err(self.fail(
                     text,
@@ -625,7 +630,7 @@ impl Builder<'_> {
                 })?;
                 (
                     target,
-                    Some(self.reference(group[0], ReferenceSet::All, text, repeat)?),
+                    Some(self.reference(group[0], ReferenceSet::QuantumControl, text, repeat)?),
                     1,
                 )
             } else {

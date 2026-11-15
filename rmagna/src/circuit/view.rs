@@ -1,7 +1,11 @@
 //! Owned control-expression snapshots and provenance-safe circuit inspection.
 
 use super::{BitExpr, Circuit, LocatedOperation, Operation};
-use std::{collections::BTreeMap, fmt, sync::Arc};
+use std::{
+    collections::{BTreeMap, BTreeSet},
+    fmt,
+    sync::Arc,
+};
 
 /// One write version of a classical control register, including overwritten writes.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -16,7 +20,7 @@ impl RegisterVersion {
     }
 }
 
-/// An owned snapshot of resolved expressions for every control-register write.
+/// Owned control-write expressions and ordered external-input dependencies.
 ///
 /// Expressions contain reported-record and external-decision atoms; register
 /// reads have already been resolved by the parser. Editing this inspection data
@@ -24,12 +28,16 @@ impl RegisterVersion {
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct ControlAnalysis {
     expressions: BTreeMap<RegisterVersion, BitExpr>,
+    required_parities: Vec<BitExpr>,
 }
 
 impl ControlAnalysis {
     /// Own an explicitly supplied expression map for inspection.
     pub fn from_expressions(expressions: BTreeMap<RegisterVersion, BitExpr>) -> Self {
-        Self { expressions }
+        Self {
+            expressions,
+            ..Default::default()
+        }
     }
 
     /// Return the exact expression, or `None` for an absent register/version.
@@ -43,6 +51,14 @@ impl ControlAnalysis {
         &self.expressions
     }
 
+    /// First-seen distinct nonconstant external-controller input expressions.
+    /// Ordered callback inputs remain untouched in the circuit operations.
+    /// Explicit expression-map construction has no circuit dependency context
+    /// and starts with an empty list. Replacing that map preserves this list.
+    pub fn required_parities(&self) -> &[BitExpr] {
+        &self.required_parities
+    }
+
     /// Replace the complete map with owned values, preserving the old snapshot
     /// when this method is called on a clone.
     pub fn with_expressions(mut self, expressions: BTreeMap<RegisterVersion, BitExpr>) -> Self {
@@ -54,7 +70,21 @@ impl ControlAnalysis {
 impl From<&Circuit> for ControlAnalysis {
     fn from(circuit: &Circuit) -> Self {
         let mut expressions = BTreeMap::new();
+        let mut required_parities = Vec::new();
+        let mut seen = BTreeSet::new();
         for operation in circuit.operations() {
+            if let Operation::Control {
+                call: Some(_),
+                inputs,
+                ..
+            } = &operation.operation
+            {
+                for input in inputs {
+                    if !input.terms.is_empty() && seen.insert(input) {
+                        required_parities.push(input.clone());
+                    }
+                }
+            }
             if let Operation::Control { outputs, .. } = &operation.operation {
                 for write in outputs {
                     expressions.insert(
@@ -64,7 +94,10 @@ impl From<&Circuit> for ControlAnalysis {
                 }
             }
         }
-        Self { expressions }
+        Self {
+            expressions,
+            required_parities,
+        }
     }
 }
 
@@ -182,7 +215,7 @@ impl CircuitView {
 }
 
 impl Circuit {
-    /// Snapshot every versioned control write into owned resolved expressions.
+    /// Snapshot control writes and distinct external inputs into owned metadata.
     pub fn control_analysis(&self) -> ControlAnalysis {
         ControlAnalysis::from(self)
     }

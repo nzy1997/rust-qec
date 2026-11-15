@@ -188,7 +188,14 @@ fn all_enumeration_options_and_non_time_results_match_the_owned_file_api() {
         full["result"]["conditional_error"]["lower"],
         full["result"]["conditional_error"]["upper"]
     );
-    let human = files.run(&["enumerate", "circuit.magna", "--task", "task.json"]);
+    let human = files.run(&[
+        "enumerate",
+        "--max-weight",
+        "1",
+        "circuit.magna",
+        "--task",
+        "task.json",
+    ]);
     assert!(human.status.success());
     let text = String::from_utf8(human.stdout).unwrap();
     for text_part in [
@@ -262,6 +269,8 @@ fn every_mode_mismatch_and_malformed_flag_rejects_before_decoder_import() {
     ] {
         let mut args = vec![
             "enumerate",
+            "--max-weight",
+            "1",
             "missing.magna",
             "--controllers",
             "controllers.json",
@@ -275,6 +284,8 @@ fn every_mode_mismatch_and_malformed_flag_rejects_before_decoder_import() {
     files.json(
         &[
             "enumerate",
+            "--max-weight",
+            "1",
             "circuit.magna",
             "--controllers",
             "controllers.json",
@@ -302,6 +313,8 @@ fn physical_category_limits_resolve_and_export_choices_without_changing_internal
     files.put("circuit.magna", "M 0\nX_ERROR(1/3) 0");
     let args = [
         "enumerate",
+        "--max-weight",
+        "1",
         "circuit.magna",
         "--include-patterns",
         "--max-original-categories",
@@ -329,6 +342,8 @@ fn physical_category_limits_resolve_and_export_choices_without_changing_internal
     let disabled = files.json(
         &[
             "enumerate",
+            "--max-weight",
+            "1",
             "circuit.magna",
             "--max-original-categories",
             "0",
@@ -355,6 +370,8 @@ fn physical_category_limits_resolve_and_export_choices_without_changing_internal
         let failed = files.json(
             &[
                 "enumerate",
+                "--max-weight",
+                "1",
                 "circuit.magna",
                 "--include-patterns",
                 flag,
@@ -392,6 +409,8 @@ fn malformed_or_boolean_physical_metadata_limits_fail_before_controller_import()
             let value = files.json(
                 &[
                     "enumerate",
+                    "--max-weight",
+                    "1",
                     "circuit.magna",
                     "--controllers",
                     "controllers.json",
@@ -413,6 +432,8 @@ fn malformed_or_boolean_physical_metadata_limits_fail_before_controller_import()
         files.json(
             &[
                 "enumerate",
+                "--max-weight",
+                "1",
                 "circuit.magna",
                 "--controllers",
                 "controllers.json",
@@ -439,6 +460,8 @@ fn noise_budgets_and_numeric_export_failures_preserve_receipts() {
         let value = files.json(
             &[
                 "enumerate",
+                "--max-weight",
+                "1",
                 "circuit.magna",
                 "--task",
                 "task.json",
@@ -457,6 +480,8 @@ fn noise_budgets_and_numeric_export_failures_preserve_receipts() {
     let numeric = files.json(
         &[
             "enumerate",
+            "--max-weight",
+            "1",
             "circuit.magna",
             "--task",
             "task.json",
@@ -481,6 +506,8 @@ fn noise_budgets_and_numeric_export_failures_preserve_receipts() {
     let deadline = files.json(
         &[
             "enumerate",
+            "--max-weight",
+            "1",
             "circuit.magna",
             "--task",
             "task.json",
@@ -504,6 +531,8 @@ fn nonlinear_external_decoders_enumerate_all_physical_histories_and_caps() {
         let value = files.json(
             &[
                 "enumerate",
+                "--max-weight",
+                "1",
                 "circuit.magna",
                 "--task",
                 "task.json",
@@ -538,6 +567,8 @@ fn nonlinear_external_decoders_enumerate_all_physical_histories_and_caps() {
         let value = files.json(
             &[
                 "enumerate",
+                "--max-weight",
+                "1",
                 "circuit.magna",
                 "--task",
                 "task.json",
@@ -565,6 +596,8 @@ fn callback_failure_and_sampled_record_requests_do_not_publish_partial_sums() {
     let value = files.json(
         &[
             "enumerate",
+            "--max-weight",
+            "1",
             "circuit.magna",
             "--task",
             "task.json",
@@ -587,6 +620,8 @@ fn callback_failure_and_sampled_record_requests_do_not_publish_partial_sums() {
     let value = files.json(
         &[
             "enumerate",
+            "--max-weight",
+            "1",
             "circuit.magna",
             "--task",
             "task.json",
@@ -602,8 +637,11 @@ fn callback_failure_and_sampled_record_requests_do_not_publish_partial_sums() {
             .unwrap()
             .contains("sample_records")
     );
-    let missing = files.json(&["enumerate", "missing.magna", "--json"], 1);
-    assert_eq!(missing["status"], "failed");
+    let missing = files.json(
+        &["enumerate", "--max-weight", "1", "missing.magna", "--json"],
+        2,
+    );
+    assert_eq!(missing["status"], "invalid");
 }
 #[test]
 fn scientific_tiny_error_and_undefined_conditional_intervals_remain_visible() {
@@ -617,6 +655,8 @@ fn scientific_tiny_error_and_undefined_conditional_intervals_remain_visible() {
     let value = files.json(
         &[
             "enumerate",
+            "--max-weight",
+            "1",
             "circuit.magna",
             "--task",
             "task.json",
@@ -629,7 +669,14 @@ fn scientific_tiny_error_and_undefined_conditional_intervals_remain_visible() {
         value["result"]["masses"]["error"]["scientific"],
         json!({"mantissa":0.5,"exponent2":-1199})
     );
-    let human = files.run(&["enumerate", "circuit.magna", "--task", "task.json"]);
+    let human = files.run(&[
+        "enumerate",
+        "--max-weight",
+        "1",
+        "circuit.magna",
+        "--task",
+        "task.json",
+    ]);
     assert!(human.status.success());
     assert!(
         String::from_utf8(human.stdout)
@@ -643,6 +690,8 @@ fn scientific_tiny_error_and_undefined_conditional_intervals_remain_visible() {
     let value = files.json(
         &[
             "enumerate",
+            "--max-weight",
+            "1",
             "circuit.magna",
             "--task",
             "task.json",
@@ -651,7 +700,14 @@ fn scientific_tiny_error_and_undefined_conditional_intervals_remain_visible() {
         0,
     );
     assert!(value["result"]["conditional_error"].is_null());
-    let human = files.run(&["enumerate", "circuit.magna", "--task", "task.json"]);
+    let human = files.run(&[
+        "enumerate",
+        "--max-weight",
+        "1",
+        "circuit.magna",
+        "--task",
+        "task.json",
+    ]);
     assert!(
         String::from_utf8(human.stdout)
             .unwrap()
@@ -762,6 +818,8 @@ fn projected_target_norms_are_exported_without_rescaling_physical_masses() {
         let value = files.json(
             &[
                 "enumerate",
+                "--max-weight",
+                "1",
                 "circuit.magna",
                 "--task",
                 "task.json",

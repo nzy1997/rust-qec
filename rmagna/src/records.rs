@@ -292,6 +292,15 @@ pub(crate) fn propose_affine_reported_observed(
             arithmetic,
         )
     })?;
+    sample_affine_family(&family, random, options, arithmetic)
+}
+
+pub(crate) fn sample_affine_family(
+    family: &crate::gf2::AffineSupport,
+    random: &mut impl RandomSource,
+    options: &SamplingOptions,
+    arithmetic: &ScalarArithmetic,
+) -> Result<AffineProposalDraw, SamplingError> {
     let entropy_words = family.dimension().div_ceil(64);
     if entropy_words > options.max_entropy_words {
         return Err(SamplingError::EntropyLimit {

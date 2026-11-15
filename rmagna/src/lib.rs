@@ -22,6 +22,7 @@ pub mod stabilizer;
 pub mod statistics;
 pub mod task;
 pub mod unitary;
+pub mod validation;
 pub use num_bigint::BigInt;
 
 pub mod fibers;

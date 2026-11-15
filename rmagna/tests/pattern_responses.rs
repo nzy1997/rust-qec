@@ -421,6 +421,8 @@ fn cli_retains_one_saved_report_and_rejects_invalid_retention_before_decoder_imp
     let report = run(
         &[
             "enumerate",
+            "--max-weight",
+            "1",
             "physical.magna",
             "--task",
             "task.json",
@@ -461,6 +463,8 @@ fn cli_retains_one_saved_report_and_rejects_invalid_retention_before_decoder_imp
     let failed = run(
         &[
             "enumerate",
+            "--max-weight",
+            "1",
             "physical.magna",
             "--task",
             "task.json",
@@ -482,6 +486,8 @@ fn cli_retains_one_saved_report_and_rejects_invalid_retention_before_decoder_imp
     let numeric = run(
         &[
             "enumerate",
+            "--max-weight",
+            "1",
             "physical.magna",
             "--task",
             "task.json",
@@ -522,6 +528,8 @@ fn cli_retains_one_saved_report_and_rejects_invalid_retention_before_decoder_imp
         let rejected = run(
             &[
                 "enumerate",
+                "--max-weight",
+                "1",
                 "physical.magna",
                 "--controllers",
                 "controllers.json",
@@ -536,6 +544,8 @@ fn cli_retains_one_saved_report_and_rejects_invalid_retention_before_decoder_imp
     run(
         &[
             "enumerate",
+            "--max-weight",
+            "1",
             "physical.magna",
             "--controllers",
             "controllers.json",

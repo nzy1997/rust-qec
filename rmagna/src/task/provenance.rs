@@ -272,7 +272,7 @@ pub(crate) fn resolved_options(input: &FingerprintInputs<'_>) -> Value {
 pub(crate) fn execution_configuration(evaluation: EvaluationOptions, run: TaskRunOptions) -> Value {
     let runtime = evaluation.runtime;
     let compile = runtime.compile;
-    let options = json!({
+    let mut options = json!({
         "history_sampler": match runtime.history_sampler { HistorySampler::ExactMarginal => "exact_marginal", HistorySampler::AffineSupport => "affine_support" },
         "causal_strategy": match runtime.strategy { CausalStrategy::FixedTemplate => "fixed_template", CausalStrategy::ColdPrefix => "cold_prefix" },
         "max_history_queries": runtime.max_history_queries, "max_history_inputs": runtime.max_history_inputs,
@@ -303,6 +303,16 @@ pub(crate) fn execution_configuration(evaluation: EvaluationOptions, run: TaskRu
             "statistics": {"max_dimensions": run.statistics.max_dimensions, "coefficient_bits": run.statistics.arithmetic.max_coefficient_bits()},
         },
     });
+    // Preserve existing default fingerprints; an explicit new completion cap
+    // is still part of the declared execution configuration.
+    if runtime.max_zero_prefix_words
+        != crate::runtime::RuntimeOptions::default().max_zero_prefix_words
+    {
+        options["max_zero_prefix_words"] = json!(runtime.max_zero_prefix_words);
+    }
+    if runtime.guarded_noise_timing == crate::runtime::GuardedNoiseTiming::Causal {
+        options["guarded_noise_timing"] = json!("causal");
+    }
     options
 }
 
