@@ -472,6 +472,30 @@ impl CompiledFileTask {
             .insert("kind".to_owned(), json!("inspection"));
         Ok(value)
     }
+    /// Run the fixed task and noise law with fresh call-local budgets.
+    /// Task/sampling overrides are rejected by the type boundary, before any
+    /// execution or controller callbacks.
+    ///
+    /// ```no_run
+    /// use rmagna::file_api::{CompiledFileTask,FileApiError,FileRunReport};
+    /// use rmagna::task::TaskRunOptions;
+    /// fn valid(compiled:&CompiledFileTask,run:&TaskRunOptions)->Result<FileRunReport,FileApiError> {
+    ///     compiled.run(run)
+    /// }
+    /// ```
+    ///
+    /// ```compile_fail
+    /// use rmagna::file_api::{CompiledFileTask,FileTask};
+    /// use rmagna::task::TaskRunOptions;
+    /// fn override_task(compiled:&CompiledFileTask,task:&FileTask) {
+    ///     compiled.run(&TaskRunOptions::default(),task);
+    /// }
+    /// ```
+    ///
+    /// ```compile_fail
+    /// use rmagna::{noise::NoiseSampling,task::TaskRunOptions};
+    /// let run=TaskRunOptions {sampling:NoiseSampling::Physical,..Default::default()};
+    /// ```
     pub fn run(&self, run: &TaskRunOptions) -> Result<FileRunReport, FileApiError> {
         self.run_observed(run, None, None)
     }

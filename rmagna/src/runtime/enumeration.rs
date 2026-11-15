@@ -270,6 +270,7 @@ impl CausalProgram {
             budget.attempt()?;
             let available_branches = options.max_branches - histories.len() - pending.len();
             let draw = ExecutionNoise {
+                defer_guarded: false,
                 faults: faults.to_vec(),
                 physical_probability: probability.clone(),
                 likelihood_ratio: BigRational::one(),

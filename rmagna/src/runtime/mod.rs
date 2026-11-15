@@ -169,8 +169,19 @@ pub enum HistorySampler {
     ExactMarginal,
     AffineSupport,
 }
+/// Timing of independent physical categories controlled by reported history.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum GuardedNoiseTiming {
+    /// Stable legacy Rust stream: draw potential categories before history.
+    #[default]
+    PreDrawn,
+    /// Draw a guarded category only after its guard resolves true, including a
+    /// word for deterministic categories. Unguarded categories remain upfront.
+    Causal,
+}
 #[derive(Clone, Copy, Debug)]
 pub struct RuntimeOptions {
+    pub guarded_noise_timing: GuardedNoiseTiming,
     pub history_sampler: HistorySampler,
     pub strategy: CausalStrategy,
     pub max_history_queries: usize,
@@ -186,6 +197,7 @@ pub struct RuntimeOptions {
 impl Default for RuntimeOptions {
     fn default() -> Self {
         Self {
+            guarded_noise_timing: GuardedNoiseTiming::PreDrawn,
             strategy: CausalStrategy::FixedTemplate,
             history_sampler: HistorySampler::ExactMarginal,
             max_history_queries: 100_000,
@@ -210,6 +222,7 @@ struct ExecutionNoise {
     physical_probability: BigRational,
     likelihood_ratio: BigRational,
     entropy_words: usize,
+    defer_guarded: bool,
 }
 impl From<NoiseDraw> for ExecutionNoise {
     fn from(draw: NoiseDraw) -> Self {
@@ -218,6 +231,7 @@ impl From<NoiseDraw> for ExecutionNoise {
             physical_probability: draw.physical_probability,
             likelihood_ratio: draw.likelihood_ratio,
             entropy_words: draw.entropy_words,
+            defer_guarded: false,
         }
     }
 }
@@ -612,6 +626,11 @@ impl CausalProgram {
             .map(CompiledInstrument::prepared_density_statistics)
             .transpose()?)
     }
+    pub fn prepared_density_reuses(&self) -> Option<u64> {
+        self.reference
+            .as_ref()
+            .map(CompiledInstrument::prepared_density_reuses)
+    }
     pub fn prepared_moment_statistics(
         &self,
     ) -> Result<Option<crate::instrument::PreparedQueryStatistics>, RuntimeError> {
@@ -696,10 +715,17 @@ impl CausalProgram {
         meter: Option<&ExecutionMeter>,
     ) -> Result<ResolvedHistory, RuntimeError> {
         self.validate_requested(requested)?;
-        let draw = self.sampler.draw(random)?;
+        let causal = self.options.guarded_noise_timing == GuardedNoiseTiming::Causal;
+        let mut draw: ExecutionNoise = if causal {
+            self.sampler.draw_excluding(&self.guarded_sites, random)?
+        } else {
+            self.sampler.draw(random)?
+        }
+        .into();
+        draw.defer_guarded = causal;
         self.execute(
             requested,
-            draw.into(),
+            draw,
             random,
             arithmetic,
             HistoryMode::Sample,
@@ -753,6 +779,7 @@ impl CausalProgram {
                 physical_probability: probability,
                 likelihood_ratio: likelihood,
                 entropy_words: 0,
+                defer_guarded: false,
             },
             random,
             arithmetic,
@@ -824,6 +851,7 @@ impl CausalProgram {
                 physical_probability: probability,
                 likelihood_ratio: BigRational::one(),
                 entropy_words: 0,
+                defer_guarded: false,
             },
             &mut crate::noise::SplitMix64::new(0),
             arithmetic,
@@ -911,6 +939,7 @@ impl CausalProgram {
                 && mode.groups().is_none())
             .then_some(ExactScalar::one()),
             zero_prefix: false,
+            noise_entropy_words: draw.entropy_words,
         };
         for (end, located) in self.circuit.operations().iter().enumerate() {
             match &located.operation {
@@ -955,6 +984,15 @@ impl CausalProgram {
                         let expression = resolve::expression(expression, &state.decisions, false)?;
                         let values = state.sample_inputs(end, &[expression], random, arithmetic)?;
                         state.guards.insert(site, values[0]);
+                        if draw.defer_guarded && values[0] {
+                            if let Some(alternative) = self
+                                .sampler
+                                .draw_guarded(site, random, &mut state.noise_entropy_words)
+                                .map_err(RuntimeError::from)?
+                            {
+                                state.chosen.insert(site, alternative);
+                            }
+                        }
                     }
                 }
                 _ => {}
@@ -1001,18 +1039,19 @@ impl CausalProgram {
                 .map_err(RuntimeError::from)
         })?
         .value;
-        let noise_probability = if instrument.noise_sites().len() == self.model.num_sites() {
-            // Every potential category remains active, so the already validated
-            // physical draw product is also the final causal path probability.
-            draw.physical_probability.clone()
-        } else {
-            crate::noise::probability_product(instrument.noise_sites().iter().map(|category| {
-                let original = self.source_sites[&category.source_operations()[0]];
-                self.model.probabilities(original).unwrap()
-                    [state.chosen.get(&original).map_or(0, |a| a + 1)]
-                .value()
-            }))
-        };
+        let noise_probability =
+            if !draw.defer_guarded && instrument.noise_sites().len() == self.model.num_sites() {
+                // Every potential category remains active, so the already validated
+                // physical draw product is also the final causal path probability.
+                draw.physical_probability.clone()
+            } else {
+                crate::noise::probability_product(instrument.noise_sites().iter().map(|category| {
+                    let original = self.source_sites[&category.source_operations()[0]];
+                    self.model.probabilities(original).unwrap()
+                        [state.chosen.get(&original).map_or(0, |a| a + 1)]
+                    .value()
+                }))
+            };
         Ok(ResolvedHistory {
             instrument,
             faults,
@@ -1024,7 +1063,7 @@ impl CausalProgram {
             noise_likelihood_ratio: draw.likelihood_ratio,
             conditions: state.conditions,
             controller_calls: state.calls,
-            noise_entropy_words: draw.entropy_words,
+            noise_entropy_words: state.noise_entropy_words,
             history_entropy_words: state.entropy_words,
             network_compilations: state.network_compilations,
             history_queries: state.history_queries,
@@ -1040,6 +1079,7 @@ struct PathState<'a> {
     conditions: Vec<(BitExpr, bool)>,
     calls: Vec<ControllerCall>,
     entropy_words: usize,
+    noise_entropy_words: usize,
     prefix_compiles: usize,
     network_compilations: usize,
     history_queries: usize,

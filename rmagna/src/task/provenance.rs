@@ -310,6 +310,9 @@ pub(crate) fn execution_configuration(evaluation: EvaluationOptions, run: TaskRu
     {
         options["max_zero_prefix_words"] = json!(runtime.max_zero_prefix_words);
     }
+    if runtime.guarded_noise_timing == crate::runtime::GuardedNoiseTiming::Causal {
+        options["guarded_noise_timing"] = json!("causal");
+    }
     options
 }
 

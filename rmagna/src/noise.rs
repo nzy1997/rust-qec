@@ -606,6 +606,241 @@ impl NoiseSampler {
             entropy_words,
         })
     }
+
+    /// Lazily draw at most `count` assignments from one caller-owned stream.
+    /// Stops after the first error; creating or exhausting an empty iterator
+    /// consumes no entropy. Budgets retain their ordinary per-draw scope.
+    pub fn draws<'a, R: RandomSource + 'a>(
+        &'a self,
+        random: &'a mut R,
+        count: usize,
+    ) -> impl Iterator<Item = Result<NoiseDraw, NoiseError>> + std::iter::FusedIterator + 'a {
+        let mut remaining = count;
+        std::iter::from_fn(move || {
+            if remaining == 0 {
+                return None;
+            }
+            remaining -= 1;
+            let next = self.draw(random);
+            if next.is_err() {
+                remaining = 0;
+            }
+            Some(next)
+        })
+        .fuse()
+    }
+
+    /// Internal causal route: defer guarded categories rather than spending
+    /// their entropy before the controller chooses whether they are active.
+    pub(crate) fn draw_excluding(
+        &self,
+        excluded: &BTreeSet<usize>,
+        random: &mut impl RandomSource,
+    ) -> Result<NoiseDraw, NoiseError> {
+        if excluded.is_empty() {
+            return self.draw(random);
+        }
+        if self.denominator_bits > self.options.max_denominator_bits {
+            return Err(NoiseError::DenominatorLimit {
+                limit: self.options.max_denominator_bits,
+                required: self.denominator_bits,
+            });
+        }
+        let mut entropy_words = 0;
+        let mut faults = Vec::new();
+        let mut p = BigRational::one();
+        let mut q = BigRational::one();
+        for (site, category) in self.proposal.categories.iter().enumerate() {
+            if excluded.contains(&site) {
+                continue;
+            }
+            let value = uniform_below(
+                &category.denominator,
+                random,
+                &mut entropy_words,
+                self.options.max_entropy_words,
+            )?;
+            let choice = category.cumulative.partition_point(|b| b <= &value);
+            if choice != 0 {
+                faults.push(FaultSelection {
+                    site,
+                    alternative: choice - 1,
+                });
+            }
+            p *= self.physical.categories[site].probabilities[choice].value();
+            q *= category.probabilities[choice].value();
+        }
+        let likelihood_ratio = if self.same_distribution {
+            BigRational::one()
+        } else {
+            &p / &q
+        };
+        Ok(NoiseDraw {
+            faults,
+            physical_probability: p,
+            proposal_probability: q,
+            likelihood_ratio,
+            entropy_words,
+        })
+    }
+
+    /// Physical guarded category, including one word for a deterministic active
+    /// category. The first word is reused for nontrivial exact rational draws;
+    /// rejection/large denominators retain the ordinary exact sampler.
+    pub(crate) fn draw_guarded(
+        &self,
+        site: usize,
+        random: &mut impl RandomSource,
+        used: &mut usize,
+    ) -> Result<Option<usize>, NoiseError> {
+        let category = self
+            .physical
+            .categories
+            .get(site)
+            .ok_or(NoiseError::InvalidCategory { site })?;
+        if self.denominator_bits > self.options.max_denominator_bits {
+            return Err(NoiseError::DenominatorLimit {
+                limit: self.options.max_denominator_bits,
+                required: self.denominator_bits,
+            });
+        }
+        let available = self.options.max_entropy_words.saturating_sub(*used);
+        let required =
+            ((&category.denominator - BigUint::one()).bits().div_ceil(64) as usize).max(1);
+        if available < required {
+            return Err(NoiseError::EntropyLimit {
+                limit: self.options.max_entropy_words,
+            });
+        }
+        let first = random.next_u64();
+        *used += 1;
+        let mut buffered = FirstWord {
+            first: Some(first),
+            random,
+            extra: 0,
+        };
+        let mut category_words = 0;
+        let value = uniform_below(
+            &category.denominator,
+            &mut buffered,
+            &mut category_words,
+            available,
+        );
+        *used += buffered.extra;
+        let value = value.map_err(|error| match error {
+            NoiseError::EntropyLimit { .. } => NoiseError::EntropyLimit {
+                limit: self.options.max_entropy_words,
+            },
+            other => other,
+        })?;
+        let choice = category.cumulative.partition_point(|b| b <= &value);
+        Ok(choice.checked_sub(1))
+    }
+}
+struct FirstWord<'a, R> {
+    first: Option<u64>,
+    random: &'a mut R,
+    extra: usize,
+}
+impl<R: RandomSource> RandomSource for FirstWord<'_, R> {
+    fn next_u64(&mut self) -> u64 {
+        self.first.take().unwrap_or_else(|| {
+            self.extra += 1;
+            self.random.next_u64()
+        })
+    }
+}
+
+#[cfg(test)]
+mod guarded_entropy_tests {
+    use super::*;
+    use num_bigint::BigInt;
+    struct Words {
+        values: std::collections::VecDeque<u64>,
+        calls: usize,
+    }
+    impl RandomSource for Words {
+        fn next_u64(&mut self) -> u64 {
+            self.calls += 1;
+            self.values.pop_front().expect("extra entropy")
+        }
+    }
+    fn sampler(limit: usize) -> NoiseSampler {
+        let model = NoiseModel::new(
+            vec![vec!["2/3".parse().unwrap(), "1/3".parse().unwrap()]],
+            &NoiseOptions::default(),
+        )
+        .unwrap();
+        NoiseSampler::physical(
+            model,
+            NoiseOptions {
+                max_entropy_words: limit,
+                ..Default::default()
+            },
+        )
+    }
+    #[test]
+    fn guarded_rejection_counts_prefetched_and_later_words_once() {
+        let mut random = Words {
+            values: [3, 2].into(),
+            calls: 0,
+        };
+        let mut used = 1;
+        assert_eq!(
+            sampler(3).draw_guarded(0, &mut random, &mut used).unwrap(),
+            Some(0)
+        );
+        assert_eq!(used, 3);
+        assert_eq!(random.calls, 2);
+        let mut random = Words {
+            values: [3, 2].into(),
+            calls: 0,
+        };
+        let mut used = 1;
+        assert!(matches!(
+            sampler(2).draw_guarded(0, &mut random, &mut used),
+            Err(NoiseError::EntropyLimit { limit: 2 })
+        ));
+        assert_eq!(used, 2);
+        assert_eq!(random.calls, 1);
+        assert_eq!(random.values.front(), Some(&2));
+        assert!(matches!(
+            sampler(2).draw_guarded(0, &mut random, &mut used),
+            Err(NoiseError::EntropyLimit { limit: 2 })
+        ));
+        assert_eq!(random.calls, 1);
+    }
+    #[test]
+    fn wide_guarded_denominators_admit_first_draw_before_prefetching() {
+        let q = (BigInt::from(1) << 65) + 1;
+        let p = BigRational::new(1.into(), q);
+        let model = NoiseModel::new(
+            vec![vec![
+                Probability::from_rational(BigRational::one() - &p).unwrap(),
+                Probability::from_rational(p).unwrap(),
+            ]],
+            &NoiseOptions::default(),
+        )
+        .unwrap();
+        let sampler = NoiseSampler::physical(
+            model,
+            NoiseOptions {
+                max_entropy_words: 1,
+                ..Default::default()
+            },
+        );
+        let mut random = Words {
+            values: [0, 0].into(),
+            calls: 0,
+        };
+        let mut used = 0;
+        assert!(matches!(
+            sampler.draw_guarded(0, &mut random, &mut used),
+            Err(NoiseError::EntropyLimit { limit: 1 })
+        ));
+        assert_eq!(random.calls, 0);
+        assert_eq!(used, 0);
+    }
 }
 fn uniform_below(
     bound: &BigUint,

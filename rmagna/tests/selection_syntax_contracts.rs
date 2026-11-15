@@ -346,11 +346,12 @@ fn original_removed_task_fields_name_circuit_migrations_before_module_loading() 
             .unwrap();
         assert_eq!(
             out.status.code(),
-            Some(1),
+            Some(2),
             "{}",
             String::from_utf8_lossy(&out.stdout)
         );
         let value: Value = serde_json::from_slice(&out.stdout).unwrap();
+        assert_eq!(value["status"], "invalid");
         let message = value["failures"][0]["message"].as_str().unwrap();
         assert!(
             message.contains(name) && message.contains(hint),

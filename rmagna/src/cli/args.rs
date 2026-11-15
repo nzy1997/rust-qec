@@ -6,7 +6,7 @@ use rmagna::instrument::{InsertionPreparation, ProbabilityPreparation, QueryPrep
 use rmagna::noise::NoiseSampling;
 use rmagna::probability::ProbabilityParser;
 use rmagna::runtime::process::ProcessOptions;
-use rmagna::runtime::{CausalStrategy, HistorySampler};
+use rmagna::runtime::{CausalStrategy, GuardedNoiseTiming, HistorySampler};
 use rmagna::task::TaskRunOptions;
 use rmagna::unitary::{CompilerStrategy, InsertionPreparationOptions};
 use std::{collections::BTreeMap, num::NonZeroU64, path::PathBuf, time::Duration};
@@ -35,13 +35,15 @@ Inputs and output:
   --version                           Show the Rust implementation version
 
 Run configuration:
-  --shots N                           Positive draw count (default 1; run or stream)
+  --shots N                           number of draws; positive (default 1; run or stream)
   --seed N                            u64 seed (default 0; run, stream or compare-samplers)
   --progress-every N                  Positive committed-draw interval on stderr (run only)
   --noise-proposal-scale RATIONAL      Exact positive scale; unavailable in enumerate
   --sampling FILE                     Sampling JSON (max 16384 bytes); conflicts with --noise-proposal-scale
   --compiler shared|parity_copies      Default shared
   --history-sampler affine_support|exact_marginal   Default affine_support; not enumerate/compare-samplers
+  --guarded-noise-timing pre_drawn|causal  Default pre_drawn; not enumerate
+  --max-zero-prefix-words N           Classical zero-prefix completion geometry (default 16777216)
   --causal-strategy fixed|cold         Default fixed
   --probability-preparation MODE       cold|trace|fixed|catalogue|native|native_injection; default fixed
   --density-preparation MODE           Same choices; default fixed, on demand
@@ -121,7 +123,7 @@ Exact enumeration only:
   --max-original-categories N         Physical metadata category cap (default 1000000)
   --max-original-channels N           Physical metadata channel cap (default 1000000)
   --max-original-probability-bits N    Metadata probability integer bit cap (default 1048576)
-  --max-weight N                      Nonnegative decimal category cutoff (default 1; unbounded input)
+  --max-weight N                      Required nonnegative decimal cutoff for enumerate
   --max-patterns N                    Positive pattern cap (default 100000)
   --max-fault-entries N               Stored fault entry cap (default 1000000)
   --max-enumeration-sites N           Potential noise category cap (default 100000)
@@ -297,6 +299,7 @@ impl Args {
             "--noise-proposal-scale",
             "--sampling",
             "--history-sampler",
+            "--guarded-noise-timing",
             "--max-record-values",
         ]
         .iter()
@@ -383,7 +386,11 @@ impl Args {
             return Err("--shots requires run; use --pilot-shots in compare-samplers".into());
         }
         configure_limits(&mut flags, &mut file, &mut load, &mut run)?;
-        let mut enumeration = configure_enumeration(&mut flags)?;
+        let mut enumeration = if mode == Mode::Enumerate {
+            configure_enumeration(&mut flags)?
+        } else {
+            FileEnumerationOptions::default()
+        };
         enumeration.execution_limits = run.execution_limits;
         configure_runtime(&mut flags, &mut file)?;
         if mode == Mode::Compare {
@@ -437,7 +444,7 @@ impl Args {
             NoiseSampling::Physical
         };
         if let Some((flag, _)) = flags.0.first_key_value() {
-            return Err(format!("unknown option {flag}; use --help"));
+            return Err(unknown_option(flag));
         }
         Ok(Self {
             mode,
@@ -463,6 +470,16 @@ impl Args {
     }
 }
 
+fn unknown_option(arg: &str) -> String {
+    let names = HELP
+        .lines()
+        .filter_map(|line| line.split_whitespace().next())
+        .map(|word| word.trim_end_matches(','))
+        .filter(|word| word.starts_with("--"));
+    let hint = rmagna::validation::closest_name(arg, names)
+        .map_or(String::new(), |name| format!("; did you mean {name}?"));
+    format!("unknown option {arg}{hint}; use --help for valid options")
+}
 fn parse_tokens(raw: Vec<String>) -> Result<(Mode, PathBuf, Flags), String> {
     let mut it = raw.into_iter();
     let mode = match it.next().as_deref() {
@@ -512,6 +529,8 @@ fn parse_tokens(raw: Vec<String>) -> Result<(Mode, PathBuf, Flags), String> {
                 | "--max-source-bytes"
                 | "--max-task-bytes"
                 | "--history-sampler"
+                | "--guarded-noise-timing"
+                | "--max-zero-prefix-words"
                 | "--causal-strategy"
                 | "--max-terms"
                 | "--compiler"
@@ -537,7 +556,7 @@ fn parse_tokens(raw: Vec<String>) -> Result<(Mode, PathBuf, Flags), String> {
             && !STREAM_FLAGS.contains(&arg.as_str())
             && !native::FLAGS.contains(&arg.as_str())
         {
-            return Err(format!("unknown option {arg}; use --help"));
+            return Err(unknown_option(&arg));
         }
         let value = if matches!(
             arg.as_str(),
@@ -602,9 +621,10 @@ fn configure_enumeration(flags: &mut Flags) -> Result<FileEnumerationOptions, St
         options.max_original_probability_bits,
     )?;
     let n = &mut options.enumeration.noise;
-    if let Some(text) = flags.text("--max-weight") {
-        n.max_weight = weight_cutoff(&text)?;
-    }
+    let text = flags
+        .text("--max-weight")
+        .ok_or("enumerate requires --max-weight N")?;
+    n.max_weight = weight_cutoff(&text)?;
     n.max_patterns = flags.number("--max-patterns", n.max_patterns)?;
     if n.max_patterns == 0 {
         return Err("--max-patterns must be positive".to_owned());
@@ -673,6 +693,19 @@ fn configure_limits(
 
 fn configure_runtime(flags: &mut Flags, file: &mut FileTaskOptions) -> Result<(), String> {
     let runtime = &mut file.evaluation.runtime;
+    runtime.guarded_noise_timing = match flags
+        .choice(
+            "--guarded-noise-timing",
+            "pre_drawn",
+            &["pre_drawn", "causal"],
+        )?
+        .as_str()
+    {
+        "causal" => GuardedNoiseTiming::Causal,
+        _ => GuardedNoiseTiming::PreDrawn,
+    };
+    runtime.max_zero_prefix_words =
+        flags.number("--max-zero-prefix-words", runtime.max_zero_prefix_words)?;
     runtime.history_sampler = match flags
         .choice(
             "--history-sampler",

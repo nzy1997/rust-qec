@@ -475,7 +475,7 @@ fn arguments_and_existing_outputs_fail_before_decoder_import() {
     }
     let value = files.json(
         &["run", "missing.magna", "--output", "failure.json", "--json"],
-        1,
+        2,
     );
     assert_eq!(
         value,
@@ -485,7 +485,7 @@ fn arguments_and_existing_outputs_fail_before_decoder_import() {
     files.put("invalid.json", "{");
     files.json(
         &["run", "circuit.magna", "--task", "invalid.json", "--json"],
-        1,
+        2,
     );
     files.json(
         &[
@@ -495,7 +495,7 @@ fn arguments_and_existing_outputs_fail_before_decoder_import() {
             "1",
             "--json",
         ],
-        1,
+        2,
     );
 }
 

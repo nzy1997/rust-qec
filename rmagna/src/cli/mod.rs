@@ -61,11 +61,18 @@ fn load_task(args: &Args) -> Result<(FileTask, Option<ControllerProcess>)> {
     )?;
     Ok((task, worker))
 }
-fn execute(args: &Args) -> Result<Value> {
+fn execute(args: &Args) -> Value {
     if args.mode == Mode::Stream {
-        return Ok(stream::execute(args));
+        return stream::execute(args);
     }
-    let (task, worker) = load_task(args)?;
+    let (task, worker) = match load_task(args) {
+        Ok(value) => value,
+        Err(error) => return output::invalid("input", error.to_string()),
+    };
+    execute_loaded(args, task, worker)
+        .unwrap_or_else(|error| output::failure("preparation", error.to_string()))
+}
+fn execute_loaded(args: &Args, task: FileTask, worker: Option<ControllerProcess>) -> Result<Value> {
     let mut value = match args.mode {
         Mode::Stream => unreachable!("stream owns its persistence lifecycle"),
         Mode::Validate => {
@@ -172,7 +179,7 @@ pub fn main() -> u8 {
     let args = match Args::parse(raw) {
         Ok(args) => args,
         Err(error) => {
-            let _ = output::print(&output::failure("arguments", error), wants_json);
+            let _ = output::print(&output::invalid("arguments", error), wants_json);
             return 2;
         }
     };
@@ -198,8 +205,7 @@ pub fn main() -> u8 {
             return 1;
         }
     };
-    let mut value = execute(&args)
-        .unwrap_or_else(|error| output::failure("input_or_preparation", error.to_string()));
+    let mut value = execute(&args);
     if let Some(file) = &mut destination {
         let written = serde_json::to_writer_pretty(&mut *file, &value)
             .map_err(std::io::Error::other)
@@ -220,5 +226,24 @@ pub fn main() -> u8 {
     if output::print(&value, args.json).is_err() {
         return 1;
     }
-    u8::from(value["status"] == "failed")
+    if !args.json
+        && value["status"] != "failed"
+        && value["status"] != "invalid"
+        && let Some(path) = &args.output
+    {
+        if writeln!(
+            std::io::stdout().lock(),
+            "Full result written to {}.",
+            path.display()
+        )
+        .is_err()
+        {
+            return 1;
+        }
+    }
+    if value["status"] == "invalid" {
+        2
+    } else {
+        u8::from(value["status"] == "failed")
+    }
 }

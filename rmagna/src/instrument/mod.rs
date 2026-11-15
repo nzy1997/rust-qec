@@ -450,6 +450,12 @@ impl CompiledInstrument {
     pub fn prepared_density_statistics(&self) -> Result<PreparedQueryStatistics, InstrumentError> {
         self.density_queries.statistics()
     }
+    /// Successful density evaluations that reused a retained matching plan.
+    /// Cumulative for this shared cache owner, saturating at u64::MAX; separate
+    /// from immutable retained-resource statistics and per-run query costs.
+    pub fn prepared_density_reuses(&self) -> u64 {
+        self.density_queries.reused_evaluations()
+    }
     pub fn prepared_moment_statistics(&self) -> Result<PreparedQueryStatistics, InstrumentError> {
         self.moment_queries.statistics()
     }

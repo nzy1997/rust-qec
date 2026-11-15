@@ -7,6 +7,13 @@ use std::io::{self, Write};
 pub fn failure(phase: &str, message: impl ToString) -> Value {
     json!({"schema_version":2,"software_version":concat!("rmagna-",env!("CARGO_PKG_VERSION")),"status":"failed","failures":[{"phase":phase,"type":"CliError","message":message.to_string()}]})
 }
+pub fn invalid(phase: &str, message: impl ToString) -> Value {
+    let message = message.to_string();
+    let mut value = failure(phase, &message);
+    value["status"] = json!("invalid");
+    value["error"] = json!(message);
+    value
+}
 /// Export failure is a CLI failure even if execution completed. Preserve actual
 /// counts and metadata; never substitute zero estimates or discard a prefix.
 pub fn export_failure(report: &FileRunReport, error: &BatchExportError) -> Value {
@@ -152,11 +159,11 @@ fn enumeration_summary(stdout: &mut impl Write, value: &Value) -> io::Result<()>
         interval(&r["conditional_error"])
     )
 }
-fn estimate(value: &Value, key: &str) -> String {
-    if let Some(number) = value["estimates"][key].as_f64() {
+fn metric(value: &Value, group: &str, key: &str) -> String {
+    if let Some(number) = value[group][key].as_f64() {
         return number.to_string();
     }
-    let scaled = &value["estimates_scientific"][key];
+    let scaled = &value[format!("{group}_scientific")][key];
     match (scaled["mantissa"].as_f64(), scaled["exponent2"].as_i64()) {
         (Some(m), Some(e)) => format!("{m} * 2^{e}"),
         _ => "n/a".to_owned(),
@@ -261,7 +268,13 @@ fn comparison_summary(stdout: &mut impl Write, value: &Value) -> io::Result<()> 
     )
 }
 pub fn print(value: &Value, json_output: bool) -> io::Result<()> {
-    let mut stdout = io::stdout().lock();
+    if !json_output && (value["status"] == "invalid" || value["status"] == "failed") {
+        print_to(value, false, &mut io::stderr().lock())
+    } else {
+        print_to(value, json_output, &mut io::stdout().lock())
+    }
+}
+fn print_to(value: &Value, json_output: bool, mut stdout: &mut impl Write) -> io::Result<()> {
     if json_output {
         serde_json::to_writer(&mut stdout, value)?;
         writeln!(stdout)
@@ -299,7 +312,20 @@ pub fn print(value: &Value, json_output: bool) -> io::Result<()> {
                 ("joint error mass", "error"),
                 ("conditional error", "conditional_error"),
             ] {
-                writeln!(stdout, "{prefix}{label}: {}", estimate(statistics, key))?;
+                if value["kind"] == "stream" {
+                    writeln!(
+                        stdout,
+                        "{prefix}{label}: {}",
+                        metric(statistics, "estimates", key)
+                    )?;
+                } else {
+                    writeln!(
+                        stdout,
+                        "{prefix}{label}: {} ± {}",
+                        metric(statistics, "estimates", key),
+                        metric(statistics, "standard_errors", key)
+                    )?;
+                }
             }
         }
         if value["kind"] == "stream"

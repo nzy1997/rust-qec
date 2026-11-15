@@ -498,7 +498,22 @@ draws noise, samples histories, nor calls decoders. `run` prepares the evaluator
 and performs actual noisy draws, with preparation included in its run limits.
 Task module paths resolve relative to the task JSON directory.
 
-`enumerate` integrates physical noise categories through `--max-weight` and all
+The default human run summary includes estimates and standard errors. `--json`
+prints the full report; `--output FILE` also saves it, with a completion notice
+in human mode. Invalid arguments return exit 2 and status `invalid`; file input
+validation in the non-stream commands uses the same rule. Stream preflight
+failures retain the stream persistence report and exit 1. Execution, preparation,
+export and output failures return exit 1 and
+status `failed`. Human failures go to stderr; JSON reports go to stdout in both
+cases. Failure reports retain actual completed draws and partial statistics.
+Unknown ASCII task fields and CLI flags receive a unique nearby spelling
+suggestion when one exists. Rust uses typed CLI flags (`--max-terms`), not an
+upstream Python options dictionary. `inspect` performs dry compilation; use
+`prepare` to build query families explicitly.
+
+
+`enumerate` requires an explicit `--max-weight N` and integrates physical noise
+categories through that cutoff and all
 positive causal histories. The cutoff accepts a nonnegative decimal integer,
 including values larger than machine integers; such ceilings select the same
 finite full sector, while every storage and work quota still applies. It reports
@@ -2132,9 +2147,18 @@ the completed history still has zero weight. Positive-mass structural failures
 and resource refusals propagate. `RuntimeOptions::max_zero_prefix_words` bounds
 the completion's conservative eight-byte geometry units (default 16,777,216,
 excluding scalar limbs). Nondefault caps enter the options fingerprint; the
-default preserves existing fingerprints. The existing Rust RNG convention
-draws potential categorical faults before histories, with no entropy for a
-deterministic category; Python's inter-callback RNG schedule is separate.
+default preserves existing fingerprints. `GuardedNoiseTiming::PreDrawn` retains
+the existing Rust convention: potential categorical faults are drawn before
+histories, without entropy for a deterministic category. Select
+`RuntimeOptions::guarded_noise_timing = GuardedNoiseTiming::Causal` to draw each
+guarded physical category after its guard resolves true. Active categories use
+at least one word, including deterministic ones; inactive categories use none.
+Additional words for exact rational rejection/large denominators share the
+per-draw noise entropy budget. Guarded categories retain their physical law
+under importance sampling. Supplied assignments and exact enumeration do not
+generate noise entropy. The causal option is fingerprinted, and the legacy
+default preserves old fingerprints and streams. CLI flags are
+`--guarded-noise-timing causal` and `--max-zero-prefix-words N`.
 
 The runtime multiplies the exact group proposal masses, then evaluates the
 physical history mass at the end. `history_proposal_mass` is present only for
@@ -6699,3 +6723,38 @@ method and seven-family direct affine boundary task. The direct task integrates
 unneeded reports, returns exact unnormalized acceptance/moments, and consumes no
 random words. Complex/opaque feedback sampling, remaining source methods, paper
 Monte Carlo experiments and performance conclusions remain separate work.
+
+
+### Original file-contract validation
+
+`remaining_file_contracts` binds the 25 R02 original methods to 30 Rust tests.
+It retains the six detector scenarios (including 1,025 callback inputs with one
+unique parity), 256 interference-prefix seeds and a 256-seed stochastic-noise
+supplement, both history methods, all 24 readout row/flip combinations,
+annotation/source identity, 70-draw noise and task batches, 40 prepared/cold
+scalar queries, four fresh per-run budgets and the 200-draw CLI fixture.
+Reported-bit and future-postselection checks use independent exact masses.
+The original Native methods use the pinned upstream fixture and helper; their
+Python object layout, exception prose and PRNG bit stream are not Rust ABI.
+
+`NoiseSampler::draws` and `TaskEvaluator::samples` lazily use one caller-owned
+Rust random stream, stop after their first error and do no work for zero draws.
+`TaskEvaluator::samples_with_costs` charges actual work to the supplied cumulative
+meter. These streams are compared with successive single calls, including full
+exact sample fields and final RNG state. Compiler counts describe Rust evaluator
+construction (including its explicit zero-width identity target); they do not
+claim the Native compiler counter's scope.
+
+`prepared_density_reuses()` on an instrument, causal program or task evaluator
+counts successful evaluations through an already retained density plan. It is
+an observational, saturating lifetime counter; it neither adds query charges
+nor changes the existing JSON report or options fingerprint. Causal programs
+without a retained reference return `None`. Readout comparisons require this
+counter to advance, rather than inferring reuse from cache occupancy alone.
+
+Compiled file tasks own their task/sampling snapshot. The run API accepts only
+run options, so task/sampling overrides are rejected at Rust type checking; the
+public documentation includes two compile-fail examples. Repeated runs retain
+preparation while starting fresh query and deadline budgets. Rust CLI summaries,
+version identity, option names and exit/status behavior are tested as public
+Rust equivalents of the corresponding original methods.

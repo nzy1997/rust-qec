@@ -249,7 +249,15 @@ fn object(value: &RawValue, field: &str) -> Result<Object, TaskError> {
 fn keys(data: &Object, allowed: &[&str], field: &str) -> Result<(), TaskError> {
     for key in data.keys() {
         if !allowed.contains(&key.as_str()) {
-            return Err(TaskError::new(field, format!("unknown field {key:?}")));
+            let hint = crate::validation::closest_name(key, allowed.iter().copied())
+                .map_or(String::new(), |name| format!("; did you mean {name:?}?"));
+            return Err(TaskError::new(
+                field,
+                format!(
+                    "unknown field {key:?}{hint}; valid fields: {}",
+                    allowed.join(", ")
+                ),
+            ));
         }
     }
     Ok(())
