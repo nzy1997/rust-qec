@@ -585,14 +585,17 @@ fn original_ordered_distinct_dependencies_keep_callback_duplicates() {
     assert_eq!(external.len(), 2);
     assert_eq!(external[0].len(), 3);
     assert_eq!(external[1].len(), 2);
-    let mut distinct = Vec::<BitExpr>::new();
-    for input in external.iter().flat_map(|inputs| inputs.iter()) {
-        if !distinct.contains(input) {
-            distinct.push(input.clone());
-        }
-    }
-    assert_eq!(distinct.len(), 3);
-    assert_eq!(distinct[0], external[0][0]);
+    let analysis = circuit.control_analysis();
+    let parity = |records: &[usize]| BitExpr {
+        constant: false,
+        terms: records.iter().map(|&j| BitAtom::Record(j)).collect(),
+    };
+    // Observe production inspection data, with literal first-seen ordering.
+    assert_eq!(
+        analysis.required_parities(),
+        [parity(&[0, 1]), parity(&[2]), parity(&[0])]
+    );
+    assert_eq!(analysis.required_parities()[0], external[0][0]);
     assert_eq!(
         external[0],
         &vec![
@@ -616,6 +619,52 @@ fn original_ordered_distinct_dependencies_keep_callback_duplicates() {
         .unwrap();
     assert_eq!(result.raw_result().status, RunStatus::Complete);
     assert_eq!(*observed.lock().unwrap(), [vec![false; 3], vec![false; 2]]);
+    observed.lock().unwrap().clear();
+    let distinct_values = files
+        .load(
+            &format!("X 0\n{source}"),
+            "{}",
+            &registry,
+            (
+                CompilerStrategy::ParityCopies,
+                CausalStrategy::FixedTemplate,
+            ),
+        )
+        .run(&run(1, 0))
+        .unwrap();
+    assert_eq!(distinct_values.raw_result().status, RunStatus::Complete);
+    assert_eq!(
+        *observed.lock().unwrap(),
+        [vec![true, false, true], vec![false, true]]
+    );
+    assert_eq!(
+        distinct_values
+            .raw_result()
+            .statistics
+            .as_ref()
+            .unwrap()
+            .accepted,
+        ExactField::one()
+    );
+
+    let constant_and_inverted = parse_circuit("M 0\nDETECTOR rec[-1]\nCONTROL[XOR](1) -> ctrl[0]\nCONTROL[wide] ctrl[0] det[0] !det[0] det[0] !det[0] -> ctrl[1]", &parse).unwrap();
+    let owned = constant_and_inverted.control_analysis();
+    let expected = [parity(&[0]), parity(&[0]).inverted()];
+    assert_eq!(owned.required_parities(), expected);
+    assert_eq!(
+        owned
+            .clone()
+            .with_expressions(BTreeMap::new())
+            .required_parities(),
+        expected
+    );
+    drop(constant_and_inverted);
+    assert_eq!(owned.required_parities(), expected);
+    assert!(
+        rmagna::circuit::ControlAnalysis::from_expressions(BTreeMap::new())
+            .required_parities()
+            .is_empty()
+    );
 }
 
 #[test]
@@ -1990,6 +2039,9 @@ fn original_annotations_manual_faults_and_sampled_source_snapshot_match_readout(
     let q = NoiseModel::physical(&right, &NoiseOptions::default()).unwrap();
     assert_eq!(p.num_sites(), q.num_sites());
     assert_eq!(p.num_sites(), 3);
+    assert_eq!(left.noise_sites()[0].source_operations(), &[0]);
+    assert_eq!(left.noise_sites()[1].source_operations(), &[1]);
+    assert_eq!(left.noise_sites()[2].source_operations(), &[4]);
     for j in 0..p.num_sites() {
         assert_eq!(p.probabilities(j), q.probabilities(j));
         assert_eq!(
@@ -2032,11 +2084,32 @@ fn original_annotations_manual_faults_and_sampled_source_snapshot_match_readout(
                 alternative: 0,
             },
             FaultSelection {
-                site: 1,
+                // Original manual m1 is the second measurement at operation 4.
+                site: 2,
                 alternative: 0,
             },
         ],
     ] {
+        // The original manual op0 X + m1 flip leaves reported m0 equal to 1.
+        // Flipping m0 instead would make this literal marginal vanish.
+        let record_zero_is_one = left
+            .reported_probability(
+                &[BitExpr::atom(BitAtom::Record(0))],
+                &rmagna::gf2::BitVector::from_indices(1, [0]).unwrap(),
+                &faults,
+                1024,
+                &arithmetic,
+            )
+            .unwrap()
+            .value;
+        assert_eq!(
+            record_zero_is_one,
+            if faults.is_empty() {
+                rmagna::scalar::ExactScalar::zero()
+            } else {
+                rmagna::scalar::ExactScalar::one()
+            }
+        );
         let x = native
             .sample_prescribed(&faults, &mut SplitMix64::new(5))
             .unwrap();

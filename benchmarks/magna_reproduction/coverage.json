@@ -678,7 +678,7 @@
           "package": "rmagna",
           "target": "remaining_file_contracts",
           "test": "original_detector_future_and_ambiguous_uses_reject_including_module_roles",
-          "source_sha256": "230b5d9d00b5de421d5346cdf429ea7737220b788f7a048c4bffae276cdcc20c"
+          "source_sha256": "63ba2cdeec643c03eb77c5308964fd6afa188751a0e9e1b5afb9b9c8d30d1de6"
         }
       ]
     },
@@ -691,7 +691,7 @@
           "package": "rmagna",
           "target": "remaining_file_contracts",
           "test": "original_detector_order_duplicates_inversions_and_prior_register_state",
-          "source_sha256": "230b5d9d00b5de421d5346cdf429ea7737220b788f7a048c4bffae276cdcc20c"
+          "source_sha256": "63ba2cdeec643c03eb77c5308964fd6afa188751a0e9e1b5afb9b9c8d30d1de6"
         }
       ]
     },
@@ -704,7 +704,7 @@
           "package": "rmagna",
           "target": "remaining_file_contracts",
           "test": "original_detector_repeat_numbering_and_parity_cancellation",
-          "source_sha256": "230b5d9d00b5de421d5346cdf429ea7737220b788f7a048c4bffae276cdcc20c"
+          "source_sha256": "63ba2cdeec643c03eb77c5308964fd6afa188751a0e9e1b5afb9b9c8d30d1de6"
         }
       ]
     },
@@ -717,7 +717,7 @@
           "package": "rmagna",
           "target": "remaining_file_contracts",
           "test": "original_detector_selection_and_target_do_not_bias_earlier_decoder_inputs",
-          "source_sha256": "230b5d9d00b5de421d5346cdf429ea7737220b788f7a048c4bffae276cdcc20c"
+          "source_sha256": "63ba2cdeec643c03eb77c5308964fd6afa188751a0e9e1b5afb9b9c8d30d1de6"
         }
       ]
     },
@@ -730,7 +730,7 @@
           "package": "rmagna",
           "target": "remaining_file_contracts",
           "test": "original_detector_separate_selection_rows_and_combination",
-          "source_sha256": "230b5d9d00b5de421d5346cdf429ea7737220b788f7a048c4bffae276cdcc20c"
+          "source_sha256": "63ba2cdeec643c03eb77c5308964fd6afa188751a0e9e1b5afb9b9c8d30d1de6"
         }
       ]
     },
@@ -743,7 +743,7 @@
           "package": "rmagna",
           "target": "remaining_file_contracts",
           "test": "original_detector_1025_inputs_keep_one_parity_and_affine_route",
-          "source_sha256": "230b5d9d00b5de421d5346cdf429ea7737220b788f7a048c4bffae276cdcc20c"
+          "source_sha256": "63ba2cdeec643c03eb77c5308964fd6afa188751a0e9e1b5afb9b9c8d30d1de6"
         }
       ]
     },
@@ -1212,7 +1212,7 @@
           "package": "rmagna",
           "target": "remaining_file_contracts",
           "test": "original_70_draw_internal_batch_preserves_all_weights_target_recovery_and_work",
-          "source_sha256": "230b5d9d00b5de421d5346cdf429ea7737220b788f7a048c4bffae276cdcc20c"
+          "source_sha256": "63ba2cdeec643c03eb77c5308964fd6afa188751a0e9e1b5afb9b9c8d30d1de6"
         }
       ]
     },
@@ -1230,7 +1230,7 @@
           "package": "rmagna",
           "target": "remaining_file_contracts",
           "test": "original_noiseless_batch_keeps_rng_and_70_noisy_draws_match_single_stream",
-          "source_sha256": "230b5d9d00b5de421d5346cdf429ea7737220b788f7a048c4bffae276cdcc20c"
+          "source_sha256": "63ba2cdeec643c03eb77c5308964fd6afa188751a0e9e1b5afb9b9c8d30d1de6"
         }
       ]
     },
@@ -1248,7 +1248,7 @@
           "package": "rmagna",
           "target": "remaining_file_contracts",
           "test": "original_prepared_scalar_queries_match_40_cold_queries_with_report_flip_controls",
-          "source_sha256": "230b5d9d00b5de421d5346cdf429ea7737220b788f7a048c4bffae276cdcc20c"
+          "source_sha256": "63ba2cdeec643c03eb77c5308964fd6afa188751a0e9e1b5afb9b9c8d30d1de6"
         }
       ]
     },
@@ -1581,7 +1581,7 @@
           "package": "rmagna",
           "target": "remaining_file_contracts",
           "test": "interference_zero_prefixes_finish_callbacks_guarded_noise_and_complex_terminal_mass",
-          "source_sha256": "230b5d9d00b5de421d5346cdf429ea7737220b788f7a048c4bffae276cdcc20c"
+          "source_sha256": "63ba2cdeec643c03eb77c5308964fd6afa188751a0e9e1b5afb9b9c8d30d1de6"
         }
       ]
     },
@@ -2697,13 +2697,13 @@
     {
       "id": "test_quantum_output.QuantumOutputTests.test_annotations_manual_faults_and_source_snapshot",
       "status": "verified",
-      "contract": "Duplicate/ordered record-success annotations preserve all eight original source operations, two public records, raw task snapshot, noise probabilities and source anchors. Both manual noise assignments and both history methods over eight seeds equal explicit noiseless readout rewrites, full sampled records, exact masses and final Rust RNG state; successful density-plan reuse is observed.",
+      "contract": "Duplicate/ordered record-success annotations preserve all eight original source operations, two public records, raw task snapshot, noise probabilities and source anchors. Both original manual noise assignments (including op0 X plus the SECOND measurement m1 flip at internal site2) and both history methods over eight seeds equal explicit noiseless readout rewrites, sampled records, exact masses and final Rust RNG state. Literal source-anchor indices and the deterministic reported-m0 marginal distinguish m1 from a mistaken m0 flip; successful density-plan reuse is observed.",
       "rust_tests": [
         {
           "package": "rmagna",
           "target": "remaining_file_contracts",
           "test": "original_annotations_manual_faults_and_sampled_source_snapshot_match_readout",
-          "source_sha256": "230b5d9d00b5de421d5346cdf429ea7737220b788f7a048c4bffae276cdcc20c"
+          "source_sha256": "63ba2cdeec643c03eb77c5308964fd6afa188751a0e9e1b5afb9b9c8d30d1de6"
         }
       ]
     },
@@ -2716,7 +2716,7 @@
           "package": "rmagna",
           "target": "remaining_file_contracts",
           "test": "original_causal_readout_callbacks_match_both_history_methods_and_report_flips",
-          "source_sha256": "230b5d9d00b5de421d5346cdf429ea7737220b788f7a048c4bffae276cdcc20c"
+          "source_sha256": "63ba2cdeec643c03eb77c5308964fd6afa188751a0e9e1b5afb9b9c8d30d1de6"
         }
       ]
     },
@@ -2742,7 +2742,7 @@
           "package": "rmagna",
           "target": "remaining_file_contracts",
           "test": "original_record_success_public_run_enumeration_task_file_and_source_reports",
-          "source_sha256": "230b5d9d00b5de421d5346cdf429ea7737220b788f7a048c4bffae276cdcc20c"
+          "source_sha256": "63ba2cdeec643c03eb77c5308964fd6afa188751a0e9e1b5afb9b9c8d30d1de6"
         }
       ]
     },
@@ -2755,7 +2755,7 @@
           "package": "rmagna",
           "target": "remaining_file_contracts",
           "test": "original_report_parities_equal_quantum_readout_and_independent_selected_event",
-          "source_sha256": "230b5d9d00b5de421d5346cdf429ea7737220b788f7a048c4bffae276cdcc20c"
+          "source_sha256": "63ba2cdeec643c03eb77c5308964fd6afa188751a0e9e1b5afb9b9c8d30d1de6"
         }
       ]
     },
@@ -2785,13 +2785,13 @@
     {
       "id": "test_query_reuse.OwnershipAndDependencies.test_ordered_distinct_dependencies_keep_callback_duplicates",
       "status": "verified",
-      "contract": "First-seen distinct parity dependencies remain ordered while repeated and inverted callback inputs remain duplicated; independently constructed exact masses and literal callback tuples validate the full source fixture.",
+      "contract": "Production ControlAnalysis inspection exposes the original three first-seen distinct nonconstant input expressions in literal order while circuit operations retain ordered duplicate callback inputs. Both the complete original fixture and a deterministic distinguishing-input supplement execute real callbacks; constants, inversions and owned snapshot preservation are additionally checked. Rust dependency inspection is separate from runtime query-resource counters; no test-local deduplication is used as production evidence.",
       "rust_tests": [
         {
           "package": "rmagna",
           "target": "remaining_file_contracts",
           "test": "original_ordered_distinct_dependencies_keep_callback_duplicates",
-          "source_sha256": "230b5d9d00b5de421d5346cdf429ea7737220b788f7a048c4bffae276cdcc20c"
+          "source_sha256": "63ba2cdeec643c03eb77c5308964fd6afa188751a0e9e1b5afb9b9c8d30d1de6"
         }
       ]
     },
@@ -2945,7 +2945,7 @@
           "package": "rmagna",
           "target": "remaining_file_contracts",
           "test": "original_affine_support_offset_and_report_flip_keep_all_16_draws",
-          "source_sha256": "230b5d9d00b5de421d5346cdf429ea7737220b788f7a048c4bffae276cdcc20c"
+          "source_sha256": "63ba2cdeec643c03eb77c5308964fd6afa188751a0e9e1b5afb9b9c8d30d1de6"
         }
       ]
     },
@@ -3741,7 +3741,7 @@
           "package": "rmagna",
           "target": "remaining_file_contracts",
           "test": "original_cli_budget_failure_uses_failed_exit_one_instead_of_invalid_input",
-          "source_sha256": "230b5d9d00b5de421d5346cdf429ea7737220b788f7a048c4bffae276cdcc20c"
+          "source_sha256": "63ba2cdeec643c03eb77c5308964fd6afa188751a0e9e1b5afb9b9c8d30d1de6"
         }
       ]
     },
@@ -3754,7 +3754,7 @@
           "package": "rmagna",
           "target": "remaining_file_contracts",
           "test": "original_cli_command_summaries_enforce_option_scopes_and_explicit_weight",
-          "source_sha256": "230b5d9d00b5de421d5346cdf429ea7737220b788f7a048c4bffae276cdcc20c"
+          "source_sha256": "63ba2cdeec643c03eb77c5308964fd6afa188751a0e9e1b5afb9b9c8d30d1de6"
         }
       ]
     },
@@ -3767,7 +3767,7 @@
           "package": "rmagna",
           "target": "remaining_file_contracts",
           "test": "original_cli_invalid_input_uses_stderr_or_invalid_json_with_spelling_help",
-          "source_sha256": "230b5d9d00b5de421d5346cdf429ea7737220b788f7a048c4bffae276cdcc20c"
+          "source_sha256": "63ba2cdeec643c03eb77c5308964fd6afa188751a0e9e1b5afb9b9c8d30d1de6"
         }
       ]
     },
@@ -3780,7 +3780,7 @@
           "package": "rmagna",
           "target": "remaining_file_contracts",
           "test": "original_cli_summary_full_json_and_output_file_preserve_all_200_draws",
-          "source_sha256": "230b5d9d00b5de421d5346cdf429ea7737220b788f7a048c4bffae276cdcc20c"
+          "source_sha256": "63ba2cdeec643c03eb77c5308964fd6afa188751a0e9e1b5afb9b9c8d30d1de6"
         }
       ]
     },
@@ -3798,7 +3798,7 @@
           "package": "rmagna",
           "target": "remaining_file_contracts",
           "test": "original_cli_version_and_command_help_name_the_rust_package_and_draw_count",
-          "source_sha256": "230b5d9d00b5de421d5346cdf429ea7737220b788f7a048c4bffae276cdcc20c"
+          "source_sha256": "63ba2cdeec643c03eb77c5308964fd6afa188751a0e9e1b5afb9b9c8d30d1de6"
         }
       ]
     },
@@ -3811,7 +3811,7 @@
           "package": "rmagna",
           "target": "remaining_file_contracts",
           "test": "original_each_compiled_run_starts_fresh_query_and_deadline_budgets",
-          "source_sha256": "230b5d9d00b5de421d5346cdf429ea7737220b788f7a048c4bffae276cdcc20c"
+          "source_sha256": "63ba2cdeec643c03eb77c5308964fd6afa188751a0e9e1b5afb9b9c8d30d1de6"
         }
       ]
     },
@@ -3829,7 +3829,7 @@
           "package": "rmagna",
           "target": "remaining_file_contracts",
           "test": "original_compiled_task_and_sampling_are_fixed_before_any_run",
-          "source_sha256": "230b5d9d00b5de421d5346cdf429ea7737220b788f7a048c4bffae276cdcc20c"
+          "source_sha256": "63ba2cdeec643c03eb77c5308964fd6afa188751a0e9e1b5afb9b9c8d30d1de6"
         }
       ]
     },
@@ -3842,7 +3842,7 @@
           "package": "rmagna",
           "target": "remaining_file_contracts",
           "test": "original_compiled_runs_match_fresh_estimates_identities_and_call_local_work",
-          "source_sha256": "230b5d9d00b5de421d5346cdf429ea7737220b788f7a048c4bffae276cdcc20c"
+          "source_sha256": "63ba2cdeec643c03eb77c5308964fd6afa188751a0e9e1b5afb9b9c8d30d1de6"
         }
       ]
     },
@@ -3855,7 +3855,7 @@
           "package": "rmagna",
           "target": "remaining_file_contracts",
           "test": "original_compiled_option_task_range_cache_and_sampling_errors_suggest_repairs",
-          "source_sha256": "230b5d9d00b5de421d5346cdf429ea7737220b788f7a048c4bffae276cdcc20c"
+          "source_sha256": "63ba2cdeec643c03eb77c5308964fd6afa188751a0e9e1b5afb9b9c8d30d1de6"
         }
       ]
     },

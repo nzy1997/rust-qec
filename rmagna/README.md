@@ -6758,3 +6758,13 @@ public documentation includes two compile-fail examples. Repeated runs retain
 preparation while starting fresh query and deadline budgets. Rust CLI summaries,
 version identity, option names and exit/status behavior are tested as public
 Rust equivalents of the corresponding original methods.
+
+
+`Circuit::control_analysis().required_parities()` exposes the first-seen distinct
+nonconstant external-controller input expressions from the parsed circuit.
+Inverted expressions remain distinct; duplicate ordered callback inputs remain
+in the operations. This is owned inspection metadata, separate from runtime
+query-resource counters. Explicit expression-map construction has no circuit
+context and starts with an empty dependency list; replacing that map preserves
+the dependency snapshot. The source-bound witness checks literal dependency
+order and distinguishing callback tuples, rather than deduplicating in test code.
