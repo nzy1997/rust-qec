@@ -130,6 +130,8 @@ pub struct TaskRunResult {
     pub requested: u64,
     pub completed: u64,
     pub failed: u64,
+    /// One started draw stopped at a cooperative safe point, with no row committed.
+    pub interrupted: u64,
     pub not_attempted: u64,
     pub seed: u64,
     /// Complete-run estimates only; always absent when status is Failed.
@@ -347,11 +349,13 @@ impl TaskEvaluator {
         let mut sampling = Instant::now();
         let mut sampling_seconds = 0.0;
         let mut cancelled = false;
+        let mut interrupted = 0;
         for shot in 0..options.shots {
             if cancellation.is_some_and(CancellationToken::is_cancelled) {
                 cancelled = true;
                 break;
             }
+            let cancellation_before = crate::cancellation::observed();
             let mut phase = RunPhase::Sampling;
             let committed_records = match sample_and_commit(
                 self,
@@ -362,6 +366,11 @@ impl TaskEvaluator {
                 &mut phase,
             ) {
                 Ok(records) => records,
+                Err(_) if crate::cancellation::observed() != cancellation_before => {
+                    cancelled = true;
+                    interrupted = 1;
+                    break;
+                }
                 Err(e) => {
                     failures.push(RunFailure {
                         phase,
@@ -449,7 +458,8 @@ impl TaskEvaluator {
             requested: options.shots,
             completed,
             failed,
-            not_attempted: options.shots - completed - failed,
+            interrupted,
+            not_attempted: options.shots - completed - failed - interrupted,
             seed: options.seed,
             statistics,
             partial_statistics,
@@ -563,6 +573,7 @@ where
                 requested: run.shots,
                 completed: 0,
                 failed: 0,
+                interrupted: 0,
                 not_attempted: run.shots,
                 seed: run.seed,
                 statistics: None,

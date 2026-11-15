@@ -153,3 +153,132 @@ fn nested_scopes_unwinding_and_other_threads_restore_their_own_contexts() {
     assert_eq!(deliberate.value, Err("deliberate error"));
     assert!(!deliberate.interrupted);
 }
+
+struct Files(std::path::PathBuf);
+impl Files {
+    fn new() -> Self {
+        static NEXT: AtomicUsize = AtomicUsize::new(0);
+        let path = std::env::temp_dir().join(format!(
+            "rmagna-inner-cancel-{}-{}",
+            std::process::id(),
+            NEXT.fetch_add(1, Ordering::Relaxed)
+        ));
+        std::fs::create_dir(&path).unwrap();
+        Self(path)
+    }
+    fn compile(
+        &self,
+        source: &str,
+        registry: &rmagna::runtime::ControllerRegistry,
+    ) -> rmagna::file_api::CompiledFileTask {
+        use rmagna::file_api::{FileLoadOptions, FileTask, FileTaskOptions};
+        let circuit = self.0.join("physical.magna");
+        let task = self.0.join("task.json");
+        std::fs::write(&circuit, source).unwrap();
+        std::fs::write(&task, r#"{"outputs":[0],"sample_records":[0]}"#).unwrap();
+        FileTask::load(
+            &circuit,
+            Some(&task),
+            registry,
+            rmagna::noise::NoiseSampling::Physical,
+            FileTaskOptions::default(),
+            &FileLoadOptions::default(),
+            Default::default(),
+        )
+        .unwrap()
+        .compile()
+        .unwrap()
+    }
+}
+impl Drop for Files {
+    fn drop(&mut self) {
+        let _ = std::fs::remove_dir_all(&self.0);
+    }
+}
+
+#[test]
+fn a_cancelled_inflight_row_is_distinct_from_committed_failed_and_unattempted_rows() {
+    use rmagna::{
+        runtime::ControllerRegistry,
+        task::{BatchProgress, ProgressObserver, RunStatus, TaskRunOptions},
+    };
+    let files = Files::new();
+    let task = files.compile(
+        "H 0\nT 0\nH 0\nM 0\nDETECTOR rec[-1]\nPOSTSELECT det[0]\n",
+        &ControllerRegistry::default(),
+    );
+    let baseline = task
+        .run(&TaskRunOptions {
+            shots: 1,
+            seed: 8,
+            ..Default::default()
+        })
+        .unwrap();
+    for shots in [2, 5] {
+        let token = CancellationToken::new();
+        let captured = token.clone();
+        let completed = Arc::new(AtomicUsize::new(0));
+        let seen = Arc::clone(&completed);
+        let checkpoint: CheckpointObserver = Arc::new(move |_| {
+            if seen.load(Ordering::SeqCst) == 1 {
+                captured.cancel();
+            }
+        });
+        let mut callback = |progress: &BatchProgress| {
+            completed.store(progress.completed as usize, Ordering::SeqCst);
+            Ok(())
+        };
+        let mut progress =
+            ProgressObserver::new(std::num::NonZeroU64::new(1).unwrap(), &mut callback);
+        let report = token.with_cooperative_scope(Some(checkpoint), || {
+            task.run_cancellable_with_progress(
+                &TaskRunOptions {
+                    shots,
+                    seed: 8,
+                    ..Default::default()
+                },
+                &token,
+                &mut progress,
+            )
+        });
+        assert!(report.interrupted);
+        let report = report.value.unwrap();
+        let raw = report.raw_result();
+        assert_eq!(raw.status, RunStatus::Cancelled);
+        assert_eq!(
+            (
+                raw.completed,
+                raw.failed,
+                raw.interrupted,
+                raw.not_attempted
+            ),
+            (1, 0, 1, shots - 2)
+        );
+        assert_eq!(raw.sampled_records, baseline.raw_result().sampled_records);
+        assert_eq!(
+            raw.partial_statistics.as_ref().unwrap(),
+            baseline.raw_result().statistics.as_ref().unwrap()
+        );
+        assert_eq!(raw.efficiency.as_ref().unwrap().completed, 1);
+        assert!(raw.failures.is_empty());
+        assert!(
+            raw.execution_costs.query.attempted
+                >= baseline.raw_result().execution_costs.query.attempted
+        );
+        for cost in [
+            raw.execution_costs.query,
+            raw.execution_costs.compilation,
+            raw.execution_costs.decoder,
+            raw.execution_costs.support,
+        ] {
+            assert_eq!(cost.attempted, cost.succeeded + cost.failed);
+        }
+        let json = report.to_json().unwrap();
+        assert_eq!(json["status"], "cancelled");
+        assert_eq!(json["interrupted"], 1);
+        assert_eq!(json["not_attempted"], shots - 2);
+    }
+    println!(
+        "committed1/failed0/interrupted1/unattempted0or3;first-row statistics and reported record preserved"
+    );
+}

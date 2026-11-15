@@ -194,11 +194,12 @@ fn validate(result: &TaskRunResult) -> Result<(), BatchExportError> {
         || result
             .completed
             .checked_add(result.failed)
+            .and_then(|n| n.checked_add(result.interrupted))
             .and_then(|n| n.checked_add(result.not_attempted))
             != Some(result.requested)
     {
         return Err(invalid(
-            "requested must be positive and equal completed + failed + not_attempted",
+            "requested must be positive and equal completed + failed + interrupted + not_attempted",
         ));
     }
     if result.completed == 0
@@ -206,6 +207,13 @@ fn validate(result: &TaskRunResult) -> Result<(), BatchExportError> {
     {
         return Err(invalid(
             "completed resources require at least one completed draw",
+        ));
+    }
+    if result.interrupted > 1
+        || (result.interrupted != 0 && (result.status == RunStatus::Complete || result.failed != 0))
+    {
+        return Err(invalid(
+            "interrupted draws require an incomplete result and no failed draw",
         ));
     }
     if result.failed > 1 {
@@ -263,11 +271,11 @@ fn validate(result: &TaskRunResult) -> Result<(), BatchExportError> {
     } else if result.status == RunStatus::Cancelled {
         if result.statistics.is_some()
             || result.failed != 0
-            || result.not_attempted == 0
+            || (result.not_attempted == 0 && result.interrupted == 0)
             || !result.failures.is_empty()
         {
             return Err(invalid(
-                "cancelled results require unattempted draws, absent main statistics and no failed draw or failure entry",
+                "cancelled results require unattempted or interrupted draws, absent main statistics and no failed draw or failure entry",
             ));
         }
     } else if result.statistics.is_some() || result.failures.is_empty() {
@@ -555,6 +563,7 @@ pub fn export_batch_metrics(
         ("requested", result.requested),
         ("completed", result.completed),
         ("failed", result.failed),
+        ("interrupted", result.interrupted),
         ("not_attempted", result.not_attempted),
         ("seed", result.seed),
     ] {

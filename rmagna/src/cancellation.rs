@@ -43,7 +43,7 @@ pub struct CooperativeResult<T> {
 }
 struct State {
     token: CancellationToken,
-    observed: Cell<bool>,
+    observed: Cell<u64>,
     checkpoints: Cell<u64>,
     observer: Option<CheckpointObserver>,
 }
@@ -79,7 +79,7 @@ impl CancellationToken {
     ) -> CooperativeResult<T> {
         let state = Rc::new(State {
             token: self.clone(),
-            observed: Cell::new(false),
+            observed: Cell::new(0),
             checkpoints: Cell::new(0),
             observer,
         });
@@ -87,19 +87,14 @@ impl CancellationToken {
         let value = operation();
         CooperativeResult {
             value,
-            interrupted: state.observed.get(),
+            interrupted: state.observed.get() != 0,
             checkpoints: state.checkpoints.get(),
         }
     }
 }
 
-pub(crate) fn observed() -> bool {
-    ACTIVE.with(|active| {
-        active
-            .borrow()
-            .as_ref()
-            .is_some_and(|state| state.observed.get())
-    })
+pub(crate) fn observed() -> Option<u64> {
+    ACTIVE.with(|active| active.borrow().as_ref().map(|state| state.observed.get()))
 }
 
 pub(crate) fn checkpoint(kind: SafePoint) -> Result<(), ScalarError> {
@@ -113,7 +108,7 @@ pub(crate) fn checkpoint(kind: SafePoint) -> Result<(), ScalarError> {
         observer(Checkpoint { kind, sequence });
     }
     if state.token.is_cancelled() {
-        state.observed.set(true);
+        state.observed.set(sequence);
         Err(ScalarError::Cancelled)
     } else {
         Ok(())
