@@ -86,6 +86,21 @@ entropy. `SplitMix64::state()` supports continuation; Python Random stream
 identity is not claimed. Metadata admission precedes draws. A later arithmetic
 or entropy error can advance the stream; the immutable marginal remains reusable.
 
+For already completed classical boundary amplitudes, use
+`CompletedProbability::from_boundary_terms(width, terms, limits)`. It takes
+ownership of equal-width terms and sums their amplitudes linearly. Signed or
+complex individual coefficients can cancel; sampling validates the real total
+and each visited Bernoulli ratio rather than certifying every possible label.
+`records::sum_boundary_terms(terms, rows, outcomes, limits, arithmetic)` also
+supports heterogeneous term widths: each set row bit must fit every term.
+Duplicate or contradictory rows retain their parity-equation meaning, and row
+zero padding is ignored. Both APIs enforce entry, path, record-width, logical
+storage and work bounds; no coherent ket/bra pairs are constructed.
+
+`gf2::LinearFactorization::right_inverse()` reuses the factorization for all
+unit right-hand sides. Its columns use `solve`'s zero free coordinates. It
+returns `None` for dependent rows, and an empty inverse for zero equations.
+
 ```rust
 use rmagna::clifford::CliffordGate;
 use rmagna::gf2::BitVector;

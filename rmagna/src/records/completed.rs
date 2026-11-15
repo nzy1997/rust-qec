@@ -431,7 +431,126 @@ pub struct CompletedProbability(CompletedMass);
 /// Signed Hermitian moments per record; these values are never sample weights.
 #[derive(Debug)]
 pub struct CompletedMoment(CompletedMass);
+
+/// Sum completed boundary amplitudes subject to parity equations. Unlike a
+/// coherent-state probability query, this is linear in the supplied terms.
+/// Different term widths are allowed: every set bit of every row must fit
+/// **every** term. Zero padding in a row's declared width is ignored. Duplicate
+/// and contradictory rows retain their ordinary linear-equation semantics.
+///
+/// Shape and resource admission for the whole input precede all contractions.
+/// The limits have the same units as `CompletedRecordLimits`; path and storage
+/// bounds conservatively use the widest term and largest path count.
+pub fn sum_boundary_terms(
+    terms: &[AffineKet],
+    rows: &[BitVector],
+    outcomes: &BitVector,
+    limits: CompletedRecordLimits,
+    arithmetic: &ScalarArithmetic,
+) -> Result<ExactScalar, CompletedRecordError> {
+    if outcomes.width() != rows.len()
+        || terms
+            .iter()
+            .any(|term| rows.iter().any(|row| row.ones().any(|j| j >= term.width())))
+    {
+        return Err(CompletedRecordError::DimensionMismatch);
+    }
+    admit(
+        "max_source_entries",
+        limits.max_source_entries,
+        terms.len() as u128,
+    )?;
+    admit("max_event_rows", limits.max_event_rows, rows.len() as u128)?;
+    admit("max_query_rows", limits.max_query_rows, rows.len() as u128)?;
+    let width = terms.iter().map(AffineKet::width).max().unwrap_or(0);
+    let paths = terms
+        .iter()
+        .map(|term| term.columns().len())
+        .max()
+        .unwrap_or(0);
+    admit("max_record_rows", limits.max_record_rows, width as u128)?;
+    admit("max_pair_paths", limits.max_pair_paths, paths as u128)?;
+    admit(
+        "max_geometry_words",
+        limits.max_geometry_words,
+        pair_geometry_words(width, paths, 0, rows.len(), terms.len() as u128),
+    )?;
+    admit(
+        "max_construction_work",
+        limits.max_construction_work,
+        pair_construction_work(width, paths, 0, rows.len(), terms.len() as u128),
+    )?;
+    let mut value = ExactScalar::zero();
+    for term in terms {
+        let normalized = rows
+            .iter()
+            .map(|row| BitVector::from_indices(term.width(), row.ones()))
+            .collect::<Result<Vec<_>, _>>()?;
+        let mass = evaluate_mass(
+            term.width(),
+            std::slice::from_ref(term),
+            &normalized,
+            outcomes,
+            arithmetic,
+        )?;
+        value = arithmetic.add(&value, &mass.value)?;
+    }
+    Ok(value)
+}
+
 impl CompletedProbability {
+    /// Import a completed classical distribution as a **linear** sum of boundary
+    /// amplitudes. These terms are already probabilities, not coherent state
+    /// amplitudes: no ket/bra product or additional absolute square is taken.
+    ///
+    /// Signed or complex individual terms are allowed. Sampling checks the real
+    /// total and each visited conditional Bernoulli mass; this constructor does
+    /// not certify nonnegativity of every possible record. Terms must all have
+    /// `width` record bits, including terms with a zero coefficient.
+    ///
+    /// The completed-record entry, path, record, storage and work limits also
+    /// apply to imported terms. No pair products are constructed (`pair_work`
+    /// is zero); the caller transfers ownership without an extra source copy.
+    pub fn from_boundary_terms(
+        width: usize,
+        terms: Vec<AffineKet>,
+        limits: CompletedRecordLimits,
+    ) -> Result<Self, CompletedRecordError> {
+        if terms.iter().any(|term| term.width() != width) {
+            return Err(CompletedRecordError::DimensionMismatch);
+        }
+        admit("max_record_rows", limits.max_record_rows, width as u128)?;
+        admit(
+            "max_source_entries",
+            limits.max_source_entries,
+            terms.len() as u128,
+        )?;
+        let paths = terms
+            .iter()
+            .map(|term| term.columns().len())
+            .max()
+            .unwrap_or(0);
+        admit("max_pair_paths", limits.max_pair_paths, paths as u128)?;
+        let words = pair_geometry_words(width, paths, width, 0, terms.len() as u128);
+        let work = pair_construction_work(width, paths, width, 0, terms.len() as u128);
+        admit("max_geometry_words", limits.max_geometry_words, words)?;
+        admit("max_construction_work", limits.max_construction_work, work)?;
+        let statistics = CompletedRecordStatistics {
+            source_entries: terms.len(),
+            pair_work: 0,
+            retained_terms: terms.len(),
+            max_pair_paths: paths,
+            estimated_geometry_words: words,
+            construction_work_bound: work,
+        };
+        Ok(Self(CompletedMass {
+            width,
+            terms,
+            limits,
+            statistics,
+        }))
+    }
+
     pub fn width(&self) -> usize {
         self.0.width
     }

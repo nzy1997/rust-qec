@@ -973,8 +973,16 @@
     },
     {
       "id": "test_file_native.NativeFileRuntimeTests.test_boundary_rejects_invalid_distribution_and_shape",
-      "status": "unmapped",
-      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+      "status": "verified",
+      "contract": "Original empty distribution, mismatched term/record width and signed masses 2|0>-|1> retain their full rejection scenarios through the public raw completed-boundary importer and exact sampler. The signed distribution has positive total one but an invalid Bernoulli numerator two, rejected before entropy. Rust u64 seed parsing rejects the original negative seed as a declared typed-language substitution. No Python RNG identity or exception-string ABI claim.",
+      "rust_tests": [
+        {
+          "package": "rmagna",
+          "target": "remaining_kernel_contracts",
+          "test": "original_raw_boundary_sampling_rejects_invalid_distribution_and_shape",
+          "source_sha256": "c52af7ee13ad081f96fe08b7a8043a2bf596d6a22f3c41c5f5c3b563827f2420"
+        }
+      ]
     },
     {
       "id": "test_file_native.NativeFileRuntimeTests.test_categories_zero_one_residual_and_large_rational_inputs",
@@ -1763,8 +1771,16 @@
     },
     {
       "id": "test_native_boundary_service.NativeBoundaryServiceTests.test_boundary_sum_validates_rows_for_every_term_width",
-      "status": "unmapped",
-      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+      "status": "verified",
+      "contract": "Original heterogeneous zero kets of widths two and one, repeated parity rows 1/1, RHS00 and01 yield exact two/zero. Row2 valid only for the first term rejects, wrong RHS shape rejects, and the native nonbinary RHS2 rejects through one-bit packed-vector conversion. Every term is validated, including supplemental zero-coefficient terms and reversed order; no coherent absolute square is inserted.",
+      "rust_tests": [
+        {
+          "package": "rmagna",
+          "target": "remaining_kernel_contracts",
+          "test": "original_boundary_sum_validates_every_term_width_and_duplicate_rhs",
+          "source_sha256": "c52af7ee13ad081f96fe08b7a8043a2bf596d6a22f3c41c5f5c3b563827f2420"
+        }
+      ]
     },
     {
       "id": "test_native_boundary_service.NativeBoundaryServiceTests.test_causal_controller_order_rng_and_terminal_masses",
@@ -1855,8 +1871,16 @@
     },
     {
       "id": "test_native_global_fastpath.NativeGlobalFastpathTests.test_original_wire_lifetime_is_still_checked_by_native_kernel",
-      "status": "unmapped",
-      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+      "status": "verified",
+      "contract": "Original plus-input T0 / MX0 m fixture rejects X fault on original wire9 after t through the typed assignment-view constructor used by the Native query. Supplemental negative wire rejects, while valid wire0 yields two exact record probabilities summing to one on an explicitly Native resource. Views have private fields, so callers cannot bypass original-wire lifetime admission through a forged compact object; no Python compact ABI claim.",
+      "rust_tests": [
+        {
+          "package": "rmagna",
+          "target": "remaining_kernel_contracts",
+          "test": "original_wire_lifetime_is_checked_on_native_assignment_view",
+          "source_sha256": "c52af7ee13ad081f96fe08b7a8043a2bf596d6a22f3c41c5f5c3b563827f2420"
+        }
+      ]
     },
     {
       "id": "test_native_global_fastpath.NativeGlobalFastpathTests.test_shared_immutable_faults_keep_distinct_records_and_batch_scope",
@@ -1885,8 +1909,16 @@
     },
     {
       "id": "test_native_global_ownership.NativeGlobalOwnershipTests.test_same_immutable_plan_has_independent_concurrent_workspaces",
-      "status": "unmapped",
-      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+      "status": "verified",
+      "contract": "Complete original plus-input MZ m / declared T^(1+6m) / MX n controlled fixture, unchanged owned-rule-v1, all four(m,n) records and I/X/Y/Z faults after c. One shared immutable trace and one genuinely Native prepared scalar query produce all16 sequential expectations and the same ordered128 values through four scoped workers (rows repeated eight times); a separate literal quarter checks every value. No environment copies, Python capsule identity or GIL claim.",
+      "rust_tests": [
+        {
+          "package": "rmagna",
+          "target": "remaining_kernel_contracts",
+          "test": "original_immutable_native_plan_has_independent_concurrent_workspaces",
+          "source_sha256": "c52af7ee13ad081f96fe08b7a8043a2bf596d6a22f3c41c5f5c3b563827f2420"
+        }
+      ]
     },
     {
       "id": "test_native_global_phase.NativeGlobalPhaseTests.test_absorption_precedes_final_resource_budget",
@@ -2670,8 +2702,16 @@
     },
     {
       "id": "test_query_reuse.PreparedBoundaryResources.test_public_prepared_query_validates_rhs_and_boundary",
-      "status": "unmapped",
-      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+      "status": "verified",
+      "contract": "Original H0/T0/H0/MZ0 coherent record fixture warms public prepared completed-record geometry at event m0=0. Both original bad RHS lengths reject; -1 and2 reject via typed one-bit packed conversion. Literal bit100 in retained row, event row, X mask and Z mask rejects at the respective public boundary, and X on the event bit rejects noncommutation. A repeated valid warm query is unchanged. Rust owns an explicit prepared object rather than the Python service private cache; no Python error-text ABI claim.",
+      "rust_tests": [
+        {
+          "package": "rmagna",
+          "target": "remaining_kernel_contracts",
+          "test": "original_warm_prepared_query_validates_rhs_and_all_boundary_masks",
+          "source_sha256": "c52af7ee13ad081f96fe08b7a8043a2bf596d6a22f3c41c5f5c3b563827f2420"
+        }
+      ]
     },
     {
       "id": "test_query_reuse.QueryReuse.test_owned_preparation_matches_public_with_actual_controls_and_faults",
@@ -2973,13 +3013,29 @@
     },
     {
       "id": "test_simulator_optimization.OptimizationTests.test_batched_inverse_same_free_coordinate_convention",
-      "status": "unmapped",
-      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+      "status": "verified",
+      "contract": "Complete unchanged seed617108 original n0..12 x12 schedule, 156 independent-row matrices and the dependent rows(1,1) negative control. Public LinearFactorization.right_inverse shares one factorization, compares every column with the captured original native least-first/free-zero result, a separate public solve and literal matrix product, and returns None for nonsurjective dependent rows. The identified generator executes all original assertions without shortening loops; no timing claim.",
+      "rust_tests": [
+        {
+          "package": "rmagna",
+          "target": "remaining_kernel_contracts",
+          "test": "original_batched_inverse_keeps_free_coordinates_and_rejects_dependent_rows",
+          "source_sha256": "c52af7ee13ad081f96fe08b7a8043a2bf596d6a22f3c41c5f5c3b563827f2420"
+        }
+      ]
     },
     {
       "id": "test_simulator_optimization.OptimizationTests.test_common_support_overlap_including_affine_shift_and_phase",
-      "status": "unmapped",
-      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+      "status": "verified",
+      "contract": "Complete unchanged seed617109 n0..6 x20 original common-support inputs retain native image-basis order, both offsets, powers[-10,0], mod-four quadratic phases and all eighth-root global phases. Exact Rust overlap matches independent exhaustive path-vector conjugate products for all140 cases. Source/generator/frontend/helper/fixture hashes bind the captured original method run; no floating tolerance or real-only replacement.",
+      "rust_tests": [
+        {
+          "package": "rmagna",
+          "target": "remaining_kernel_contracts",
+          "test": "original_common_support_overlap_retains_all_shifts_and_global_phases",
+          "source_sha256": "c52af7ee13ad081f96fe08b7a8043a2bf596d6a22f3c41c5f5c3b563827f2420"
+        }
+      ]
     },
     {
       "id": "test_simulator_optimization.OptimizationTests.test_compact_key_noise_reports_weights_and_limits",
@@ -2988,13 +3044,29 @@
     },
     {
       "id": "test_simulator_optimization.OptimizationTests.test_control_callbacks_always_execute_and_new_gate_table_is_used",
-      "status": "unmapped",
-      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+      "status": "verified",
+      "contract": "Original zero-input CONTROL then MZ fixture executes its opaque callback on each of two identity queries and the subsequent X query, returning exact one/one/zero with exactly three calls despite unchanged-version metadata. Replacing the callback with identity and the same version returns one and a fourth call. Rust owns callback tables, so replacement constructs a new immutable instrument; no mutable Python registry/cache identity claim.",
+      "rust_tests": [
+        {
+          "package": "rmagna",
+          "target": "remaining_kernel_contracts",
+          "test": "original_control_callbacks_execute_fresh_with_unchanged_version_and_replacement",
+          "source_sha256": "c52af7ee13ad081f96fe08b7a8043a2bf596d6a22f3c41c5f5c3b563827f2420"
+        }
+      ]
     },
     {
       "id": "test_simulator_optimization.OptimizationTests.test_exact_sparse_contraction_with_dependent_boundaries",
-      "status": "unmapped",
-      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+      "status": "verified",
+      "contract": "Complete unchanged seed617106 n0..9 x24 inputs preserve original random width0..4, all dependent columns, alternating .8/.2 upper-triangle densities, powers[-12,2] and global phases. All240 Rust contractions, including actual interference zeros, equal an independent exhaustive original tensor path sum at every output label. Generator executes all original assertions; no production elimination kernel supplies expectations.",
+      "rust_tests": [
+        {
+          "package": "rmagna",
+          "target": "remaining_kernel_contracts",
+          "test": "original_sparse_contraction_matches_every_dependent_boundary_path_sum",
+          "source_sha256": "c52af7ee13ad081f96fe08b7a8043a2bf596d6a22f3c41c5f5c3b563827f2420"
+        }
+      ]
     },
     {
       "id": "test_simulator_optimization.OptimizationTests.test_mutable_control_parent_list_updates_ir_certificate",
@@ -3003,8 +3075,16 @@
     },
     {
       "id": "test_simulator_optimization.OptimizationTests.test_packed_pullback_against_direct_quadratic_values",
-      "status": "unmapped",
-      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+      "status": "verified",
+      "contract": "Complete unchanged seed617107 n0..8, twelve five-column affine maps each, including dependent bases and shifts. All108 Rust restrictions preserve the constant and agree with independent direct mod-four evaluation for all32 assignments (3456 comparisons). Fixture captures the actual unshortened original method and binds source/generator/native hashes; no self-comparison of two production restrict calls.",
+      "rust_tests": [
+        {
+          "package": "rmagna",
+          "target": "remaining_kernel_contracts",
+          "test": "original_packed_pullback_matches_all_32_assignments_of_all_108_maps",
+          "source_sha256": "c52af7ee13ad081f96fe08b7a8043a2bf596d6a22f3c41c5f5c3b563827f2420"
+        }
+      ]
     },
     {
       "id": "test_simulator_optimization.OptimizationTests.test_prepared_ir_nested_mutation_and_returned_snapshot",

@@ -18,12 +18,12 @@ class RemainingContractsTests(unittest.TestCase):
 
     def test_complete_static_inventory_does_not_certify_parity(self):
         result = self.check()
-        self.assertEqual(result["outstanding"], 130)
-        self.assertEqual(result["categories"], {"G": 6, "P": 32, "V": 41, "E": 49, "U": 2})
+        self.assertEqual(result["outstanding"], 120)
+        self.assertEqual(result["categories"], {"G": 6, "P": 32, "V": 31, "E": 49, "U": 2})
         self.assertEqual((result["tasks"], result["paper_files"], result["roadmap_issues"]), (31, 435, 18))
         self.assertEqual(result["scope"], "static_requirements_only")
         self.assertFalse(result["upstream_verified"])
-        self.assertEqual(result["ledger_snapshot"], {"verified": 222, "partial": 2, "unmapped": 128})
+        self.assertEqual(result["ledger_snapshot"], {"verified": 232, "partial": 2, "unmapped": 118})
 
     def test_source_missing_method_and_unwitnessed_promotions_are_rejected(self):
         changed = copy.deepcopy(self.catalog)
