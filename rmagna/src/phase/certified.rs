@@ -105,7 +105,10 @@ impl<C: Clone> CertifiedPathTensor<C> {
                 quotient_rank: resource.quotient_rank(),
                 constructive_terms: resource.num_terms(),
                 zero: false,
-                terms: if receipt.route == PhaseSelectionRoute::CertifiedCatalogue {
+                terms: if matches!(
+                    receipt.route,
+                    PhaseSelectionRoute::CertifiedCatalogue | PhaseSelectionRoute::PositiveTProduct
+                ) {
                     PathTermReport::StabilizerTerms(resource.num_terms())
                 } else {
                     PathTermReport::AmplitudeTerms(resource.num_terms())

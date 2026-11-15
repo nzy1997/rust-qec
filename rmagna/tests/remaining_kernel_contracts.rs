@@ -1529,6 +1529,17 @@ fn original_rank_zero_empty_database_unit_requires_more_than_four_table_bytes_in
             ExactScalar::one()
         );
         assert_eq!(d.report.logical_table_and_coefficient_bytes, 44);
+        assert_eq!(d.report.terms, PathTermReport::StabilizerTerms(1));
+        assert_eq!(
+            d.resource
+                .as_ref()
+                .unwrap()
+                .native_resource()
+                .unwrap()
+                .receipt()
+                .route,
+            rmagna::catalogue::PhaseSelectionRoute::PositiveTProduct
+        );
         let mut options = NativePhaseOptions::default();
         options.selection.max_table_and_coefficient_bytes = 4;
         let error = match t.decompose(1, options, Some(&db), absorption, &a) {

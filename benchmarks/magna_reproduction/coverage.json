@@ -1028,7 +1028,7 @@
           "package": "rmagna",
           "target": "remaining_kernel_contracts",
           "test": "original_raw_boundary_sampling_rejects_invalid_distribution_and_shape",
-          "source_sha256": "807535926fc71647cd6cfa116b2b618278603dc4c2f06fbaaa7e24dc1275f8b8"
+          "source_sha256": "a2cb48fc836e08ce35ae88b475def2e4d0397ee824400fe67a618ab341496229"
         }
       ]
     },
@@ -1171,7 +1171,7 @@
           "package": "rmagna",
           "target": "remaining_kernel_contracts",
           "test": "original_floating_summaries_reject_all_four_nonfinite_and_shape_rows",
-          "source_sha256": "807535926fc71647cd6cfa116b2b618278603dc4c2f06fbaaa7e24dc1275f8b8"
+          "source_sha256": "a2cb48fc836e08ce35ae88b475def2e4d0397ee824400fe67a618ab341496229"
         }
       ]
     },
@@ -1706,7 +1706,7 @@
           "package": "rmagna",
           "target": "remaining_kernel_contracts",
           "test": "original_public_certificate_facades_preserve_forged_zero_one_backends_and_caller_order",
-          "source_sha256": "807535926fc71647cd6cfa116b2b618278603dc4c2f06fbaaa7e24dc1275f8b8"
+          "source_sha256": "a2cb48fc836e08ce35ae88b475def2e4d0397ee824400fe67a618ab341496229"
         }
       ]
     },
@@ -1874,7 +1874,7 @@
           "package": "rmagna",
           "target": "remaining_kernel_contracts",
           "test": "original_boundary_sum_validates_every_term_width_and_duplicate_rhs",
-          "source_sha256": "807535926fc71647cd6cfa116b2b618278603dc4c2f06fbaaa7e24dc1275f8b8"
+          "source_sha256": "a2cb48fc836e08ce35ae88b475def2e4d0397ee824400fe67a618ab341496229"
         }
       ]
     },
@@ -1892,7 +1892,7 @@
           "package": "rmagna",
           "target": "remaining_kernel_contracts",
           "test": "original_completed_marginal_two_schedules_keep_all_eight_seeds_and_rust_rng_state",
-          "source_sha256": "807535926fc71647cd6cfa116b2b618278603dc4c2f06fbaaa7e24dc1275f8b8"
+          "source_sha256": "a2cb48fc836e08ce35ae88b475def2e4d0397ee824400fe67a618ab341496229"
         }
       ]
     },
@@ -1977,7 +1977,7 @@
           "package": "rmagna",
           "target": "remaining_kernel_contracts",
           "test": "original_ordinary_record_import_rejects_every_invalid_map_and_empty_stream_does_no_work",
-          "source_sha256": "807535926fc71647cd6cfa116b2b618278603dc4c2f06fbaaa7e24dc1275f8b8"
+          "source_sha256": "a2cb48fc836e08ce35ae88b475def2e4d0397ee824400fe67a618ab341496229"
         }
       ]
     },
@@ -1990,7 +1990,7 @@
           "package": "rmagna",
           "target": "remaining_kernel_contracts",
           "test": "original_wire_lifetime_is_checked_on_native_assignment_view",
-          "source_sha256": "807535926fc71647cd6cfa116b2b618278603dc4c2f06fbaaa7e24dc1275f8b8"
+          "source_sha256": "a2cb48fc836e08ce35ae88b475def2e4d0397ee824400fe67a618ab341496229"
         }
       ]
     },
@@ -2028,7 +2028,7 @@
           "package": "rmagna",
           "target": "remaining_kernel_contracts",
           "test": "original_immutable_native_plan_has_independent_concurrent_workspaces",
-          "source_sha256": "807535926fc71647cd6cfa116b2b618278603dc4c2f06fbaaa7e24dc1275f8b8"
+          "source_sha256": "a2cb48fc836e08ce35ae88b475def2e4d0397ee824400fe67a618ab341496229"
         }
       ]
     },
@@ -2041,7 +2041,7 @@
           "package": "rmagna",
           "target": "remaining_kernel_contracts",
           "test": "original_absorption_runs_before_final_rank_term_and_table_limits_and_reports_full_rank",
-          "source_sha256": "807535926fc71647cd6cfa116b2b618278603dc4c2f06fbaaa7e24dc1275f8b8"
+          "source_sha256": "a2cb48fc836e08ce35ae88b475def2e4d0397ee824400fe67a618ab341496229"
         }
       ]
     },
@@ -2122,7 +2122,7 @@
           "package": "rmagna",
           "target": "remaining_kernel_contracts",
           "test": "original_rank_zero_empty_database_unit_requires_more_than_four_table_bytes_in_both_orders",
-          "source_sha256": "807535926fc71647cd6cfa116b2b618278603dc4c2f06fbaaa7e24dc1275f8b8"
+          "source_sha256": "a2cb48fc836e08ce35ae88b475def2e4d0397ee824400fe67a618ab341496229"
         }
       ]
     },
@@ -2877,7 +2877,7 @@
           "package": "rmagna",
           "target": "remaining_kernel_contracts",
           "test": "original_warm_prepared_query_validates_rhs_and_all_boundary_masks",
-          "source_sha256": "807535926fc71647cd6cfa116b2b618278603dc4c2f06fbaaa7e24dc1275f8b8"
+          "source_sha256": "a2cb48fc836e08ce35ae88b475def2e4d0397ee824400fe67a618ab341496229"
         }
       ]
     },
@@ -3196,7 +3196,7 @@
           "package": "rmagna",
           "target": "remaining_kernel_contracts",
           "test": "original_batched_inverse_keeps_free_coordinates_and_rejects_dependent_rows",
-          "source_sha256": "807535926fc71647cd6cfa116b2b618278603dc4c2f06fbaaa7e24dc1275f8b8"
+          "source_sha256": "a2cb48fc836e08ce35ae88b475def2e4d0397ee824400fe67a618ab341496229"
         }
       ]
     },
@@ -3209,7 +3209,7 @@
           "package": "rmagna",
           "target": "remaining_kernel_contracts",
           "test": "original_common_support_overlap_retains_all_shifts_and_global_phases",
-          "source_sha256": "807535926fc71647cd6cfa116b2b618278603dc4c2f06fbaaa7e24dc1275f8b8"
+          "source_sha256": "a2cb48fc836e08ce35ae88b475def2e4d0397ee824400fe67a618ab341496229"
         }
       ]
     },
@@ -3227,7 +3227,7 @@
           "package": "rmagna",
           "target": "remaining_kernel_contracts",
           "test": "original_control_callbacks_execute_fresh_with_unchanged_version_and_replacement",
-          "source_sha256": "807535926fc71647cd6cfa116b2b618278603dc4c2f06fbaaa7e24dc1275f8b8"
+          "source_sha256": "a2cb48fc836e08ce35ae88b475def2e4d0397ee824400fe67a618ab341496229"
         }
       ]
     },
@@ -3240,7 +3240,7 @@
           "package": "rmagna",
           "target": "remaining_kernel_contracts",
           "test": "original_sparse_contraction_matches_every_dependent_boundary_path_sum",
-          "source_sha256": "807535926fc71647cd6cfa116b2b618278603dc4c2f06fbaaa7e24dc1275f8b8"
+          "source_sha256": "a2cb48fc836e08ce35ae88b475def2e4d0397ee824400fe67a618ab341496229"
         }
       ]
     },
@@ -3258,7 +3258,7 @@
           "package": "rmagna",
           "target": "remaining_kernel_contracts",
           "test": "original_packed_pullback_matches_all_32_assignments_of_all_108_maps",
-          "source_sha256": "807535926fc71647cd6cfa116b2b618278603dc4c2f06fbaaa7e24dc1275f8b8"
+          "source_sha256": "a2cb48fc836e08ce35ae88b475def2e4d0397ee824400fe67a618ab341496229"
         }
       ]
     },
