@@ -1,0 +1,16 @@
+SPDX-License-Identifier: MPL-2.0
+
+original_feedback_incidence.json, original_feedback_incidence.py and corresponding
+incidence tests in rust_snapshot_contracts.rs are adapted from itpyi/magna,
+revision 56847478c840395735146ef1e1ccdc3d8aedc10f:
+tests/core/test_feedback_incidence.py::FeedbackIncidenceTest.test_partial_decisions_xors_versions_constants_and_wire_remap.
+
+Original repository: https://github.com/itpyi/magna
+Full license: original_many_record_input.LICENSE in this directory.
+
+The identified prebuilt helper executes the complete unchanged original method:
+4 versioned decisions,81 partial assignments,2 prefix/wire maps,162 queries.
+Rust uses expanded operation IDs and (call,bit) atoms. The fixture retains native
+anchors and register versions, mapping corresponding ordered rows explicitly.
+It does not equate private native string anchors with expanded Rust IDs.
+Source, generator, manifest, frontend and helper hashes bind the capture.

@@ -3448,3 +3448,115 @@ issue batch does not establish complete original API coverage, complex feedback
 sampling, Native cache/RNG identity, Monte Carlo precision or paper performance.
 Fresh complete-parity audit exit 2 remains intentional and must still produce a
 valid new report bound to the actual ledger, execution manifest and sources.
+
+### Explicit Rust ownership and snapshot contracts (R04)
+
+`rust-snapshot-contracts.json` records a separate decision for each of the 27
+original methods assigned to R04, bound to their full source/method identities.
+It specifies contracts consumed by R09 reference networks and R11 suffix/fault
+packing. Validate it, optionally against the retained pinned source, with:
+
+```sh
+python3 benchmarks/magna_reproduction/snapshot_contracts.py --upstream "$MAGNA_REFERENCE"
+cargo test --locked -p rmagna --test rust_snapshot_contracts
+```
+
+`OriginalAssignmentPlan::new` copies a borrowed typed source;
+`from_owned` moves it. Each construction creates a session token. Replace a source
+or control declaration by constructing a fresh plan. Existing lazy batches keep
+the old snapshot, re-execute callbacks for every assignment, and release consumed
+inputs. Ordinary inputs are copied again at each yield. Compact inputs retain
+an immutable fault group and true record word; foreign tokens are rejected before
+empty-group reuse. `OriginalCompactNoiseLayout` owns IXZY codebooks, supports
+arbitrary-width typed codes, and captures each selected row before its first
+yield. Report flips compose by XOR. Its JSON adapter refuses bool/negative/float
+codes; fault-group snapshot counts describe retained groups, not avoided Native
+compiler work.
+
+The execution policy is explicitly `LiteralPerAssignment`. Unexpected kernel
+errors and quota refusals propagate once. `compile_with_kernel` is the same
+captured/collected pipeline with a caller-supplied exact kernel, enabling backend
+comparisons without replay. `compile` returns an owned certificate with independent
+JSON exports and an input-only diagnostic SHA256; source identity is separate.
+Probability queries perform no input hashing and have no probability-value cache. Downstream type probes locate existing artifacts in both Cargo deps and
+per-target build output layouts, including a real relocated library/test binary.
+They reuse dependency artifacts without nested Cargo builds.
+There is no implicit Native preparation, automatic backend fallback, or mutable
+Python option dictionary.
+
+`OriginalTraceCache` is an optional bounded LRU keyed by source session and path
+budget. It stores immutable traces without retaining source callbacks. Evicted
+externally held `Arc` traces remain usable; their `Weak` references expire when
+the last external owner drops. A budget change prepares separately and cannot
+silently reuse a more generous result. Opaque callbacks are refused by the trace
+compiler. The assignment service continues to run them freshly.
+
+`circuit::FeedbackTemplate` exposes the fixed ordered incidence of external
+decisions, partial assignments, guard expressions, virtual controls and final
+selection offsets. Register versions are resolved to `(call,bit)` atoms. It is an
+intermediate offset service, without executing a quantum circuit. Rust expanded
+operation IDs replace private Native string anchors. `NamedPhasePathTensor`
+preserves owned UTF8/NUL/non-BMP environment labels; invalid surrogate bytes are
+rejected at JSON import. `SparseNoiseSampler` owns action buffers over the existing
+exact categorical sampler. Guarded categories require the causal runtime rather
+than silent guard removal.
+
+The target runs 30 tests, including all 162 original partial-incidence queries,
+all 64 borrowed/owned fault/event queries under both coherent compilers, and all 100
+captured Native sparse/dense categorical choices/actions/weights. Sparse seeded
+comparisons additionally check Rust RNG final state; default Python RNG identity
+is a separate R06 concern. The three fixture generators use the identified
+prebuilt helper and retained environment, and execute complete unchanged original
+methods without a Native rebuild.
+
+The ledger promotes 20 complete typed equivalents, keeps 6 methods partial, and
+leaves 1 reference-tool method unmapped. The remaining gaps are explicit: arbitrary
+cyclic/aliased Python metadata, metadata-keyed certificate caching, and automatic
+Native preparation/fallback reports are not implemented by the typed API.
+Exact manifest-relative reference paths avoid basename-search ambiguity; this is
+not a new Rust C++ header resolver. None of these gaps is an architecture exclusion
+or removed from the original 352-method denominator. These decisions do not claim
+paper benchmark completion or throughput parity.
+
+### Installed Rust consumers (R05)
+
+`cargo test --locked -p rmagna --test installed_cli_contracts` copies the current
+executable and 31 small, hash-verified original task/decoder inputs into a temporary
+working directory outside the checkout. It clears inherited environment/source
+search settings,embeds a source-package import trap,and explicitly selects local
+decoder modules. The binary includes its Python worker and generates its 15-entry certified phase
+catalogue internally, without reading external catalogue files. No Python wheel, source tree, dependency
+environment or Native build is copied.
+
+The owning suite executes 35 installed CLI commands: validate/inspect/enumerate/run,
+record success,nonlinear selection and its inverse,three-file terminal recovery,
+projected/mixed targets,the complete small DK task,the three sampling-guide
+examples,progress and pilot comparisons. Assertions cover resolved sampling-file
+configuration, default affine history sampling, completed pilot counts, causal
+execution routing, circuit format, the complete moment list, actionable selector
+diagnostics, enumeration status and the DK output artifact. Same-Rust-seed outputs are reproduced;
+Python Random trajectories and wheel namespace/signature identity are not claimed.
+It also compiles and executes one downstream Rust consumer for both original
+getting-started examples, with exact T-interference values,checks three rejected
+API misuses,and checks a removed executable as OS NotFound. Existing compiled
+libraries are reused across Cargo artifact layouts; no nested Cargo build occurs.
+Every temporary installation is removed on success or unwinding failure.
+
+Regenerate the 22 KiB input fixture without building anything:
+
+```sh
+python3 benchmarks/magna_reproduction/original_installed_inputs.py --upstream "$MAGNA_REFERENCE" --out "$NEW_INPUT_JSON"
+```
+
+The fixture contains original input texts and tutorial blocks, not wheel-run
+results. Both full source hashes and the complete fixture hash are checked.
+The universal Rust CLI takes explicit circuit/task/controller paths; it does not
+execute the original Python runner or silently translate Native-only run.json
+options. The library exposes file-task APIs under `rmagna::file_api` and operation
+APIs under `rmagna::instrument`;downstream examples check these typed boundaries.
+
+Fourteen R05 methods are verified as explicit Rust equivalents. The installed
+conditional-noise method remains partial for Native-private preparation/reuse
+counters,owned by R09 #1299. Python missing-extension/build-guidance remains
+unmapped despite the separate Rust missing-executable check. Neither is an
+architecture exclusion. These cases do not establish paper benchmark results.

@@ -258,8 +258,16 @@
     },
     {
       "id": "test_capped_affine.CappedAffineTests.test_reconfigure_prepares_optional_route",
-      "status": "unmapped",
-      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+      "status": "verified",
+      "contract": "Explicit immutable compiled options: prepare a fresh affine-support evaluator; the old exact evaluator remains usable, with exact proposal1/2 and acceptance1.",
+      "rust_tests": [
+        {
+          "package": "rmagna",
+          "target": "rust_snapshot_contracts",
+          "test": "original_sampler_reconfiguration_is_an_explicit_fresh_preparation",
+          "source_sha256": "361e89079517d0b9295f04e320e85fc175f412f820aaec67368e60797a3c8d3c"
+        }
+      ]
     },
     {
       "id": "test_capped_affine.CappedAffineTests.test_terminal_recovery_controller_and_target",
@@ -749,8 +757,16 @@
     },
     {
       "id": "test_feedback_incidence.FeedbackIncidenceTest.test_partial_decisions_xors_versions_constants_and_wire_remap",
-      "status": "unmapped",
-      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+      "status": "verified",
+      "contract": "Fixed incidence built from parsed version-resolved expressions; all4 decision atoms,81 partial assignments,2 prefix/wire maps,6 ordered rows,CS virtual control and final selection constants match Native. Expanded operation IDs replace native string anchors.",
+      "rust_tests": [
+        {
+          "package": "rmagna",
+          "target": "rust_snapshot_contracts",
+          "test": "original_partial_feedback_incidence_matches_all_162_queries",
+          "source_sha256": "361e89079517d0b9295f04e320e85fc175f412f820aaec67368e60797a3c8d3c"
+        }
+      ]
     },
     {
       "id": "test_file_api.FileApiTests.test_compiled_circuit_rejects_use_from_a_second_thread",
@@ -1226,8 +1242,16 @@
     },
     {
       "id": "test_file_reuse.FileReuseTests.test_native_budget_identity_and_weak_structure_eviction",
-      "status": "unmapped",
-      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+      "status": "verified",
+      "contract": "Explicit one-entry trace LRU keys source-session token and path budget. Specialize the original echo/XOR/CS source for decisions0/1: three actual preparations,old external +/-Z values,Weak expiry after eviction; budget changes never reuse a larger-budget trace.",
+      "rust_tests": [
+        {
+          "package": "rmagna",
+          "target": "rust_snapshot_contracts",
+          "test": "original_trace_cache_obeys_source_and_budget_identity_and_weak_eviction",
+          "source_sha256": "361e89079517d0b9295f04e320e85fc175f412f820aaec67368e60797a3c8d3c"
+        }
+      ]
     },
     {
       "id": "test_file_reuse.FileReuseTests.test_no_noise_does_not_advance_rng_and_batch_matches_single",
@@ -1595,63 +1619,172 @@
     },
     {
       "id": "test_installed_interface.InstalledInterfaceTests.test_getting_started_python_examples",
-      "status": "unmapped",
-      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+      "status": "verified",
+      "contract": "The pinned tutorial retains both original code blocks; a downstream Rust executable runs the file compile/run and operation-level H/T/H/MZ examples with exact (2+sqrt2)/4 values outside the checkout. The installed CLI independently uses the generated bundled catalogue.",
+      "rust_tests": [
+        {
+          "package": "rmagna",
+          "target": "installed_cli_contracts",
+          "test": "original_installed_scenarios_run_from_one_binary_without_checkout_imports",
+          "source_sha256": "8769a84e3f3b68d8744bda07bc0d8c20b97a68911ee4e1132900c2bd7e604145"
+        },
+        {
+          "package": "rmagna",
+          "target": "installed_cli_contracts",
+          "test": "downstream_rust_consumer_executes_both_tutorial_apis_and_embedded_catalogue",
+          "source_sha256": "8769a84e3f3b68d8744bda07bc0d8c20b97a68911ee4e1132900c2bd7e604145"
+        }
+      ]
     },
     {
       "id": "test_installed_interface.InstalledInterfaceTests.test_importance_sampling_guide_and_installed_cli",
-      "status": "unmapped",
-      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+      "status": "verified",
+      "contract": "Retain all three original guide examples: physical1000,scale10 importance1000 and256-per-channel pilot at seed7. Check one scaled category,ESS bounds,4SE error0.001/acceptance1 tests and the original64-shot sampling-file command. Typed Rust statistics/CLI fields replace Python dictionaries.",
+      "rust_tests": [
+        {
+          "package": "rmagna",
+          "target": "installed_cli_contracts",
+          "test": "original_installed_scenarios_run_from_one_binary_without_checkout_imports",
+          "source_sha256": "8769a84e3f3b68d8744bda07bc0d8c20b97a68911ee4e1132900c2bd7e604145"
+        }
+      ]
     },
     {
       "id": "test_installed_interface.InstalledInterfaceTests.test_installed_conditional_noise_fixed_reference_networks",
-      "status": "unmapped",
-      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+      "status": "partial",
+      "contract": "The installed binary executes the complete guarded-noise source for64 draws and independently enumerates acceptance1/error1/12 without source imports.",
+      "rust_tests": [
+        {
+          "package": "rmagna",
+          "target": "installed_cli_contracts",
+          "test": "original_installed_scenarios_run_from_one_binary_without_checkout_imports",
+          "source_sha256": "8769a84e3f3b68d8744bda07bc0d8c20b97a68911ee4e1132900c2bd7e604145"
+        }
+      ],
+      "remaining_gap": "The Native private execution-state assertions (three fixed reference preparations,no later compilations,and zero reference resource/coordinate constructions) are not established by this installed CLI witness. R09 #1299 must provide corresponding reuse counters or retain this explicit gap."
     },
     {
       "id": "test_installed_interface.InstalledInterfaceTests.test_installed_console_commands_and_seed_reproducibility",
-      "status": "unmapped",
-      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+      "status": "verified",
+      "contract": "One copied current executable runs validate/inspect/run on the original parity task,checks8 completed draws and output-file equality,and replays exact same-Rust-seed estimates,records,weights and fingerprints outside the checkout.",
+      "rust_tests": [
+        {
+          "package": "rmagna",
+          "target": "installed_cli_contracts",
+          "test": "original_installed_scenarios_run_from_one_binary_without_checkout_imports",
+          "source_sha256": "8769a84e3f3b68d8744bda07bc0d8c20b97a68911ee4e1132900c2bd7e604145"
+        }
+      ]
     },
     {
       "id": "test_installed_interface.InstalledInterfaceTests.test_installed_external_decoder_binding",
-      "status": "unmapped",
-      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+      "status": "verified",
+      "contract": "The original majority circuit/task and explicitly selected local decoder execute16 seeded draws from an isolated working directory; acceptance is1 and error lies in[0,1]. The standalone binary embeds its decoder worker.",
+      "rust_tests": [
+        {
+          "package": "rmagna",
+          "target": "installed_cli_contracts",
+          "test": "original_installed_scenarios_run_from_one_binary_without_checkout_imports",
+          "source_sha256": "8769a84e3f3b68d8744bda07bc0d8c20b97a68911ee4e1132900c2bd7e604145"
+        }
+      ]
     },
     {
       "id": "test_installed_interface.InstalledInterfaceTests.test_installed_history_progress_and_pilot",
-      "status": "unmapped",
-      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+      "status": "verified",
+      "contract": "The original X_ERROR(1/2) task runs32 draws with two16-draw progress lines,kappa1,and32 draws per pilot channel; gamma is positive and automatic switching is false.",
+      "rust_tests": [
+        {
+          "package": "rmagna",
+          "target": "installed_cli_contracts",
+          "test": "original_installed_scenarios_run_from_one_binary_without_checkout_imports",
+          "source_sha256": "8769a84e3f3b68d8744bda07bc0d8c20b97a68911ee4e1132900c2bd7e604145"
+        }
+      ]
     },
     {
       "id": "test_installed_interface.InstalledInterfaceTests.test_installed_low_weight_enumeration",
-      "status": "unmapped",
-      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+      "status": "verified",
+      "contract": "The original X_ERROR(1/10),M,detector and zero selection enumerate all weight<=1 patterns outside the checkout,with acceptance0.9 and covered probability1. Rust has no runtime Python adapter discovery.",
+      "rust_tests": [
+        {
+          "package": "rmagna",
+          "target": "installed_cli_contracts",
+          "test": "original_installed_scenarios_run_from_one_binary_without_checkout_imports",
+          "source_sha256": "8769a84e3f3b68d8744bda07bc0d8c20b97a68911ee4e1132900c2bd7e604145"
+        }
+      ]
     },
     {
       "id": "test_installed_interface.InstalledInterfaceTests.test_installed_nonlinear_postselection_api_and_console",
-      "status": "unmapped",
-      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+      "status": "verified",
+      "contract": "All four installed commands execute the original majority selection; exact acceptance3/4,error1/4,moment1/4,conditional error1/3;32-shot same-Rust-seed replay;inverse selection acceptance/error1/4;both invalid parameterized selectors reject.",
+      "rust_tests": [
+        {
+          "package": "rmagna",
+          "target": "installed_cli_contracts",
+          "test": "original_installed_scenarios_run_from_one_binary_without_checkout_imports",
+          "source_sha256": "8769a84e3f3b68d8744bda07bc0d8c20b97a68911ee4e1132900c2bd7e604145"
+        }
+      ]
     },
     {
       "id": "test_installed_interface.InstalledInterfaceTests.test_installed_record_success_entry",
-      "status": "unmapped",
-      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+      "status": "verified",
+      "contract": "The original physical/report-error observable example enumerates exact error2/7 and runs8 draws with its task file outside the checkout; Rust schema2 exact/numeric fields replace Python return dictionaries.",
+      "rust_tests": [
+        {
+          "package": "rmagna",
+          "target": "installed_cli_contracts",
+          "test": "original_installed_scenarios_run_from_one_binary_without_checkout_imports",
+          "source_sha256": "8769a84e3f3b68d8744bda07bc0d8c20b97a68911ee4e1132900c2bd7e604145"
+        }
+      ]
     },
     {
       "id": "test_installed_interface.InstalledInterfaceTests.test_portable_directory_with_local_decoder_and_universal_runner",
-      "status": "unmapped",
-      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+      "status": "verified",
+      "contract": "Run the complete pinned small DK circuit,ideal,recovery,task and local Steane decoder from the installed executable outside the checkout,4 draws at seed7 and an output file. The universal Rust runner takes explicit circuit/task/controller paths; it does not execute Python run_task.py or interpret Native-only run.json options.",
+      "rust_tests": [
+        {
+          "package": "rmagna",
+          "target": "installed_cli_contracts",
+          "test": "original_installed_scenarios_run_from_one_binary_without_checkout_imports",
+          "source_sha256": "8769a84e3f3b68d8744bda07bc0d8c20b97a68911ee4e1132900c2bd7e604145"
+        }
+      ]
     },
     {
       "id": "test_installed_interface.InstalledInterfaceTests.test_three_file_evaluation_with_installed_native_engine",
-      "status": "unmapped",
-      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+      "status": "verified",
+      "contract": "Original terminal physical/ideal/recovery inputs run4 draws with acceptance1/error0,raw target error1,auxiliary five-qubit projected target error0.9,mixed target error0.5,and explicit recovery CLI2 draws error0;all from the standalone Rust binary and local decoder.",
+      "rust_tests": [
+        {
+          "package": "rmagna",
+          "target": "installed_cli_contracts",
+          "test": "original_installed_scenarios_run_from_one_binary_without_checkout_imports",
+          "source_sha256": "8769a84e3f3b68d8744bda07bc0d8c20b97a68911ee4e1132900c2bd7e604145"
+        }
+      ]
     },
     {
       "id": "test_installed_interface.InstalledInterfaceTests.test_wheel_global_query_and_legacy_api_without_protocol_paths",
-      "status": "unmapped",
-      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+      "status": "verified",
+      "contract": "A standalone Rust executable and generated bundled catalogue evaluate exact T interference outside the checkout; a downstream consumer executes the legacy operation-level probability API. Root make_plan import is rejected. Rust modules replace wheel resources and CPython namespaces; no Python wheel/retired-module ABI identity is claimed.",
+      "rust_tests": [
+        {
+          "package": "rmagna",
+          "target": "installed_cli_contracts",
+          "test": "original_installed_scenarios_run_from_one_binary_without_checkout_imports",
+          "source_sha256": "8769a84e3f3b68d8744bda07bc0d8c20b97a68911ee4e1132900c2bd7e604145"
+        },
+        {
+          "package": "rmagna",
+          "target": "installed_cli_contracts",
+          "test": "downstream_rust_consumer_executes_both_tutorial_apis_and_embedded_catalogue",
+          "source_sha256": "8769a84e3f3b68d8744bda07bc0d8c20b97a68911ee4e1132900c2bd7e604145"
+        }
+      ]
     },
     {
       "id": "test_kernel_contract.KernelContractTests.test_legacy_flags_cannot_select_an_old_kernel_and_general_callbacks_work",
@@ -1681,8 +1814,22 @@
     },
     {
       "id": "test_kernel_contract.KernelContractTests.test_no_old_probability_entry_in_production_extension",
-      "status": "unmapped",
-      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+      "status": "verified",
+      "contract": "Downstream compilation rejects legacy evaluate_batch and boundary_trace_reference_test imports; the public typed trace service remains available. This is a Rust namespace boundary,not a CPython extension ABI claim.",
+      "rust_tests": [
+        {
+          "package": "rmagna",
+          "target": "rust_snapshot_contracts",
+          "test": "original_compiled_misuses_and_legacy_private_entries_are_rejected_downstream",
+          "source_sha256": "361e89079517d0b9295f04e320e85fc175f412f820aaec67368e60797a3c8d3c"
+        },
+        {
+          "package": "rmagna",
+          "target": "rust_snapshot_contracts",
+          "test": "original_public_trace_boundary_is_available_as_a_typed_rust_service",
+          "source_sha256": "361e89079517d0b9295f04e320e85fc175f412f820aaec67368e60797a3c8d3c"
+        }
+      ]
     },
     {
       "id": "test_kernel_contract.KernelContractTests.test_options_change_revalidates_resource_budget",
@@ -1725,8 +1872,16 @@
     },
     {
       "id": "test_kernel_contract.KernelContractTests.test_unexpected_kernel_errors_are_never_retried_on_another_backend",
-      "status": "unmapped",
-      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+      "status": "verified",
+      "contract": "The normal captured/collected branch pipeline runs one injected kernel and propagates its exact unexpected error once; no retry,callback replay or diagnostic key generation.",
+      "rust_tests": [
+        {
+          "package": "rmagna",
+          "target": "rust_snapshot_contracts",
+          "test": "original_unexpected_kernel_error_propagates_once_without_another_backend_attempt",
+          "source_sha256": "361e89079517d0b9295f04e320e85fc175f412f820aaec67368e60797a3c8d3c"
+        }
+      ]
     },
     {
       "id": "test_low_weight.LowWeightTests.test_distinct_sites_and_exact_truncated_mass",
@@ -1847,23 +2002,61 @@
     },
     {
       "id": "test_native_batch.BatchTests.test_bad_codes_and_duplicate_report_flips",
-      "status": "unmapped",
-      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+      "status": "verified",
+      "contract": "Strict JSON adapter rejects the original four malformed rows; typed words reject foreign width; duplicated report flips cancel by XOR.",
+      "rust_tests": [
+        {
+          "package": "rmagna",
+          "target": "rust_snapshot_contracts",
+          "test": "original_noise_layout_rejects_all_four_bad_code_rows_and_cancels_duplicate_reports",
+          "source_sha256": "361e89079517d0b9295f04e320e85fc175f412f820aaec67368e60797a3c8d3c"
+        }
+      ]
     },
     {
       "id": "test_native_batch.BatchTests.test_compact_callbacks_execute_and_batch_snapshot",
-      "status": "unmapped",
-      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+      "status": "verified",
+      "contract": "A lazy batch captures one immutable source; each compact assignment invokes its callback freshly,and later explicit source replacement rejects the old owner token.",
+      "rust_tests": [
+        {
+          "package": "rmagna",
+          "target": "rust_snapshot_contracts",
+          "test": "original_compact_batch_retains_owner_while_callbacks_execute_on_every_assignment",
+          "source_sha256": "361e89079517d0b9295f04e320e85fc175f412f820aaec67368e60797a3c8d3c"
+        }
+      ]
     },
     {
       "id": "test_native_batch.BatchTests.test_immutable_group_with_report_errors_and_mutation",
-      "status": "unmapped",
-      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+      "status": "verified",
+      "contract": "Immutable shared Y/report groups capture mutable row data before yield,true words are reported XOR flips,each certificate/export owns its values,and a new source session rejects the old compact input.",
+      "rust_tests": [
+        {
+          "package": "rmagna",
+          "target": "rust_snapshot_contracts",
+          "test": "original_shared_fault_group_keeps_records_report_errors_and_independent_snapshots",
+          "source_sha256": "361e89079517d0b9295f04e320e85fc175f412f820aaec67368e60797a3c8d3c"
+        },
+        {
+          "package": "rmagna",
+          "target": "rust_snapshot_contracts",
+          "test": "original_noise_rows_snapshot_before_yield_and_share_true_record_inversions",
+          "source_sha256": "361e89079517d0b9295f04e320e85fc175f412f820aaec67368e60797a3c8d3c"
+        }
+      ]
     },
     {
       "id": "test_native_batch.BatchTests.test_no_probability_fingerprint_without_cache",
-      "status": "unmapped",
-      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+      "status": "verified",
+      "contract": "Probability paths have no value cache and perform zero actual input SHA256 operations under the Rust no-cache policy; explicit certificate compilation generates one array-ordered diagnostic input fingerprint.",
+      "rust_tests": [
+        {
+          "package": "rmagna",
+          "target": "rust_snapshot_contracts",
+          "test": "original_probability_queries_generate_no_input_key_but_explicit_compile_does",
+          "source_sha256": "361e89079517d0b9295f04e320e85fc175f412f820aaec67368e60797a3c8d3c"
+        }
+      ]
     },
     {
       "id": "test_native_boundary_service.NativeBoundaryServiceTests.test_boundary_sum_validates_rows_for_every_term_width",
@@ -1960,13 +2153,29 @@
     },
     {
       "id": "test_native_global_fastpath.NativeGlobalFastpathTests.test_mutable_fault_tuple_is_repacked_after_each_yield",
-      "status": "unmapped",
-      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+      "status": "verified",
+      "contract": "Each ordinary yield snapshots the currently supplied mutable Arc payload again; I/Z fault replacements produce distinct exact masses and two real branch compilations. Fault-group snapshots do not claim native packing costs.",
+      "rust_tests": [
+        {
+          "package": "rmagna",
+          "target": "rust_snapshot_contracts",
+          "test": "original_ordinary_faults_are_copied_again_after_each_mutating_yield",
+          "source_sha256": "361e89079517d0b9295f04e320e85fc175f412f820aaec67368e60797a3c8d3c"
+        }
+      ]
     },
     {
       "id": "test_native_global_fastpath.NativeGlobalFastpathTests.test_no_feedback_does_not_retain_consumed_assignments",
-      "status": "unmapped",
-      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+      "status": "verified",
+      "contract": "All64 original alternating inputs execute,consumed Arc/Weak assignments expire before subsequent yields,and the stream retains no consumed input or branch.",
+      "rust_tests": [
+        {
+          "package": "rmagna",
+          "target": "rust_snapshot_contracts",
+          "test": "original_no_feedback_stream_releases_all_sixty_four_consumed_assignments",
+          "source_sha256": "361e89079517d0b9295f04e320e85fc175f412f820aaec67368e60797a3c8d3c"
+        }
+      ]
     },
     {
       "id": "test_native_global_fastpath.NativeGlobalFastpathTests.test_ordinary_record_validation_and_empty_stream",
@@ -2001,23 +2210,57 @@
     },
     {
       "id": "test_native_global_fastpath.NativeGlobalFastpathTests.test_snapshot_check_precedes_shared_empty_fault_reuse",
-      "status": "unmapped",
-      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+      "status": "verified",
+      "contract": "Foreign source token rejection precedes globally shared empty fault reuse; fail-fast statistics prove no later input/kernel/callback is consumed.",
+      "rust_tests": [
+        {
+          "package": "rmagna",
+          "target": "rust_snapshot_contracts",
+          "test": "original_empty_fault_sharing_cannot_bypass_foreign_snapshot_validation",
+          "source_sha256": "361e89079517d0b9295f04e320e85fc175f412f820aaec67368e60797a3c8d3c"
+        }
+      ]
     },
     {
       "id": "test_native_global_ownership.NativeGlobalOwnershipTests.test_certificate_retains_input_before_native_return",
-      "status": "unmapped",
-      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+      "status": "verified",
+      "contract": "Both controlled/uncontrolled source cases capture records and Y fault before the kernel mutates caller inputs; exact certificates,masses,literal output amplitudes and callback counts retain the original values.",
+      "rust_tests": [
+        {
+          "package": "rmagna",
+          "target": "rust_snapshot_contracts",
+          "test": "original_certificate_keeps_both_captured_inputs_before_the_evaluation_kernel_returns",
+          "source_sha256": "361e89079517d0b9295f04e320e85fc175f412f820aaec67368e60797a3c8d3c"
+        }
+      ]
     },
     {
       "id": "test_native_global_ownership.NativeGlobalOwnershipTests.test_compile_counts_preparation_fallback_once",
-      "status": "unmapped",
-      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+      "status": "partial",
+      "contract": "Explicit LiteralPerAssignment policy compiles the admitted source once with no structural preparation attempt; exact values and amplitudes are checked.",
+      "rust_tests": [
+        {
+          "package": "rmagna",
+          "target": "rust_snapshot_contracts",
+          "test": "original_explicit_literal_policy_compiles_once_without_structural_preparation",
+          "source_sha256": "361e89079517d0b9295f04e320e85fc175f412f820aaec67368e60797a3c8d3c"
+        }
+      ],
+      "remaining_gap": "The upstream max_structure_bytes=0 automatic Native-preparation fallback and its Python normal/resource dictionaries are not implemented by this API. Rust chooses literal execution explicitly; this is not full original-method verification."
     },
     {
       "id": "test_native_global_ownership.NativeGlobalOwnershipTests.test_native_fallback_retains_values_packed_before_kernel",
-      "status": "unmapped",
-      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+      "status": "partial",
+      "contract": "The original odd-phase control scenario uses captured input even when the kernel mutates caller values; one rule collection and no replay.",
+      "rust_tests": [
+        {
+          "package": "rmagna",
+          "target": "rust_snapshot_contracts",
+          "test": "original_literal_policy_retains_packed_values_and_never_replays_the_phase_rule",
+          "source_sha256": "361e89079517d0b9295f04e320e85fc175f412f820aaec67368e60797a3c8d3c"
+        }
+      ],
+      "remaining_gap": "Rust executes this case literally by explicit policy; the original automatic Native fastpath-to-literal fallback and its private rule_evaluations counter remain unimplemented."
     },
     {
       "id": "test_native_global_ownership.NativeGlobalOwnershipTests.test_same_immutable_plan_has_independent_concurrent_workspaces",
@@ -2073,13 +2316,29 @@
     },
     {
       "id": "test_native_global_phase.NativeGlobalPhaseTests.test_environment_surrogate_preserves_python_conversion_exception",
-      "status": "unmapped",
-      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+      "status": "verified",
+      "contract": "Both named-tensor services reject unpaired surrogate/invalidUTF8 at the shared JSON byte boundary. Rust Strings cannot contain surrogate code units; typed JSON errors replace UnicodeEncodeError identity.",
+      "rust_tests": [
+        {
+          "package": "rmagna",
+          "target": "rust_snapshot_contracts",
+          "test": "original_unpaired_environment_surrogate_rejects_at_the_shared_json_import_boundary",
+          "source_sha256": "361e89079517d0b9295f04e320e85fc175f412f820aaec67368e60797a3c8d3c"
+        }
+      ]
     },
     {
       "id": "test_native_global_phase.NativeGlobalPhaseTests.test_environment_unicode_and_embedded_nul_roundtrip",
-      "status": "unmapped",
-      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+      "status": "verified",
+      "contract": "Owned labels preserve embedded NUL,non-BMP and permitted multibyte UTF8 through absorption and decomposition; independent exported labels do not mutate the source.",
+      "rust_tests": [
+        {
+          "package": "rmagna",
+          "target": "rust_snapshot_contracts",
+          "test": "original_environment_unicode_nul_and_non_bmp_labels_survive_both_tensor_services",
+          "source_sha256": "361e89079517d0b9295f04e320e85fc175f412f820aaec67368e60797a3c8d3c"
+        }
+      ]
     },
     {
       "id": "test_native_global_phase.NativeGlobalPhaseTests.test_malformed_dimensions_and_zero_phase_conventions",
@@ -2183,7 +2442,7 @@
     {
       "id": "test_native_source_tools.NativeSourceToolsTests.test_source_resolution_rejects_absent_and_ambiguous_hooks",
       "status": "unmapped",
-      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+      "reason": "No Rust native_source header-search service is exposed. Exact-path reference-tool admission replaces ambiguous basename search; the original C++ helper lookup method remains unmapped,with no architecture exclusion."
     },
     {
       "id": "test_native_standalone.NativeStandaloneTest.test_foundation_without_cpython",
@@ -2822,13 +3081,31 @@
     },
     {
       "id": "test_query_reuse.OwnershipAndDependencies.test_deferred_public_graph_isolation_and_owned_transfer",
-      "status": "unmapped",
-      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+      "status": "partial",
+      "contract": "Borrowed preparation clones typed operations and owned preparation moves them; both survive explicit source replacement/drop and all64 control/fault/event queries agree.",
+      "rust_tests": [
+        {
+          "package": "rmagna",
+          "target": "rust_snapshot_contracts",
+          "test": "original_borrowed_and_owned_traces_keep_all_sixty_four_control_fault_event_queries",
+          "source_sha256": "361e89079517d0b9295f04e320e85fc175f412f820aaec67368e60797a3c8d3c"
+        }
+      ],
+      "remaining_gap": "Arbitrary cyclic/aliased Python annotation graphs and deepcopy alias identity are not representable in the typed OriginalGate API. No graph arena or Python-object compatibility has been implemented."
     },
     {
       "id": "test_query_reuse.OwnershipAndDependencies.test_lowered_operations_are_owned_even_for_guarded_noise",
-      "status": "unmapped",
-      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+      "status": "partial",
+      "contract": "Both causal compilers own the guarded source and supplied categorical fault inputs; caller replacement and source/program drop leave the physical -Z result intact.",
+      "rust_tests": [
+        {
+          "package": "rmagna",
+          "target": "rust_snapshot_contracts",
+          "test": "original_guarded_supplied_noise_retains_owned_actions_after_inputs_are_dropped",
+          "source_sha256": "361e89079517d0b9295f04e320e85fc175f412f820aaec67368e60797a3c8d3c"
+        }
+      ],
+      "remaining_gap": "Supplied arbitrary nested Python gate extra metadata is unsupported. Rust supplies checked categorical fault identities,not arbitrary Python gate dictionaries."
     },
     {
       "id": "test_query_reuse.OwnershipAndDependencies.test_ordered_distinct_dependencies_keep_callback_duplicates",
@@ -2845,8 +3122,17 @@
     },
     {
       "id": "test_query_reuse.OwnershipAndDependencies.test_public_ir_still_copies_arbitrary_graph_and_prepared_snapshot",
-      "status": "unmapped",
-      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+      "status": "partial",
+      "contract": "Borrowed source operations remain isolated after explicit replacement with an invalid wire target; owned and borrowed traces keep all original64 query values under both compilers.",
+      "rust_tests": [
+        {
+          "package": "rmagna",
+          "target": "rust_snapshot_contracts",
+          "test": "original_borrowed_and_owned_traces_keep_all_sixty_four_control_fault_event_queries",
+          "source_sha256": "361e89079517d0b9295f04e320e85fc175f412f820aaec67368e60797a3c8d3c"
+        }
+      ],
+      "remaining_gap": "Cyclic public Python metadata deepcopy and mutable prepared.matches identity have no direct typed graph implementation; source replacement creates a new explicit session token."
     },
     {
       "id": "test_query_reuse.PreparedBoundaryResources.test_affine_probe_does_not_expand_a_nonaffine_resource",
@@ -2883,8 +3169,16 @@
     },
     {
       "id": "test_query_reuse.QueryReuse.test_owned_preparation_matches_public_with_actual_controls_and_faults",
-      "status": "unmapped",
-      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+      "status": "verified",
+      "contract": "All64 original I/X/Y/Z xreportflip xoutcome xoutputPauli queries match captured Native and independent literal totals under both compilers and both constructors; raw contribution equality,source replacement/drop and path-budget refusal are checked.",
+      "rust_tests": [
+        {
+          "package": "rmagna",
+          "target": "rust_snapshot_contracts",
+          "test": "original_borrowed_and_owned_traces_keep_all_sixty_four_control_fault_event_queries",
+          "source_sha256": "361e89079517d0b9295f04e320e85fc175f412f820aaec67368e60797a3c8d3c"
+        }
+      ]
     },
     {
       "id": "test_query_reuse.QueryReuse.test_shared_plan_threads_and_batched_paulis",
@@ -3083,8 +3377,28 @@
     },
     {
       "id": "test_runtime_ownership.RuntimeOwnershipTests.test_sparse_noise_equals_dense_categories_and_isolation",
-      "status": "unmapped",
-      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+      "status": "verified",
+      "contract": "Replay all100 captured Native categorical choices,actions and exact weights by action identity; compare own100-seed dense/sparse draws and final RNG state; nested caller mutation leaves another100 draws unchanged. Direct table shape errors and invalid Pauli/negative qubit type misuse are rejected. No default Python RNG sequence claim.",
+      "rust_tests": [
+        {
+          "package": "rmagna",
+          "target": "rust_snapshot_contracts",
+          "test": "original_sparse_actions_match_all_hundred_dense_draws_and_remain_isolated",
+          "source_sha256": "361e89079517d0b9295f04e320e85fc175f412f820aaec67368e60797a3c8d3c"
+        },
+        {
+          "package": "rmagna",
+          "target": "rust_snapshot_contracts",
+          "test": "original_direct_sparse_action_table_owns_nested_factors_and_rejects_shape_errors",
+          "source_sha256": "361e89079517d0b9295f04e320e85fc175f412f820aaec67368e60797a3c8d3c"
+        },
+        {
+          "package": "rmagna",
+          "target": "rust_snapshot_contracts",
+          "test": "original_compiled_misuses_and_legacy_private_entries_are_rejected_downstream",
+          "source_sha256": "361e89079517d0b9295f04e320e85fc175f412f820aaec67368e60797a3c8d3c"
+        }
+      ]
     },
     {
       "id": "test_runtime_ownership.RuntimeOwnershipTests.test_structure_reuse_changed_rhs_faults_effects_and_uncached",
@@ -3246,8 +3560,16 @@
     },
     {
       "id": "test_simulator_optimization.OptimizationTests.test_mutable_control_parent_list_updates_ir_certificate",
-      "status": "unmapped",
-      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+      "status": "verified",
+      "contract": "Explicit immutable parent-list replacement a->a,b under the same callback version changes the captured branch and probability1->0; certificates have distinct source tokens and the old session remains valid.",
+      "rust_tests": [
+        {
+          "package": "rmagna",
+          "target": "rust_snapshot_contracts",
+          "test": "original_parent_list_replacement_changes_source_identity_and_uses_new_callback_inputs",
+          "source_sha256": "361e89079517d0b9295f04e320e85fc175f412f820aaec67368e60797a3c8d3c"
+        }
+      ]
     },
     {
       "id": "test_simulator_optimization.OptimizationTests.test_packed_pullback_against_direct_quadratic_values",
@@ -3264,13 +3586,48 @@
     },
     {
       "id": "test_simulator_optimization.OptimizationTests.test_prepared_ir_nested_mutation_and_returned_snapshot",
-      "status": "unmapped",
-      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+      "status": "partial",
+      "contract": "Returned certificate JSON owns its arrays; explicit operation/initial replacements affect fresh sessions while existing sessions/batches keep captured values.",
+      "rust_tests": [
+        {
+          "package": "rmagna",
+          "target": "rust_snapshot_contracts",
+          "test": "original_probability_queries_generate_no_input_key_but_explicit_compile_does",
+          "source_sha256": "361e89079517d0b9295f04e320e85fc175f412f820aaec67368e60797a3c8d3c"
+        },
+        {
+          "package": "rmagna",
+          "target": "rust_snapshot_contracts",
+          "test": "original_lazy_batches_capture_one_source_while_next_single_query_uses_replacement",
+          "source_sha256": "361e89079517d0b9295f04e320e85fc175f412f820aaec67368e60797a3c8d3c"
+        },
+        {
+          "package": "rmagna",
+          "target": "rust_snapshot_contracts",
+          "test": "original_borrowed_and_owned_traces_keep_all_sixty_four_control_fault_event_queries",
+          "source_sha256": "361e89079517d0b9295f04e320e85fc175f412f820aaec67368e60797a3c8d3c"
+        }
+      ],
+      "remaining_gap": "No arbitrary Python metadata mutation,metadata-keyed certificate LRU or cache_hit dictionary exists. Typed source/JSON isolation is witnessed,but the original complete metadata/cache method remains partial."
     },
     {
       "id": "test_simulator_optimization.OptimizationTests.test_probability_batch_snapshot_and_zero_cache_budget",
-      "status": "unmapped",
-      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+      "status": "verified",
+      "contract": "An entire lazy batch keeps its captured initial state; the next query on an explicitly replaced session observes the new state. Probability batches retain no probability-value cache or input fingerprints.",
+      "rust_tests": [
+        {
+          "package": "rmagna",
+          "target": "rust_snapshot_contracts",
+          "test": "original_lazy_batches_capture_one_source_while_next_single_query_uses_replacement",
+          "source_sha256": "361e89079517d0b9295f04e320e85fc175f412f820aaec67368e60797a3c8d3c"
+        },
+        {
+          "package": "rmagna",
+          "target": "rust_snapshot_contracts",
+          "test": "original_probability_queries_generate_no_input_key_but_explicit_compile_does",
+          "source_sha256": "361e89079517d0b9295f04e320e85fc175f412f820aaec67368e60797a3c8d3c"
+        }
+      ]
     },
     {
       "id": "test_simulator_optimization.OptimizationTests.test_unbiased_noise_preserves_exact_rng_stream",
@@ -3834,8 +4191,16 @@
     },
     {
       "id": "test_user_interface.CommandLineTests.test_unimportable_decoder_binding_is_invalid_input",
-      "status": "unmapped",
-      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+      "status": "verified",
+      "contract": "Both original missing module/function bindings and an actually removed local decoder fail with invalid-input exit2 before any draw; no checkout or package fallback is used.",
+      "rust_tests": [
+        {
+          "package": "rmagna",
+          "target": "installed_cli_contracts",
+          "test": "original_installed_scenarios_run_from_one_binary_without_checkout_imports",
+          "source_sha256": "8769a84e3f3b68d8744bda07bc0d8c20b97a68911ee4e1132900c2bd7e604145"
+        }
+      ]
     },
     {
       "id": "test_user_interface.CommandLineTests.test_version_and_command_help",
@@ -3865,8 +4230,16 @@
     },
     {
       "id": "test_user_interface.CompiledRunTests.test_compiled_circuits_are_not_compiled_again",
-      "status": "unmapped",
-      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+      "status": "verified",
+      "contract": "Two downstream compile-negative probes reject compile and sampler comparison on compiled values; a matching current-library positive control admits source compilation/comparison and compiled execution.",
+      "rust_tests": [
+        {
+          "package": "rmagna",
+          "target": "rust_snapshot_contracts",
+          "test": "original_compiled_misuses_and_legacy_private_entries_are_rejected_downstream",
+          "source_sha256": "361e89079517d0b9295f04e320e85fc175f412f820aaec67368e60797a3c8d3c"
+        }
+      ]
     },
     {
       "id": "test_user_interface.CompiledRunTests.test_compiled_run_rejects_settings_it_already_fixes",
@@ -3910,17 +4283,33 @@
     {
       "id": "test_user_interface.MissingExtensionTests.test_import_without_native_extension_explains_how_to_build",
       "status": "unmapped",
-      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+      "reason": "The standalone Rust distribution has no CPython extension-import step. The consumer checks OS NotFound after removing an executable,but the original Python missing-extension/build-instruction contract is not implemented and remains unmapped;no architecture exclusion."
     },
     {
       "id": "test_user_interface.NamespaceTests.test_first_parameters_have_their_documented_names",
-      "status": "unmapped",
-      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+      "status": "verified",
+      "contract": "A downstream consumer compiles and executes documented typed file APIs and operation APIs; passing a compiled task as the load input fails with E0308. Rust positional types replace Python keyword-name reflection; inspect.signature compatibility is not claimed.",
+      "rust_tests": [
+        {
+          "package": "rmagna",
+          "target": "installed_cli_contracts",
+          "test": "downstream_rust_consumer_executes_both_tutorial_apis_and_embedded_catalogue",
+          "source_sha256": "8769a84e3f3b68d8744bda07bc0d8c20b97a68911ee4e1132900c2bd7e604145"
+        }
+      ]
     },
     {
       "id": "test_user_interface.NamespaceTests.test_top_level_is_the_file_interface_and_operations_is_separate",
-      "status": "unmapped",
-      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+      "status": "verified",
+      "contract": "A compiled/executed downstream example uses public file_api and instrument modules separately; a root run import and retired make_plan import fail with E0432. This is the explicit Rust module contract,not a CPython __all__ compatibility claim.",
+      "rust_tests": [
+        {
+          "package": "rmagna",
+          "target": "installed_cli_contracts",
+          "test": "downstream_rust_consumer_executes_both_tutorial_apis_and_embedded_catalogue",
+          "source_sha256": "8769a84e3f3b68d8744bda07bc0d8c20b97a68911ee4e1132900c2bd7e604145"
+        }
+      ]
     },
     {
       "id": "test_virtual_clifford_feedback.VirtualCliffordFeedbackTests.test_composed_control_simplification_and_versions_determine_route",

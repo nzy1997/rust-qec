@@ -3,12 +3,14 @@
 mod absorption;
 mod certified;
 mod core;
+mod named;
 mod resource;
 mod tensor;
 pub use certified::{
     CertifiedPathTensor, PathCertificate, PathDecomposition, PathDecompositionReport,
     PathTermReport,
 };
+pub use named::{NamedPathDecomposition, NamedPathTensorError, NamedPhasePathTensor};
 mod transport;
 pub use absorption::{
     CliffordRadicalAbsorption, RadicalAbsorptionDiagnostics, RadicalAbsorptionOptions,

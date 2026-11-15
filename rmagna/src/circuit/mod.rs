@@ -1,5 +1,10 @@
 //! Magna text circuits with exact probabilities and causal classical expressions.
 
+mod feedback;
+pub use feedback::{
+    FeedbackFault, FeedbackTemplate, FeedbackTemplateError, FeedbackTemplateOptions,
+    FeedbackUpdate, FeedbackVirtualControl,
+};
 mod parse;
 mod program;
 mod view;

@@ -1,0 +1,18 @@
+SPDX-License-Identifier: MPL-2.0
+
+original-installed-inputs.json and corresponding installed_cli_contracts.rs cases
+are adapted from itpyi/magna, revision 56847478c840395735146ef1e1ccdc3d8aedc10f.
+The fixture binds31 small circuit/task/decoder files and two tutorial documents
+under examples/dk, tests/fixtures/basic, tests/fixtures/terminal-recovery,
+tests/fixtures/importance-sampling and docs/software. All full source hashes are
+recorded and checked against benchmarks/magna_reproduction/reference.json.
+
+Original repository: https://github.com/itpyi/magna
+Full license: ../fixtures/original_many_record_input.LICENSE.
+Regenerate with benchmarks/magna_reproduction/original_installed_inputs.py.
+
+These are original input texts, not installed Python-wheel results. The Rust
+suite copies only the current executable and small local task inputs outside the
+checkout, runs corresponding CLI commands and compiled Rust consumers, and
+states unsupported Python installation/reflection and Native-cache identities
+separately. It reuses the existing compiler/dependency environment.

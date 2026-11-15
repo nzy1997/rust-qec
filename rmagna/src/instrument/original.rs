@@ -93,6 +93,16 @@ pub use assignment_stream::{
     OriginalAssignmentStream, OriginalAssignmentStreamStatistics, OriginalRecordAssignment,
 };
 
+#[path = "original_assignment_plan.rs"]
+mod assignment_plan;
+pub use assignment_plan::{
+    OriginalAssignmentBatch, OriginalAssignmentBatchStatistics, OriginalAssignmentCertificate,
+    OriginalAssignmentExecutionPolicy, OriginalAssignmentInput, OriginalAssignmentPlan,
+    OriginalCompactAssignment, OriginalCompactNoiseChannel, OriginalCompactNoiseLayout,
+    OriginalNoiseAssignmentStream, OriginalNoiseCodeSelection, OriginalSharedFaults,
+    OriginalTraceCache, OriginalTraceCacheStatistics,
+};
+
 pub type OriginalWire = i64;
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum OriginalPauli {
@@ -236,7 +246,7 @@ pub struct OriginalControl {
     pub version: String,
     pub callback: Arc<OriginalCallback>,
 }
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct OriginalFault {
     pub after: String,
     pub wire: OriginalWire,
@@ -520,12 +530,32 @@ impl OriginalInstrument {
     pub fn control_rule(&self, operation: &str) -> Option<&ControlRule> {
         self.declarations.get(operation).map(Arc::as_ref)
     }
-    pub fn compile(
+    /// Read-only original source operations. Replacements construct another
+    /// validated source; previously prepared snapshots keep their old values.
+    pub fn operations(&self) -> &[OriginalOperation] {
+        &self.operations
+    }
+    pub fn with_operations(
+        &self,
+        operations: Vec<OriginalOperation>,
+        arithmetic: &ScalarArithmetic,
+    ) -> Result<Self, OriginalError> {
+        let mut replaced = Self::new(
+            self.inputs.clone(),
+            self.outputs.clone(),
+            self.initial.clone(),
+            operations,
+            self.controls.values().cloned().collect(),
+            self.limits,
+            arithmetic,
+        )?;
+        replaced.declarations = self.declarations.clone();
+        Ok(replaced)
+    }
+    pub(super) fn admit_assignment_metadata(
         &self,
         assignment: &OriginalAssignment,
-        strategy: CompilerStrategy,
-        arithmetic: &ScalarArithmetic,
-    ) -> Result<OriginalBranch, OriginalError> {
+    ) -> Result<(), OriginalError> {
         let l = self.limits;
         admit("max_faults", l.max_faults, assignment.faults.len() as u128)?;
         let bytes = assignment
@@ -544,6 +574,16 @@ impl OriginalInstrument {
                 .map(|v| 48 + v.after.len() as u128)
                 .sum::<u128>();
         admit("max_metadata_bytes", l.max_metadata_bytes, bytes)?;
+        Ok(())
+    }
+    pub fn compile(
+        &self,
+        assignment: &OriginalAssignment,
+        strategy: CompilerStrategy,
+        arithmetic: &ScalarArithmetic,
+    ) -> Result<OriginalBranch, OriginalError> {
+        let l = self.limits;
+        self.admit_assignment_metadata(assignment)?;
         let known = self
             .records
             .iter()
