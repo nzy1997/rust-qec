@@ -1083,6 +1083,11 @@ Overwriting a register cannot change an earlier selection, gate or observable.
 Detectors retain raw parity rather than subtracting a noiseless reference.
 Report-flip probability is stored separately from the quantum measurement.
 
+Classically controlled quantum gates accept `rec[...]` and initialized
+`ctrl[...]` inputs. To use a detector parity, first write it to a control
+register, for example `CONTROL[XOR] det[0] -> ctrl[0]`, then use `CX ctrl[0] 0`.
+Direct detector targets such as `CX det[0] 0` are rejected.
+
 `DETECTOR` takes only non-complemented `rec[...]` targets. `POSTSELECT` takes
 `det[...]` or `ctrl[...]`; prefix a target with `!` to require one instead of
 zero. `OBSERVABLE_INCLUDE(index)` XORs non-complemented `rec[...]` and
