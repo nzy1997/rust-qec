@@ -3560,3 +3560,39 @@ conditional-noise method remains partial for Native-private preparation/reuse
 counters,owned by R09 #1299. Python missing-extension/build-guidance remains
 unmapped despite the separate Rust missing-executable check. Neither is an
 architecture exclusion. These cases do not establish paper benchmark results.
+
+
+### Numeric and record-proposal boundaries (R06)
+
+`cargo test --locked -p rmagna --test remaining_numeric_contracts` adapts all five
+R06 original methods. It exercises 30 independent and 30 externally certified
+affine proposals, 120 exact protocol requests, 100 physical and 40 effective-rate
+noise draws, all 35 scalar inputs and their weights, six estimator families and
+all 512 finite scalar-ratio pairs. The unchanged occurrence suite retains its
+560 packed trials; it is reused rather than reimplemented.
+
+The public boundaries are explicit:
+
+| Boundary | Rust contract |
+| --- | --- |
+| Real-record proposals | `OriginalIndependentRecordProposal` owns strict full-support probabilities (default one half). `OriginalAffineRecordProposal` checks real-record affine algebra and owns caller-supplied physical coverage evidence; it does not infer that physical coverage claim. Both use owner-bound R04 compact assignments and exact rational proposal masses. |
+| RNG protocol | Caller-owned `RandRangeSource` requests and exhaustion match the captured schedules. A power-of-two affine request maps the original two-bit request to range four. Default SplitMix64 does not implement Python Random trajectories. |
+| Finite uniform index | Opt-in `ModuloWordRangeSource` rejects the incomplete low modulo bucket and consumes zero words at bound one. The default masked `WordRangeSource` retains its separately documented convention. |
+| Decimal contexts | The original 80-or-more-digit results remain reference observations. Rust retains exact field coefficients and rational weights, then correctly rounds scientific/binary64 output. All 70 scalar conversions match rounded reference bits; Python Decimal strings/context rounding are not an API promise. |
+| Statistics | `ExactStatistics` is reused. Pairwise-difference covariance and independent closed forms validate all six families, including 78-digit differences and weights `1E-2000`/`1E2000`. Native underflow and tagged infinity exports are checked separately from finite scientific values. |
+| Process rounding | The integer export kernel has no hardware-division fast/general route split. On supported Unix hosts, an isolated child gets `FE_UPWARD` from the platform C header, checks all 512 pairs and one third, and restores the saved rounding mode on normal return and injected panic. The parent test runner is unaffected. A platform C compiler is required for this header probe. |
+
+The checked fixtures include all original source, producer and retained
+Native/helper identities. Regenerate to new output paths:
+
+```sh
+python3 benchmarks/magna_reproduction/original_numeric_contracts.py --upstream "$MAGNA_REFERENCE" --native-helper "$MAGNA_NATIVE_HELPER" --out "$NEW_NUMERIC_JSON"
+python3 benchmarks/magna_reproduction/original_numeric_512.py --upstream "$MAGNA_REFERENCE" --out "$NEW_512_JSON"
+```
+
+The first producer runs all five unchanged original methods with the existing
+Native/helper environment. The second only compiles the small original standalone
+C++ test with observation logging; all assertions remain enabled. Both check the
+full pinned source before/after execution, refuse unsafe/existing destinations
+before capture, and emit strict JSON. Native extensions and environments are
+neither rebuilt nor copied. These contracts establish no paper throughput claim.

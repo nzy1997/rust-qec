@@ -17,10 +17,12 @@ import native_core_contract_reference as contracts
 import native_core_reference as core
 import original_noise_reference as noise
 import original_ratio_rounding_vectors as ratio
+import original_numeric_contracts as numeric
+import original_numeric_512 as numeric512
 import witness_paths
 
 
-CLIENTS = {"ratio": ratio, "noise": noise, "contracts": contracts, "core": core}
+CLIENTS = {"ratio": ratio, "noise": noise, "contracts": contracts, "core": core, "numeric": numeric, "numeric512": numeric512}
 
 
 def snapshot(root):
@@ -66,6 +68,8 @@ class WitnessDestinationTests(unittest.TestCase):
         if kind == "ratio":
             args += ["--receipt", str(receipt), "--helper", str(layout.helper),
                      "--helper-record", str(layout.record)]
+        elif kind == "numeric":
+            args += ["--native-helper", str(layout.helper)]
         elif kind == "core":
             args += ["--manifest", str(layout.root / "fake-manifest.json")]
         return args
