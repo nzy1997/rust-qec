@@ -1,0 +1,17 @@
+SPDX-License-Identifier: MPL-2.0
+
+original_sparse_ownership.json, original_sparse_ownership.py and corresponding
+sparse-noise cases in rust_snapshot_contracts.rs are adapted from itpyi/magna,
+revision 56847478c840395735146ef1e1ccdc3d8aedc10f:
+tests/core/test_runtime_ownership.py::RuntimeOwnershipTests.test_sparse_noise_equals_dense_categories_and_isolation.
+
+Original repository: https://github.com/itpyi/magna
+Full license: original_many_record_input.LICENSE in this directory.
+
+The complete unchanged original method validates100 dense and200 sparse draws,
+including caller table mutation and malformed action checks. The fixture retains
+all100 original seeds, categorical choices, named actions and raw/canonical exact
+likelihood ratios. Rust maps foreign channel order by explicit action identity,
+replays all100 choices and compares its own sparse/dense100-seed streams; it does
+not claim default Python RNG sequence or private native index equality. Generator,
+source, frontend and identified prebuilt helper hashes bind the observations.

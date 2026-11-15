@@ -112,6 +112,9 @@ def check_contracts(catalog, ledger, manifest, *, root=ROOT, upstream=None):
             require(declarations.get(name) == binding, f"method declaration changed: {name}")
             details = method_details((upstream / binding["path"]).read_text(), name)
             require(row["method"] == details, f"method/helper requirements changed: {name}")
+    from snapshot_contracts import check_decisions
+    check_decisions(read_json(HERE / "rust-snapshot-contracts.json"), ledger, manifest,
+                    root=root, upstream=upstream)
     return dict(status="PASS", scope=catalog["parity_claim"], outstanding=len(rows),
                 ledger_snapshot=snapshot, categories=catalog["category_counts"],
                 tasks=len(catalog["packaged_tasks"]), paper_files=len(paper["files"]),

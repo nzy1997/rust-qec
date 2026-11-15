@@ -1,0 +1,18 @@
+SPDX-License-Identifier: MPL-2.0
+
+original_snapshot_queries.json, original_snapshot_queries.py and the borrowed/
+owned query case in rust_snapshot_contracts.rs are adapted from itpyi/magna,
+revision 56847478c840395735146ef1e1ccdc3d8aedc10f:
+tests/core/test_query_reuse.py::QueryReuse.test_owned_preparation_matches_public_with_actual_controls_and_faults.
+
+Original repository: https://github.com/itpyi/magna
+Full license: original_many_record_input.LICENSE in this directory.
+
+The generator runs the complete unchanged original method and captures all128
+public/owned query results, including exact signed raw boundary terms and their
+linear sums. The Rust test preserves all64 logical queries under both compiler
+strategies, compares its own borrowed/owned raw contributions, and checks exact
+sums against both these Native observations and literal Pauli signs. Native
+internal tuple/certificate representation is retained as evidence, not claimed
+identical to Rust's decomposition layout. Source, generator and identified
+Native frontend/helper hashes bind the fixture without rebuilding Native.

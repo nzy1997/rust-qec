@@ -58,6 +58,22 @@ class ReferenceTests(unittest.TestCase):
                 with self.subTest(name=name), self.assertRaises(reference.ReferenceError):
                     reference.relative_file(Path(temporary).resolve(), name)
 
+    def test_explicit_helper_paths_do_not_search_duplicate_basenames(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary).resolve()
+            paths = [root / "probe.hpp", root / "nested/probe.hpp"]
+            paths[1].parent.mkdir()
+            expected = {"probe.hpp": hashlib.sha256(b"first").hexdigest(),
+                        "nested/probe.hpp": hashlib.sha256(b"second").hexdigest()}
+            for path, value in zip(paths, [b"first", b"second"]):
+                path.write_bytes(value)
+            self.assertEqual(reference.verify_files(root, expected), 2)
+            self.assertNotEqual(reference.relative_file(root, "probe.hpp"),
+                                reference.relative_file(root, "nested/probe.hpp"))
+            paths[0].unlink()
+            with self.assertRaisesRegex(reference.ReferenceError, "missing"):
+                reference.verify_files(root, expected)
+
     def test_partial_or_failed_draws_cannot_be_declared_complete(self):
         valid = {"schema_version": 2, "seed": 7, "status": "complete", "requested": 8, "completed": 8, "failed": 0,
                  "not_attempted": 0, "failures": [], "estimates": {"acceptance": 0.75, "error": 0.125}}

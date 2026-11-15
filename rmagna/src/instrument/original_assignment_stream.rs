@@ -38,6 +38,13 @@ impl OriginalInstrument {
         strategy: CompilerStrategy,
         arithmetic: &ScalarArithmetic,
     ) -> Result<OriginalBranch, OriginalError> {
+        let typed = self.normalize_record_assignment(&assignment)?;
+        self.compile(&typed, strategy, arithmetic)
+    }
+    pub(super) fn normalize_record_assignment(
+        &self,
+        assignment: &OriginalRecordAssignment,
+    ) -> Result<OriginalAssignment, OriginalError> {
         admit(
             "max_faults",
             self.limits.max_faults,
@@ -82,16 +89,15 @@ impl OriginalInstrument {
             }
         }
         drop(seen);
-        let typed = OriginalAssignment {
+        Ok(OriginalAssignment {
             true_values: assignment
                 .records
-                .into_iter()
-                .map(|(name, value)| (name, value.as_i64() == Some(1)))
+                .iter()
+                .map(|(name, value)| (name.clone(), value.as_i64() == Some(1)))
                 .collect(),
-            report_flips: assignment.report_flips,
-            faults: assignment.faults,
-        };
-        self.compile(&typed, strategy, arithmetic)
+            report_flips: assignment.report_flips.clone(),
+            faults: assignment.faults.clone(),
+        })
     }
     /// No input is pulled, branch compiled or callback invoked at construction.
     /// Empty streams therefore have zero values and all-zero work counters.

@@ -1,0 +1,635 @@
+{
+  "schema": "rmagna.rust-snapshot-contracts.v1",
+  "reference_sha256": "c49203a586f5a451e3183b435793df693dd486857356aed8826df5dc723e5454",
+  "upstream_commit": "56847478c840395735146ef1e1ccdc3d8aedc10f",
+  "roadmap_key": "R04",
+  "issue": 1294,
+  "required_target": "rust_snapshot_contracts",
+  "claims": "Explicit independent Rust contracts; no automatic Python/private-object parity or architecture exclusions.",
+  "consumers": {
+    "R09": {
+      "issue": 1299,
+      "contract": "Use immutable captured source plans,explicit trace cache ownership/budgets and literal fallback policy. Unsupported cyclic metadata and Native-private identities remain visible; reference-network tests still require their own full method witnesses."
+    },
+    "R11": {
+      "issue": 1300,
+      "contract": "Use typed BitVector record words,IXZY codebooks and owner-bound compact inputs. Snapshot-count statistics count retained groups,not Native fault-packing avoidance. FeedbackTemplate provides ordered partial-decision incidence; it does not execute a quantum circuit."
+    }
+  },
+  "policies": {
+    "source_replacement": "Create a fresh plan session for changed operations,initial state or control declarations. Existing batches keep their captured source. No automatic mutable-IR detection.",
+    "callbacks": "Every assignment collects callbacks freshly; no probability-value cache. Opaque callbacks cannot enter the immutable trace cache.",
+    "fallback": "LiteralPerAssignment is explicit. Unexpected/resource errors propagate once. No automatic Native preparation or backend retry.",
+    "cache": "Optional bounded OriginalTraceCache keys source identity and requested path budget. External Arc remains valid after LRU eviction; no source/callback retention by cache keys.",
+    "metadata": "Typed operations/control declarations and owned UTF8 labels only. Arbitrary cyclic/aliased Python graphs are unsupported,not excluded from the original352-method denominator."
+  },
+  "methods": [
+    {
+      "id": "test_capped_affine.CappedAffineTests.test_reconfigure_prepares_optional_route",
+      "source": {
+        "path": "tests/core/test_capped_affine.py",
+        "source_sha256": "5cb6f0e96abcf57308316343178ca3d9cd3e78ff161951615a0e68e2cf58a066",
+        "line": 223,
+        "end_line": 229
+      },
+      "method_sha256": "bc5758022b8a36050a074cd15616a48eb291e61230c7c733601bdc7400fb6752",
+      "status": "verified",
+      "contract": "Explicit immutable compiled options: prepare a fresh affine-support evaluator; the old exact evaluator remains usable, with exact proposal1/2 and acceptance1.",
+      "remaining_gap": "",
+      "rust_tests": [
+        {
+          "package": "rmagna",
+          "target": "rust_snapshot_contracts",
+          "test": "original_sampler_reconfiguration_is_an_explicit_fresh_preparation",
+          "source_sha256": "47227eadf480b8ff0eb81f60f514e2628e2abbe9c47002338a92d7b29b2e34fd"
+        }
+      ]
+    },
+    {
+      "id": "test_feedback_incidence.FeedbackIncidenceTest.test_partial_decisions_xors_versions_constants_and_wire_remap",
+      "source": {
+        "path": "tests/core/test_feedback_incidence.py",
+        "source_sha256": "b80facd5d6d066e6d4a0b141cc46c740799e47ea138ceeb8a0d7e66b01f8734e",
+        "line": 10,
+        "end_line": 41
+      },
+      "method_sha256": "84ec774164bc67c864892806c516e0be5e292676d21348326348c28dde38b000",
+      "status": "verified",
+      "contract": "Fixed incidence built from parsed version-resolved expressions; all4 decision atoms,81 partial assignments,2 prefix/wire maps,6 ordered rows,CS virtual control and final selection constants match Native. Expanded operation IDs replace native string anchors.",
+      "remaining_gap": "",
+      "rust_tests": [
+        {
+          "package": "rmagna",
+          "target": "rust_snapshot_contracts",
+          "test": "original_partial_feedback_incidence_matches_all_162_queries",
+          "source_sha256": "47227eadf480b8ff0eb81f60f514e2628e2abbe9c47002338a92d7b29b2e34fd"
+        }
+      ]
+    },
+    {
+      "id": "test_file_reuse.FileReuseTests.test_native_budget_identity_and_weak_structure_eviction",
+      "source": {
+        "path": "tests/core/test_file_reuse.py",
+        "source_sha256": "fc52e7b895ab575d4a7a3a1ccfae6a59071165d144d4b3220368c7bb93eb7037",
+        "line": 135,
+        "end_line": 158
+      },
+      "method_sha256": "37141518434dc7da8ea97f409f6c3d12aaadedd11c0fe46438649a409fa6782e",
+      "status": "verified",
+      "contract": "Explicit one-entry trace LRU keys source-session token and path budget. Specialize the original echo/XOR/CS source for decisions0/1: three actual preparations,old external +/-Z values,Weak expiry after eviction; budget changes never reuse a larger-budget trace.",
+      "remaining_gap": "",
+      "rust_tests": [
+        {
+          "package": "rmagna",
+          "target": "rust_snapshot_contracts",
+          "test": "original_trace_cache_obeys_source_and_budget_identity_and_weak_eviction",
+          "source_sha256": "47227eadf480b8ff0eb81f60f514e2628e2abbe9c47002338a92d7b29b2e34fd"
+        }
+      ]
+    },
+    {
+      "id": "test_kernel_contract.KernelContractTests.test_no_old_probability_entry_in_production_extension",
+      "source": {
+        "path": "tests/core/test_kernel_contract.py",
+        "source_sha256": "8118024904c89019028d756dc412974f67347ba7c5809efdfd05b5ac26ec4307",
+        "line": 22,
+        "end_line": 25
+      },
+      "method_sha256": "d9343ab790eac7eb99e96e88567822176b90a1e132d6bedd71aee022ea88937d",
+      "status": "verified",
+      "contract": "Downstream compilation rejects legacy evaluate_batch and boundary_trace_reference_test imports; the public typed trace service remains available. This is a Rust namespace boundary,not a CPython extension ABI claim.",
+      "remaining_gap": "",
+      "rust_tests": [
+        {
+          "package": "rmagna",
+          "target": "rust_snapshot_contracts",
+          "test": "original_compiled_misuses_and_legacy_private_entries_are_rejected_downstream",
+          "source_sha256": "47227eadf480b8ff0eb81f60f514e2628e2abbe9c47002338a92d7b29b2e34fd"
+        },
+        {
+          "package": "rmagna",
+          "target": "rust_snapshot_contracts",
+          "test": "original_public_trace_boundary_is_available_as_a_typed_rust_service",
+          "source_sha256": "47227eadf480b8ff0eb81f60f514e2628e2abbe9c47002338a92d7b29b2e34fd"
+        }
+      ]
+    },
+    {
+      "id": "test_kernel_contract.KernelContractTests.test_unexpected_kernel_errors_are_never_retried_on_another_backend",
+      "source": {
+        "path": "tests/core/test_kernel_contract.py",
+        "source_sha256": "8118024904c89019028d756dc412974f67347ba7c5809efdfd05b5ac26ec4307",
+        "line": 142,
+        "end_line": 147
+      },
+      "method_sha256": "9019c2eca02e32251d0a7b571aaa6b0b497ab5b27fc4828e9fb791cbcc959d64",
+      "status": "verified",
+      "contract": "The normal captured/collected branch pipeline runs one injected kernel and propagates its exact unexpected error once; no retry,callback replay or diagnostic key generation.",
+      "remaining_gap": "",
+      "rust_tests": [
+        {
+          "package": "rmagna",
+          "target": "rust_snapshot_contracts",
+          "test": "original_unexpected_kernel_error_propagates_once_without_another_backend_attempt",
+          "source_sha256": "47227eadf480b8ff0eb81f60f514e2628e2abbe9c47002338a92d7b29b2e34fd"
+        }
+      ]
+    },
+    {
+      "id": "test_native_batch.BatchTests.test_bad_codes_and_duplicate_report_flips",
+      "source": {
+        "path": "tests/core/test_native_batch.py",
+        "source_sha256": "b415b56cfe36c49dd202f3fe04d6261f633d6031af6856e56e5eae5be9bda2f0",
+        "line": 48,
+        "end_line": 55
+      },
+      "method_sha256": "7bfaf7c7b972f4cd0f27ace7bdc321e1f7fc876c94936db0a01cfb388910c20c",
+      "status": "verified",
+      "contract": "Strict JSON adapter rejects the original four malformed rows; typed words reject foreign width; duplicated report flips cancel by XOR.",
+      "remaining_gap": "",
+      "rust_tests": [
+        {
+          "package": "rmagna",
+          "target": "rust_snapshot_contracts",
+          "test": "original_noise_layout_rejects_all_four_bad_code_rows_and_cancels_duplicate_reports",
+          "source_sha256": "47227eadf480b8ff0eb81f60f514e2628e2abbe9c47002338a92d7b29b2e34fd"
+        }
+      ]
+    },
+    {
+      "id": "test_native_batch.BatchTests.test_compact_callbacks_execute_and_batch_snapshot",
+      "source": {
+        "path": "tests/core/test_native_batch.py",
+        "source_sha256": "b415b56cfe36c49dd202f3fe04d6261f633d6031af6856e56e5eae5be9bda2f0",
+        "line": 57,
+        "end_line": 71
+      },
+      "method_sha256": "196c4126b254426587726aac146409aae7cfc08f9f6338e8b7a50224586034c4",
+      "status": "verified",
+      "contract": "A lazy batch captures one immutable source; each compact assignment invokes its callback freshly,and later explicit source replacement rejects the old owner token.",
+      "remaining_gap": "",
+      "rust_tests": [
+        {
+          "package": "rmagna",
+          "target": "rust_snapshot_contracts",
+          "test": "original_compact_batch_retains_owner_while_callbacks_execute_on_every_assignment",
+          "source_sha256": "47227eadf480b8ff0eb81f60f514e2628e2abbe9c47002338a92d7b29b2e34fd"
+        }
+      ]
+    },
+    {
+      "id": "test_native_batch.BatchTests.test_immutable_group_with_report_errors_and_mutation",
+      "source": {
+        "path": "tests/core/test_native_batch.py",
+        "source_sha256": "b415b56cfe36c49dd202f3fe04d6261f633d6031af6856e56e5eae5be9bda2f0",
+        "line": 30,
+        "end_line": 46
+      },
+      "method_sha256": "fbb3b82bcb64ce80f249d2fd5b56e3bf864ee3b9e73e42e750990df6e054a27a",
+      "status": "verified",
+      "contract": "Immutable shared Y/report groups capture mutable row data before yield,true words are reported XOR flips,each certificate/export owns its values,and a new source session rejects the old compact input.",
+      "remaining_gap": "",
+      "rust_tests": [
+        {
+          "package": "rmagna",
+          "target": "rust_snapshot_contracts",
+          "test": "original_shared_fault_group_keeps_records_report_errors_and_independent_snapshots",
+          "source_sha256": "47227eadf480b8ff0eb81f60f514e2628e2abbe9c47002338a92d7b29b2e34fd"
+        },
+        {
+          "package": "rmagna",
+          "target": "rust_snapshot_contracts",
+          "test": "original_noise_rows_snapshot_before_yield_and_share_true_record_inversions",
+          "source_sha256": "47227eadf480b8ff0eb81f60f514e2628e2abbe9c47002338a92d7b29b2e34fd"
+        }
+      ]
+    },
+    {
+      "id": "test_native_batch.BatchTests.test_no_probability_fingerprint_without_cache",
+      "source": {
+        "path": "tests/core/test_native_batch.py",
+        "source_sha256": "b415b56cfe36c49dd202f3fe04d6261f633d6031af6856e56e5eae5be9bda2f0",
+        "line": 19,
+        "end_line": 28
+      },
+      "method_sha256": "41a88558af17c3007c78923f040818d8ee93b3fd94885a1f77a90f976ff73406",
+      "status": "verified",
+      "contract": "Probability paths have no value cache and perform zero actual input SHA256 operations under the Rust no-cache policy; explicit certificate compilation generates one array-ordered diagnostic input fingerprint.",
+      "remaining_gap": "",
+      "rust_tests": [
+        {
+          "package": "rmagna",
+          "target": "rust_snapshot_contracts",
+          "test": "original_probability_queries_generate_no_input_key_but_explicit_compile_does",
+          "source_sha256": "47227eadf480b8ff0eb81f60f514e2628e2abbe9c47002338a92d7b29b2e34fd"
+        }
+      ]
+    },
+    {
+      "id": "test_native_global_fastpath.NativeGlobalFastpathTests.test_mutable_fault_tuple_is_repacked_after_each_yield",
+      "source": {
+        "path": "tests/core/test_native_global_fastpath.py",
+        "source_sha256": "ee4b59147bd36e0bdfd5d871c740c699094bf450324be46313c410f983285ac5",
+        "line": 47,
+        "end_line": 62
+      },
+      "method_sha256": "071935b8fd3844a6b949d63c063a618ea3da803c99527ac59772c4c69d6c4426",
+      "status": "verified",
+      "contract": "Each ordinary yield snapshots the currently supplied mutable Arc payload again; I/Z fault replacements produce distinct exact masses and two real branch compilations. Fault-group snapshots do not claim native packing costs.",
+      "remaining_gap": "",
+      "rust_tests": [
+        {
+          "package": "rmagna",
+          "target": "rust_snapshot_contracts",
+          "test": "original_ordinary_faults_are_copied_again_after_each_mutating_yield",
+          "source_sha256": "47227eadf480b8ff0eb81f60f514e2628e2abbe9c47002338a92d7b29b2e34fd"
+        }
+      ]
+    },
+    {
+      "id": "test_native_global_fastpath.NativeGlobalFastpathTests.test_no_feedback_does_not_retain_consumed_assignments",
+      "source": {
+        "path": "tests/core/test_native_global_fastpath.py",
+        "source_sha256": "ee4b59147bd36e0bdfd5d871c740c699094bf450324be46313c410f983285ac5",
+        "line": 95,
+        "end_line": 106
+      },
+      "method_sha256": "7881357821ed707d34ed13a41f5fa51fade330f77f0437918d2a14bf6732f442",
+      "status": "verified",
+      "contract": "All64 original alternating inputs execute,consumed Arc/Weak assignments expire before subsequent yields,and the stream retains no consumed input or branch.",
+      "remaining_gap": "",
+      "rust_tests": [
+        {
+          "package": "rmagna",
+          "target": "rust_snapshot_contracts",
+          "test": "original_no_feedback_stream_releases_all_sixty_four_consumed_assignments",
+          "source_sha256": "47227eadf480b8ff0eb81f60f514e2628e2abbe9c47002338a92d7b29b2e34fd"
+        }
+      ]
+    },
+    {
+      "id": "test_native_global_fastpath.NativeGlobalFastpathTests.test_snapshot_check_precedes_shared_empty_fault_reuse",
+      "source": {
+        "path": "tests/core/test_native_global_fastpath.py",
+        "source_sha256": "ee4b59147bd36e0bdfd5d871c740c699094bf450324be46313c410f983285ac5",
+        "line": 64,
+        "end_line": 71
+      },
+      "method_sha256": "0bd4b4a9fe7894be474061ba475f7d05e74da12be476de8987f86a87e0c6e737",
+      "status": "verified",
+      "contract": "Foreign source token rejection precedes globally shared empty fault reuse; fail-fast statistics prove no later input/kernel/callback is consumed.",
+      "remaining_gap": "",
+      "rust_tests": [
+        {
+          "package": "rmagna",
+          "target": "rust_snapshot_contracts",
+          "test": "original_empty_fault_sharing_cannot_bypass_foreign_snapshot_validation",
+          "source_sha256": "47227eadf480b8ff0eb81f60f514e2628e2abbe9c47002338a92d7b29b2e34fd"
+        }
+      ]
+    },
+    {
+      "id": "test_native_global_ownership.NativeGlobalOwnershipTests.test_certificate_retains_input_before_native_return",
+      "source": {
+        "path": "tests/core/test_native_global_ownership.py",
+        "source_sha256": "51cd28f9cf3d831bfc922feb72891f84e6a40e7f919a71ff46a4e5f7cd63fdf9",
+        "line": 55,
+        "end_line": 71
+      },
+      "method_sha256": "279443cf2dfb9242e3be86ab0f9defb352077eade79e45fa47a897053f644871",
+      "status": "verified",
+      "contract": "Both controlled/uncontrolled source cases capture records and Y fault before the kernel mutates caller inputs; exact certificates,masses,literal output amplitudes and callback counts retain the original values.",
+      "remaining_gap": "",
+      "rust_tests": [
+        {
+          "package": "rmagna",
+          "target": "rust_snapshot_contracts",
+          "test": "original_certificate_keeps_both_captured_inputs_before_the_evaluation_kernel_returns",
+          "source_sha256": "47227eadf480b8ff0eb81f60f514e2628e2abbe9c47002338a92d7b29b2e34fd"
+        }
+      ]
+    },
+    {
+      "id": "test_native_global_ownership.NativeGlobalOwnershipTests.test_compile_counts_preparation_fallback_once",
+      "source": {
+        "path": "tests/core/test_native_global_ownership.py",
+        "source_sha256": "51cd28f9cf3d831bfc922feb72891f84e6a40e7f919a71ff46a4e5f7cd63fdf9",
+        "line": 27,
+        "end_line": 39
+      },
+      "method_sha256": "f0038037d2545b8977412ae4983ad749d1f3b701d1171e080a823158e900e518",
+      "status": "partial",
+      "contract": "Explicit LiteralPerAssignment policy compiles the admitted source once with no structural preparation attempt; exact values and amplitudes are checked.",
+      "remaining_gap": "The upstream max_structure_bytes=0 automatic Native-preparation fallback and its Python normal/resource dictionaries are not implemented by this API. Rust chooses literal execution explicitly; this is not full original-method verification.",
+      "rust_tests": [
+        {
+          "package": "rmagna",
+          "target": "rust_snapshot_contracts",
+          "test": "original_explicit_literal_policy_compiles_once_without_structural_preparation",
+          "source_sha256": "47227eadf480b8ff0eb81f60f514e2628e2abbe9c47002338a92d7b29b2e34fd"
+        }
+      ]
+    },
+    {
+      "id": "test_native_global_ownership.NativeGlobalOwnershipTests.test_native_fallback_retains_values_packed_before_kernel",
+      "source": {
+        "path": "tests/core/test_native_global_ownership.py",
+        "source_sha256": "51cd28f9cf3d831bfc922feb72891f84e6a40e7f919a71ff46a4e5f7cd63fdf9",
+        "line": 41,
+        "end_line": 53
+      },
+      "method_sha256": "3599b029aad18307b94bc533ea358f11a445f41fb40352cc3a99873005042ea3",
+      "status": "partial",
+      "contract": "The original odd-phase control scenario uses captured input even when the kernel mutates caller values; one rule collection and no replay.",
+      "remaining_gap": "Rust executes this case literally by explicit policy; the original automatic Native fastpath-to-literal fallback and its private rule_evaluations counter remain unimplemented.",
+      "rust_tests": [
+        {
+          "package": "rmagna",
+          "target": "rust_snapshot_contracts",
+          "test": "original_literal_policy_retains_packed_values_and_never_replays_the_phase_rule",
+          "source_sha256": "47227eadf480b8ff0eb81f60f514e2628e2abbe9c47002338a92d7b29b2e34fd"
+        }
+      ]
+    },
+    {
+      "id": "test_native_global_phase.NativeGlobalPhaseTests.test_environment_surrogate_preserves_python_conversion_exception",
+      "source": {
+        "path": "tests/core/test_native_global_phase.py",
+        "source_sha256": "b9d596e34dd777a83ac9aa8feb81e4a246d56bd4fae9db9be663f091927d6b50",
+        "line": 118,
+        "end_line": 124
+      },
+      "method_sha256": "182d43219d0e988069d0324fcaf304d49d91577951494b18d0561fb28985e658",
+      "status": "verified",
+      "contract": "Both named-tensor services reject unpaired surrogate/invalidUTF8 at the shared JSON byte boundary. Rust Strings cannot contain surrogate code units; typed JSON errors replace UnicodeEncodeError identity.",
+      "remaining_gap": "",
+      "rust_tests": [
+        {
+          "package": "rmagna",
+          "target": "rust_snapshot_contracts",
+          "test": "original_unpaired_environment_surrogate_rejects_at_the_shared_json_import_boundary",
+          "source_sha256": "47227eadf480b8ff0eb81f60f514e2628e2abbe9c47002338a92d7b29b2e34fd"
+        }
+      ]
+    },
+    {
+      "id": "test_native_global_phase.NativeGlobalPhaseTests.test_environment_unicode_and_embedded_nul_roundtrip",
+      "source": {
+        "path": "tests/core/test_native_global_phase.py",
+        "source_sha256": "b9d596e34dd777a83ac9aa8feb81e4a246d56bd4fae9db9be663f091927d6b50",
+        "line": 126,
+        "end_line": 133
+      },
+      "method_sha256": "f7b18f43858712651ddd45520f24d1d595629efad6b5ed0697ddf58e0885662d",
+      "status": "verified",
+      "contract": "Owned labels preserve embedded NUL,non-BMP and permitted multibyte UTF8 through absorption and decomposition; independent exported labels do not mutate the source.",
+      "remaining_gap": "",
+      "rust_tests": [
+        {
+          "package": "rmagna",
+          "target": "rust_snapshot_contracts",
+          "test": "original_environment_unicode_nul_and_non_bmp_labels_survive_both_tensor_services",
+          "source_sha256": "47227eadf480b8ff0eb81f60f514e2628e2abbe9c47002338a92d7b29b2e34fd"
+        }
+      ]
+    },
+    {
+      "id": "test_native_source_tools.NativeSourceToolsTests.test_source_resolution_rejects_absent_and_ambiguous_hooks",
+      "source": {
+        "path": "tests/core/test_native_source_tools.py",
+        "source_sha256": "d1932aaf901dbbaeac479a53244615995340a303bbe952076ecaf3c0cbaba23e",
+        "line": 16,
+        "end_line": 24
+      },
+      "method_sha256": "2c9ec3d041e62efe01041270daf174d1a11e8871aa5609ed6b022d15e34dc588",
+      "status": "unmapped",
+      "contract": "Reference captures select full manifest-relative source paths and an explicit hashed helper path; no bare-name recursive hook search is performed.",
+      "remaining_gap": "No Rust native_source header-search service is exposed. Exact-path reference-tool admission replaces ambiguous basename search; the original C++ helper lookup method remains unmapped,with no architecture exclusion.",
+      "rust_tests": []
+    },
+    {
+      "id": "test_query_reuse.OwnershipAndDependencies.test_deferred_public_graph_isolation_and_owned_transfer",
+      "source": {
+        "path": "tests/core/test_query_reuse.py",
+        "source_sha256": "4f62065a0e8cf3aca70a30cc484b8bd7d6e67d58d9589304668c96ee603f1f30",
+        "line": 44,
+        "end_line": 58
+      },
+      "method_sha256": "598e48ad4fb40a7f8518a2a38411c92a8b47dcbf6946dc25b83f1c331e705ec5",
+      "status": "partial",
+      "contract": "Borrowed preparation clones typed operations and owned preparation moves them; both survive explicit source replacement/drop and all64 control/fault/event queries agree.",
+      "remaining_gap": "Arbitrary cyclic/aliased Python annotation graphs and deepcopy alias identity are not representable in the typed OriginalGate API. No graph arena or Python-object compatibility has been implemented.",
+      "rust_tests": [
+        {
+          "package": "rmagna",
+          "target": "rust_snapshot_contracts",
+          "test": "original_borrowed_and_owned_traces_keep_all_sixty_four_control_fault_event_queries",
+          "source_sha256": "47227eadf480b8ff0eb81f60f514e2628e2abbe9c47002338a92d7b29b2e34fd"
+        }
+      ]
+    },
+    {
+      "id": "test_query_reuse.OwnershipAndDependencies.test_lowered_operations_are_owned_even_for_guarded_noise",
+      "source": {
+        "path": "tests/core/test_query_reuse.py",
+        "source_sha256": "4f62065a0e8cf3aca70a30cc484b8bd7d6e67d58d9589304668c96ee603f1f30",
+        "line": 60,
+        "end_line": 68
+      },
+      "method_sha256": "b4f087b4ca8b91e57f1b29adf861f7e8cc18847fcb74eee8881dbd11b000fe7d",
+      "status": "partial",
+      "contract": "Both causal compilers own the guarded source and supplied categorical fault inputs; caller replacement and source/program drop leave the physical -Z result intact.",
+      "remaining_gap": "Supplied arbitrary nested Python gate extra metadata is unsupported. Rust supplies checked categorical fault identities,not arbitrary Python gate dictionaries.",
+      "rust_tests": [
+        {
+          "package": "rmagna",
+          "target": "rust_snapshot_contracts",
+          "test": "original_guarded_supplied_noise_retains_owned_actions_after_inputs_are_dropped",
+          "source_sha256": "47227eadf480b8ff0eb81f60f514e2628e2abbe9c47002338a92d7b29b2e34fd"
+        }
+      ]
+    },
+    {
+      "id": "test_query_reuse.OwnershipAndDependencies.test_public_ir_still_copies_arbitrary_graph_and_prepared_snapshot",
+      "source": {
+        "path": "tests/core/test_query_reuse.py",
+        "source_sha256": "4f62065a0e8cf3aca70a30cc484b8bd7d6e67d58d9589304668c96ee603f1f30",
+        "line": 28,
+        "end_line": 42
+      },
+      "method_sha256": "39d3e20e9b47b89f0b926b31b601ad92e41c14a4eaa50f0974802dd451c7d9d5",
+      "status": "partial",
+      "contract": "Borrowed source operations remain isolated after explicit replacement with an invalid wire target; owned and borrowed traces keep all original64 query values under both compilers.",
+      "remaining_gap": "Cyclic public Python metadata deepcopy and mutable prepared.matches identity have no direct typed graph implementation; source replacement creates a new explicit session token.",
+      "rust_tests": [
+        {
+          "package": "rmagna",
+          "target": "rust_snapshot_contracts",
+          "test": "original_borrowed_and_owned_traces_keep_all_sixty_four_control_fault_event_queries",
+          "source_sha256": "47227eadf480b8ff0eb81f60f514e2628e2abbe9c47002338a92d7b29b2e34fd"
+        }
+      ]
+    },
+    {
+      "id": "test_query_reuse.QueryReuse.test_owned_preparation_matches_public_with_actual_controls_and_faults",
+      "source": {
+        "path": "tests/core/test_query_reuse.py",
+        "source_sha256": "4f62065a0e8cf3aca70a30cc484b8bd7d6e67d58d9589304668c96ee603f1f30",
+        "line": 105,
+        "end_line": 125
+      },
+      "method_sha256": "229ab1935a8dc494b4e2ffff0085a4d390e8aac70f15de2fd898455a9f366e79",
+      "status": "verified",
+      "contract": "All64 original I/X/Y/Z xreportflip xoutcome xoutputPauli queries match captured Native and independent literal totals under both compilers and both constructors; raw contribution equality,source replacement/drop and path-budget refusal are checked.",
+      "remaining_gap": "",
+      "rust_tests": [
+        {
+          "package": "rmagna",
+          "target": "rust_snapshot_contracts",
+          "test": "original_borrowed_and_owned_traces_keep_all_sixty_four_control_fault_event_queries",
+          "source_sha256": "47227eadf480b8ff0eb81f60f514e2628e2abbe9c47002338a92d7b29b2e34fd"
+        }
+      ]
+    },
+    {
+      "id": "test_runtime_ownership.RuntimeOwnershipTests.test_sparse_noise_equals_dense_categories_and_isolation",
+      "source": {
+        "path": "tests/core/test_runtime_ownership.py",
+        "source_sha256": "f0fe2ffc4f757b48d433c456f9c1194dd8fb9b13461e20f069a50aae14eaf510",
+        "line": 71,
+        "end_line": 99
+      },
+      "method_sha256": "973d85ec8f57cd856266841c479069b4ccd6bd21d1053dfb30c22d71e2a7c8c0",
+      "status": "verified",
+      "contract": "Replay all100 captured Native categorical choices,actions and exact weights by action identity; compare own100-seed dense/sparse draws and final RNG state; nested caller mutation leaves another100 draws unchanged. Direct table shape errors and invalid Pauli/negative qubit type misuse are rejected. No default Python RNG sequence claim.",
+      "remaining_gap": "",
+      "rust_tests": [
+        {
+          "package": "rmagna",
+          "target": "rust_snapshot_contracts",
+          "test": "original_sparse_actions_match_all_hundred_dense_draws_and_remain_isolated",
+          "source_sha256": "47227eadf480b8ff0eb81f60f514e2628e2abbe9c47002338a92d7b29b2e34fd"
+        },
+        {
+          "package": "rmagna",
+          "target": "rust_snapshot_contracts",
+          "test": "original_direct_sparse_action_table_owns_nested_factors_and_rejects_shape_errors",
+          "source_sha256": "47227eadf480b8ff0eb81f60f514e2628e2abbe9c47002338a92d7b29b2e34fd"
+        },
+        {
+          "package": "rmagna",
+          "target": "rust_snapshot_contracts",
+          "test": "original_compiled_misuses_and_legacy_private_entries_are_rejected_downstream",
+          "source_sha256": "47227eadf480b8ff0eb81f60f514e2628e2abbe9c47002338a92d7b29b2e34fd"
+        }
+      ]
+    },
+    {
+      "id": "test_simulator_optimization.OptimizationTests.test_mutable_control_parent_list_updates_ir_certificate",
+      "source": {
+        "path": "tests/core/test_simulator_optimization.py",
+        "source_sha256": "2391f35f00a33244677f0a903bbdb34a0ab4448da7cc454850e2b27e33596d3d",
+        "line": 172,
+        "end_line": 181
+      },
+      "method_sha256": "e15c00ce8ad19a07421365e763bfd78d39902ad573391cde10b17d154a9b00fe",
+      "status": "verified",
+      "contract": "Explicit immutable parent-list replacement a->a,b under the same callback version changes the captured branch and probability1->0; certificates have distinct source tokens and the old session remains valid.",
+      "remaining_gap": "",
+      "rust_tests": [
+        {
+          "package": "rmagna",
+          "target": "rust_snapshot_contracts",
+          "test": "original_parent_list_replacement_changes_source_identity_and_uses_new_callback_inputs",
+          "source_sha256": "47227eadf480b8ff0eb81f60f514e2628e2abbe9c47002338a92d7b29b2e34fd"
+        }
+      ]
+    },
+    {
+      "id": "test_simulator_optimization.OptimizationTests.test_prepared_ir_nested_mutation_and_returned_snapshot",
+      "source": {
+        "path": "tests/core/test_simulator_optimization.py",
+        "source_sha256": "2391f35f00a33244677f0a903bbdb34a0ab4448da7cc454850e2b27e33596d3d",
+        "line": 107,
+        "end_line": 124
+      },
+      "method_sha256": "0fc7af4f1adc5542403984889856a41fe58dce8650d898d43481a29d6283c6ee",
+      "status": "partial",
+      "contract": "Returned certificate JSON owns its arrays; explicit operation/initial replacements affect fresh sessions while existing sessions/batches keep captured values.",
+      "remaining_gap": "No arbitrary Python metadata mutation,metadata-keyed certificate LRU or cache_hit dictionary exists. Typed source/JSON isolation is witnessed,but the original complete metadata/cache method remains partial.",
+      "rust_tests": [
+        {
+          "package": "rmagna",
+          "target": "rust_snapshot_contracts",
+          "test": "original_probability_queries_generate_no_input_key_but_explicit_compile_does",
+          "source_sha256": "47227eadf480b8ff0eb81f60f514e2628e2abbe9c47002338a92d7b29b2e34fd"
+        },
+        {
+          "package": "rmagna",
+          "target": "rust_snapshot_contracts",
+          "test": "original_lazy_batches_capture_one_source_while_next_single_query_uses_replacement",
+          "source_sha256": "47227eadf480b8ff0eb81f60f514e2628e2abbe9c47002338a92d7b29b2e34fd"
+        },
+        {
+          "package": "rmagna",
+          "target": "rust_snapshot_contracts",
+          "test": "original_borrowed_and_owned_traces_keep_all_sixty_four_control_fault_event_queries",
+          "source_sha256": "47227eadf480b8ff0eb81f60f514e2628e2abbe9c47002338a92d7b29b2e34fd"
+        }
+      ]
+    },
+    {
+      "id": "test_simulator_optimization.OptimizationTests.test_probability_batch_snapshot_and_zero_cache_budget",
+      "source": {
+        "path": "tests/core/test_simulator_optimization.py",
+        "source_sha256": "2391f35f00a33244677f0a903bbdb34a0ab4448da7cc454850e2b27e33596d3d",
+        "line": 159,
+        "end_line": 170
+      },
+      "method_sha256": "6dc3f786d797243dca62027aabc9862b44cb63b50e5b2ed3ded61dcd6c249272",
+      "status": "verified",
+      "contract": "An entire lazy batch keeps its captured initial state; the next query on an explicitly replaced session observes the new state. Probability batches retain no probability-value cache or input fingerprints.",
+      "remaining_gap": "",
+      "rust_tests": [
+        {
+          "package": "rmagna",
+          "target": "rust_snapshot_contracts",
+          "test": "original_lazy_batches_capture_one_source_while_next_single_query_uses_replacement",
+          "source_sha256": "47227eadf480b8ff0eb81f60f514e2628e2abbe9c47002338a92d7b29b2e34fd"
+        },
+        {
+          "package": "rmagna",
+          "target": "rust_snapshot_contracts",
+          "test": "original_probability_queries_generate_no_input_key_but_explicit_compile_does",
+          "source_sha256": "47227eadf480b8ff0eb81f60f514e2628e2abbe9c47002338a92d7b29b2e34fd"
+        }
+      ]
+    },
+    {
+      "id": "test_user_interface.CompiledRunTests.test_compiled_circuits_are_not_compiled_again",
+      "source": {
+        "path": "tests/core/test_user_interface.py",
+        "source_sha256": "79384caafc7fafa504e9b6d0f155311f3b37583d810f6a69c008b930a3e8e3c2",
+        "line": 58,
+        "end_line": 64
+      },
+      "method_sha256": "5ef38cfd3e6c157a835b8dea5d9a97f40b9a6a68d83992c32feee68a7fe58308",
+      "status": "verified",
+      "contract": "Two downstream compile-negative probes reject compile and sampler comparison on compiled values; a matching current-library positive control admits source compilation/comparison and compiled execution.",
+      "remaining_gap": "",
+      "rust_tests": [
+        {
+          "package": "rmagna",
+          "target": "rust_snapshot_contracts",
+          "test": "original_compiled_misuses_and_legacy_private_entries_are_rejected_downstream",
+          "source_sha256": "47227eadf480b8ff0eb81f60f514e2628e2abbe9c47002338a92d7b29b2e34fd"
+        }
+      ]
+    }
+  ],
+  "fixtures": {
+    "rmagna/tests/fixtures/original_snapshot_queries.json": "66e61acaba96d4286f8e51c90a1e1e6c77fbbcd1cfaa74bcc6e09576416cbac9",
+    "rmagna/tests/fixtures/original_sparse_ownership.json": "b65daed64c008f1ff65d71495c6bde070cf2192238c3731e3419d9c57f5e4e5f",
+    "rmagna/tests/fixtures/original_feedback_incidence.json": "c9869bedd5d18d688e44edafd4f293bb3351466bff131511ce404f3a76236928"
+  }
+}

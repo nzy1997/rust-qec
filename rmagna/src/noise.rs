@@ -1,5 +1,9 @@
 //! Exact independent categorical noise and reproducible prescribed assignments.
 mod conditional;
+mod sparse;
+pub use sparse::{
+    SparseNoiseAction, SparseNoiseDraw, SparseNoiseError, SparseNoiseOptions, SparseNoiseSampler,
+};
 mod sampling;
 pub use sampling::{
     SamplingDeclarationError, SamplingDeclarationOptions, load_sampling_declaration,
