@@ -3643,14 +3643,26 @@ cargo test --locked -p rmagna --test paper_proposal_integration
 Successful validation requires both the finite distribution checks and the actual
 Rust probe. Six finite cultivation cases cover 304 patterns, nonuniform channel
 weights, impossible closure, one/two closing sites and all three reweighting
-rates. The logical check classifies all 262144 physical patterns, verifies exact
+rates. Independent exact random transcripts replay every positive cultivation
+branch at the CDF interval endpoints, including occurrence, prefix, mixture
+and tail choices. Every residual class/weight endpoint and first/interior/last
+bucket index execute; small residual models exhaust all physical indices.
+Skipped/extra entropy, constant identity output and biased mixture/weight/bucket
+draws fail even when the reported density remains correct.
+The logical check classifies all 262144 physical patterns, verifies exact
 support and normalization, and agrees with all three deposited exact logical
 oracles and their leading coefficients. The Rust probe applies 128 patterns
 under three rates and two causal strategies (768 evaluations), checks exact
 weighted acceptance/error and physical noise masses, and observes all 768
 decoder calls; 384 have distinct true/reported outcomes. The same probe runs
-as an owning integration test in CI. Its source/fixture identities are checked
-when invoked from Python, preventing reuse of an obsolete probe result.
+as an owning integration test in CI. Cargo embeds a SHA256 identity of all
+`rmagna/src` files, workspace/package manifests, lockfile, `.cargo` files, the
+build script, probe source/fixture, and Python model/draw oracle/generator. The
+Python entry point independently compares the current files to that build-time
+identity and checks the executable hash before/after execution. A retained
+probe therefore rejects changed backend, model or build inputs until rebuilt.
+This checks source freshness; it does not claim historical toolchain or RNG
+identity. No nested Cargo build or copied environment is needed.
 
 Regenerate the small data to fresh paths without copying the environment:
 

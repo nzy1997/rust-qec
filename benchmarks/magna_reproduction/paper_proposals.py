@@ -268,6 +268,7 @@ def enumerate_cultivation_branches(model, max_patterns=4096):
 
 def check_cultivation_model(model):
     from random import Random
+    from paper_proposal_draws import cultivation_draws
     distribution = enumerate_cultivation_branches(model)
     require(sum(distribution.values()) == 1, "proposal branches are not normalized")
     require(all(q > 0 for q in distribution.values()), "proposal lost physical support")
@@ -295,11 +296,13 @@ def check_cultivation_model(model):
         require(draw.proposal_probability == distribution[draw.pattern]
                 and draw.physical_probability == model.physical_mass(draw.pattern),
                 "sampled pattern probability mismatch")
-    return dict(patterns=len(distribution), rates=len(rates), draws=32)
+    protocol_draws = cultivation_draws(model)
+    return dict(patterns=len(distribution), rates=len(rates), draws=32, protocol_draws=protocol_draws)
 
 
 def check_residual_model(model, expected_counts):
     from random import Random
+    from paper_proposal_draws import residual_draws
     require(model.counts == tuple(map(tuple, expected_counts)), "residual-class partition changed")
     require(sum(map(sum, model.counts)) == 4**model.width, "residual class support is incomplete")
     require(sum(model.class_masses) == sum(model.class_proposal) == 1, "residual class normalization changed")
@@ -332,4 +335,6 @@ def check_residual_model(model, expected_counts):
             physical = prod(model.atom_mass(model.classify(word)[1],rate) for word in words)
             require(model.reweight(words,rate) == physical/total_proposal,
                     "joint patch likelihood does not reweight the same batch")
-    return dict(patterns=4**model.width, classes=4, rates=3, shared_batch_draws=8, patches_per_draw=15)
+    protocol_draws = residual_draws(model)
+    return dict(patterns=4**model.width, classes=4, rates=3, shared_batch_draws=8,
+                patches_per_draw=15, protocol_draws=protocol_draws)

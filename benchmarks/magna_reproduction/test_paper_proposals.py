@@ -2,6 +2,10 @@ from fractions import Fraction
 import json
 from pathlib import Path
 import unittest
+from unittest.mock import patch
+import paper_proposals
+from paper_proposals import FaultDraw
+from paper_proposal_draws import residual_draws, cultivation_draws
 
 import paper_proposal_check as checks
 from paper_proposals import (CultivationProposal, ResidualClassProposal,
@@ -40,6 +44,54 @@ class PaperProposalTests(unittest.TestCase):
         model.buckets = buckets
         with self.assertRaisesRegex(ValueError,"pattern was removed"):
             check_residual_model(model,model.counts)
+
+    def test_actual_draws_cannot_ignore_randomness_while_reporting_correct_masses(self):
+        cultivation = CultivationProposal([[0,1,2],[1],[0,1,3],[2]],"1/1000",closing_sites=2)
+        residual = ResidualClassProposal([0,1,0,1],[0,1,0,1],width=2)
+        identity = (0,)*4
+        with patch.object(cultivation,"draw",return_value=FaultDraw(identity,
+                cultivation.mass(identity),cultivation.physical_mass(identity))):
+            with self.assertRaisesRegex(ValueError,"draw protocol"):
+                check_cultivation_model(cultivation)
+        with patch.object(residual,"draw",return_value=(0,residual.mass(0))):
+            with self.assertRaisesRegex(ValueError,"draw protocol"):
+                check_residual_model(residual,residual.counts)
+
+    def test_actual_mixture_weight_and_bucket_biases_preserving_density_are_rejected(self):
+        cultivation = CultivationProposal([[0,1,2],[1],[0,1,3],[2]],"1/1000",closing_sites=2)
+        residual = ResidualClassProposal([0,1,0,1],[0,1,0,1],width=2)
+        original = paper_proposals.choose
+        def ordinary_only(probabilities, source):
+            selected = original(probabilities,source)
+            return 0 if tuple(probabilities) == (Fraction(1,20),Fraction(19,20)) else selected
+        with patch("paper_proposals.choose",side_effect=ordinary_only):
+            with self.assertRaisesRegex(ValueError,"draw protocol"):
+                cultivation_draws(cultivation)
+        def wrong_weight(probabilities, source):
+            selected = original(probabilities,source)
+            return next(i for i,p in enumerate(probabilities) if p) if len(probabilities) == 3 else selected
+        with patch("paper_proposals.choose",side_effect=wrong_weight):
+            with self.assertRaisesRegex(ValueError,"draw protocol"):
+                residual_draws(residual)
+        original_draw = residual.draw
+        class FirstBucketIndex:
+            def __init__(self,source):self.source,self.calls=source,0
+            def randrange(self,bound):
+                value=self.source.randrange(bound)
+                self.calls+=1
+                return 0 if self.calls == 3 else value
+        with patch.object(residual,"draw",side_effect=lambda source:original_draw(FirstBucketIndex(source))):
+            with self.assertRaisesRegex(ValueError,"draw protocol"):
+                residual_draws(residual)
+
+    def test_all_small_residual_words_and_cdf_interval_endpoints_execute(self):
+        model=ResidualClassProposal([0,1,0,1],[0,1,0,1],width=2)
+        self.assertGreaterEqual(residual_draws(model),4**model.width)
+        # A nontrivial alpha and nonuniform channels force both mixture paths,
+        # prefix channels and tail CDF intervals with zero-probability entries.
+        model=CultivationProposal([[0,1],[2],[0,1],[3]],"1/1000",
+            channel_weights=[["1/3","2/3"],[1],["1/4","3/4"],[1]],closing_sites=2)
+        self.assertGreater(cultivation_draws(model),36)
 
     def test_invalid_exact_inputs_sources_and_unsupported_laws_fail_before_sampling(self):
         for kwargs in [dict(physical_rate=.001),dict(physical_rate="1/2",extra_faults=3),

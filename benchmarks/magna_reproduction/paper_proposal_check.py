@@ -109,9 +109,12 @@ def check_finite(manifest):
 def check_with_runtime(manifest, binary):
     import tempfile
     from paper_benchmark import run_process
+    from paper_probe_identity import source_identity
     require(binary is not None, "set MAGNA_PAPER_PROPOSAL_PROBE or --rust-probe to an existing paper_proposal_probe executable")
     result = check_finite(manifest)
     binary = Path(binary).resolve(strict=True)
+    root = HERE.parents[1]
+    current_source = source_identity(root)
     before = reference.digest(binary)
     with tempfile.TemporaryDirectory(prefix="magna-proposal-check-") as directory:
         stage = run_process([str(binary)], 60, directory)
@@ -120,9 +123,13 @@ def check_with_runtime(manifest, binary):
     expected = dict(schema="rmagna.paper-proposal-integration.v1",status="PASS",samples=768,
         true_reported_differ=384,decoder_calls=768,rates=3,causal_strategies=2,
         closing_policies=2,patterns_per_policy=64,
+        build_source_sha256=current_source,
         fixture_sha256=reference.digest(HERE.parents[1]/"rmagna/tests/data/paper-proposal-runtime.json"),
         source_sha256=reference.digest(HERE.parents[1]/"rmagna/tests/support/paper_proposal_probe.rs"))
+    require(isinstance(payload, dict) and payload.get("build_source_sha256") == current_source,
+            "stale Rust proposal probe: rebuild against current backend/model/build inputs")
     require(payload == expected, "Rust proposal integration result/source changed")
+    require(source_identity(root) == current_source, "probe source changed during execution")
     require(reference.digest(binary) == before, "Rust proposal probe changed during execution")
     result.update(decoder_runtime_integration="PASS",rust_integration=stage,rust_binary_sha256=before)
     return result

@@ -28,7 +28,7 @@ pub fn check() -> Value {
     let raw = include_bytes!("../data/paper-proposal-runtime.json");
     assert_eq!(
         format!("{:x}", Sha256::digest(raw)),
-        "b1fcc6b8d56019ff0a9b6a8d4de5d5e5ad8d3bbb85f431e5554c30ca14de0b1d"
+        "728662a6fd913cebaf72febc7486bc819cf9272dc4b4be7dabf4d36e8a91361b"
     );
     let data: Value = serde_json::from_slice(raw).unwrap();
     assert_eq!(
@@ -215,6 +215,7 @@ pub fn check() -> Value {
     json!({"schema":"rmagna.paper-proposal-integration.v1","status":"PASS","samples":samples,
         "true_reported_differ":distinct_true_reported,"decoder_calls":calls.lock().unwrap().len(),
         "rates":3,"causal_strategies":2,"closing_policies":2,"patterns_per_policy":64,
+        "build_source_sha256":env!("RMAGNA_PAPER_SOURCE_SHA256"),
         "fixture_sha256":format!("{:x}",Sha256::digest(raw)),
         "source_sha256":format!("{:x}",Sha256::digest(include_bytes!("paper_proposal_probe.rs")))})
 }
