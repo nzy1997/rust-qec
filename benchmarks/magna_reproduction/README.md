@@ -3560,3 +3560,120 @@ conditional-noise method remains partial for Native-private preparation/reuse
 counters,owned by R09 #1299. Python missing-extension/build-guidance remains
 unmapped despite the separate Rust missing-executable check. Neither is an
 architecture exclusion. These cases do not establish paper benchmark results.
+
+
+### Numeric and record-proposal boundaries (R06)
+
+`cargo test --locked -p rmagna --test remaining_numeric_contracts` adapts all five
+R06 original methods. It exercises 30 independent and 30 externally certified
+affine proposals, 120 exact protocol requests, 100 physical and 40 effective-rate
+noise draws, all 35 scalar inputs and their weights, six estimator families and
+all 512 finite scalar-ratio pairs. The unchanged occurrence suite retains its
+560 packed trials; it is reused rather than reimplemented.
+
+The public boundaries are explicit:
+
+| Boundary | Rust contract |
+| --- | --- |
+| Real-record proposals | `OriginalIndependentRecordProposal` owns strict full-support probabilities (default one half). `OriginalAffineRecordProposal` checks real-record affine algebra and owns caller-supplied physical coverage evidence; it does not infer that physical coverage claim. Both use owner-bound R04 compact assignments and exact rational proposal masses. |
+| RNG protocol | Caller-owned `RandRangeSource` requests and exhaustion match the captured schedules. A power-of-two affine request maps the original two-bit request to range four. Default SplitMix64 does not implement Python Random trajectories. |
+| Finite uniform index | Opt-in `ModuloWordRangeSource` rejects the incomplete low modulo bucket and consumes zero words at bound one. The default masked `WordRangeSource` retains its separately documented convention. |
+| Decimal contexts | The original 80-or-more-digit results remain reference observations. Rust retains exact field coefficients and rational weights, then correctly rounds scientific/binary64 output. All 70 scalar conversions match rounded reference bits; Python Decimal strings/context rounding are not an API promise. |
+| Statistics | `ExactStatistics` is reused. Pairwise-difference covariance and independent closed forms validate all six families, including 78-digit differences and weights `1E-2000`/`1E2000`. Native underflow and tagged infinity exports are checked separately from finite scientific values. |
+| Process rounding | The integer export kernel has no hardware-division fast/general route split. On supported Unix hosts, an isolated child gets `FE_UPWARD` from the platform C header, checks all 512 pairs and one third, and restores the saved rounding mode on normal return and injected panic. The parent test runner is unaffected. A platform C compiler is required for this header probe. |
+
+The checked fixtures include all original source, producer and retained
+Native/helper identities. Regenerate to new output paths:
+
+```sh
+python3 benchmarks/magna_reproduction/original_numeric_contracts.py --upstream "$MAGNA_REFERENCE" --native-helper "$MAGNA_NATIVE_HELPER" --out "$NEW_NUMERIC_JSON"
+python3 benchmarks/magna_reproduction/original_numeric_512.py --upstream "$MAGNA_REFERENCE" --out "$NEW_512_JSON"
+```
+
+The first producer runs all five unchanged original methods with the existing
+Native/helper environment. The second only compiles the small original standalone
+C++ test with observation logging; all assertions remain enabled. Both check the
+full pinned source before/after execution, refuse unsafe/existing destinations
+before capture, and emit strict JSON. Native extensions and environments are
+neither rebuilt nor copied. These contracts establish no paper throughput claim.
+
+
+### Paper-specific proposal layer (B02)
+
+`paper_proposals.py` reconstructs the v1 experiment-side probability laws. The
+historical sampling drivers are identified by hashes in the deposit; their
+source and exact random streams are not available. The reconstruction therefore
+specifies a complete normalized distribution, rather than claiming identical
+historical draws. Its parameters are checked against the pinned deposited data.
+
+For cultivation, sample independent occupied locations at `q = p + 3/N`.
+Draw ordinary channels for all but the last occupied location (last two for
+RP2 d5). For that tail, mix its ordinary channel distribution with probability
+`1/20` and its detector-passing conditional distribution with probability
+`19/20`. Both branch masses contribute to the final proposal density. The
+conditional normalizer includes all passing channel tuples with their original
+weights. If none passes, use the ordinary tail law. With no occupied locations,
+the empty pattern is unchanged. The ordinary mixture branch preserves support
+when a proxy constraint is imperfect. Proxy signatures are input to this layer;
+constructing and validating signatures for each complete physical task belongs
+to the cultivation campaign, not these small distribution tests.
+
+For logical distillation, enumerate all `4^9` physical Pauli patterns through the
+pinned d3 matching recovery rule, with only syndromes given to that rule. The
+resulting IXZY weight counts match the historical deposit exactly. Assign total
+nonidentity residual probability `1/5`, split the three nonidentity classes in
+their physical proportions at `p0=1/100`. Within each class, draw from the exact
+conditional physical law at that rate. Weight selection and uniform selection
+within each weight bucket reproduce every conditional pattern probability.
+One set of fifteen physical patches can then be reweighted to `1/1000`, `3/1000`
+and `1/100` by the product of physical-over-proposal factors. Residual classes
+are offline proposal data; they are never runtime decoder inputs.
+
+Build the small probe in the existing shared Cargo target, then run the required
+entry point. Set `MAGNA_PAPER_PROPOSAL_PROBE` to that existing executable (or pass
+`--rust-probe`); the Python entry point never starts a nested Cargo build.
+
+```sh
+cargo build --locked -p rmagna --example paper_proposal_probe
+export MAGNA_PAPER_PROPOSAL_PROBE="${CARGO_TARGET_DIR:-target}/debug/examples/paper_proposal_probe"
+python3 benchmarks/magna_reproduction/paper_benchmark.py proposal-check --manifest benchmarks/magna_reproduction/paper/proposals.json
+cargo test --locked -p rmagna --test paper_proposal_integration
+```
+
+Successful validation requires both the finite distribution checks and the actual
+Rust probe. Six finite cultivation cases cover 304 patterns, nonuniform channel
+weights, impossible closure, one/two closing sites and all three reweighting
+rates. Independent exact random transcripts replay every positive cultivation
+branch at the CDF interval endpoints, including occurrence, prefix, mixture
+and tail choices. Every residual class/weight endpoint and first/interior/last
+bucket index execute; small residual models exhaust all physical indices.
+Skipped/extra entropy, constant identity output and biased mixture/weight/bucket
+draws fail even when the reported density remains correct.
+The logical check classifies all 262144 physical patterns, verifies exact
+support and normalization, and agrees with all three deposited exact logical
+oracles and their leading coefficients. The Rust probe applies 128 patterns
+under three rates and two causal strategies (768 evaluations), checks exact
+weighted acceptance/error and physical noise masses, and observes all 768
+decoder calls; 384 have distinct true/reported outcomes. The same probe runs
+as an owning integration test in CI. Cargo embeds a SHA256 identity of all
+`rmagna/src` files, workspace/package manifests, lockfile, `.cargo` files, the
+build script, probe source/fixture, and Python model/draw oracle/generator. The
+Python entry point independently compares the current files to that build-time
+identity and checks the executable hash before/after execution. A retained
+probe therefore rejects changed backend, model or build inputs until rebuilt.
+This checks source freshness; it does not claim historical toolchain or RNG
+identity. No nested Cargo build or copied environment is needed.
+
+Regenerate the small data to fresh paths without copying the environment:
+
+```sh
+python3 benchmarks/magna_reproduction/original_logical_residuals.py --upstream "$MAGNA_REFERENCE" --paper-archive "$MAGNA_PAPER_ARCHIVE" --out "$NEW_RESIDUAL_JSON"
+python3 benchmarks/magna_reproduction/paper_proposal_runtime_vectors.py --out "$NEW_RUNTIME_JSON"
+```
+
+The classifier capture needs the existing Stim/NumPy/PyMatching environment.
+It verifies the entire pinned source and archive identity, reads only the six
+needed deposited JSON files, and removes its import cache afterward. Ordinary
+PR checks use committed small data and do not import these optional packages.
+This deliverable adds no original-method promotions and executes no paper-scale
+precision or timing campaign; those remain B03/B04/B05/B06.

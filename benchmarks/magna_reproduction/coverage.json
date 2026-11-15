@@ -2387,18 +2387,66 @@
     },
     {
       "id": "test_native_proposals.NativeProposalTests.test_estimator_matches_independent_decimal_operations",
-      "status": "unmapped",
-      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+      "status": "verified",
+      "contract": "Complete six-family typed adaptation: reuse ExactStatistics for all original weight/score rows; independently verify exact means, ESS, pairwise-difference covariance, paired-ratio residual variance and closed forms, including 1E+-2000 weights and nonzero 78-digit covariance. All Native finite/underflow/tagged-infinity result exports agree with correctly rounded Rust outputs. Rust exact fields/scientific output replace Decimal context/string identity; no paper-performance claim.",
+      "rust_tests": [
+        {
+          "package": "rmagna",
+          "target": "remaining_numeric_contracts",
+          "test": "all_six_original_estimator_families_keep_tiny_covariances_and_extreme_weights",
+          "source_sha256": "3ba1032fbbd2a566265115fd08e03e38f16a2dcee0929604a78d6d6db20cc25e"
+        }
+      ]
     },
     {
       "id": "test_native_proposals.NativeProposalTests.test_exact_independent_and_affine_rng_streams",
-      "status": "unmapped",
-      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+      "status": "verified",
+      "contract": "Complete original 30 independent and 30 affine real-record proposals: strict owned full-support probabilities 2/7,default1/2,3/11; equation word3/RHS1 and coverage evidence; every true bit, exact proposal probability and all120 range/two-bit protocol requests; invalid RHS2 rejects. Captured Native/reference RNG states and protocols agree. Rust replays caller-owned protocol inputs without claiming Python Random defaults. Supplementary full8-point masses, source ownership/quotas/errors and65-bit affine coordinate tests.",
+      "rust_tests": [
+        {
+          "package": "rmagna",
+          "target": "remaining_numeric_contracts",
+          "test": "all_original_independent_and_affine_draws_replay_exact_protocols_and_point_masses",
+          "source_sha256": "3ba1032fbbd2a566265115fd08e03e38f16a2dcee0929604a78d6d6db20cc25e"
+        },
+        {
+          "package": "rmagna",
+          "target": "remaining_numeric_contracts",
+          "test": "independent_record_proposals_own_probabilities_and_all_eight_exact_point_masses",
+          "source_sha256": "3ba1032fbbd2a566265115fd08e03e38f16a2dcee0929604a78d6d6db20cc25e"
+        },
+        {
+          "package": "rmagna",
+          "target": "remaining_numeric_contracts",
+          "test": "affine_real_record_proposals_own_equations_and_sample_the_checked_nullspace",
+          "source_sha256": "3ba1032fbbd2a566265115fd08e03e38f16a2dcee0929604a78d6d6db20cc25e"
+        },
+        {
+          "package": "rmagna",
+          "target": "remaining_numeric_contracts",
+          "test": "record_proposal_errors_refuse_invalid_support_quotas_and_range_results",
+          "source_sha256": "3ba1032fbbd2a566265115fd08e03e38f16a2dcee0929604a78d6d6db20cc25e"
+        },
+        {
+          "package": "rmagna",
+          "target": "remaining_numeric_contracts",
+          "test": "affine_record_proposals_keep_coordinates_and_probability_beyond_a_machine_word",
+          "source_sha256": "3ba1032fbbd2a566265115fd08e03e38f16a2dcee0929604a78d6d6db20cc25e"
+        }
+      ]
     },
     {
       "id": "test_native_proposals.NativeProposalTests.test_real_decimal_and_weight_preserve_precision_and_rounding",
-      "status": "unmapped",
-      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+      "status": "verified",
+      "contract": "Complete35 original real scalar inputs plus35 exact rational weights retained from unchanged precision-context assertions. Rust exact Q(omega) coefficients independently match canonical powers and weights; all70 correctly rounded scientific mantissa/exponent pairs agree with Fraction-rounded Native Decimal observations. Original80-or-more-digit contexts remain source evidence, not a promised Rust Decimal context/string ABI.",
+      "rust_tests": [
+        {
+          "package": "rmagna",
+          "target": "remaining_numeric_contracts",
+          "test": "all_original_real_and_weighted_scalar_inputs_keep_exact_fields_and_rounded_bits",
+          "source_sha256": "3ba1032fbbd2a566265115fd08e03e38f16a2dcee0929604a78d6d6db20cc25e"
+        }
+      ]
     },
     {
       "id": "test_native_records.NativeRecordTests.test_dense_events_and_hermitian_moments",
@@ -2534,9 +2582,8 @@
     },
     {
       "id": "test_noise_numeric_fastpaths.NoiseNumericFastpathTests.test_finite_noise_thresholds_and_general_conversion_in_native_module",
-      "status": "partial",
-      "contract": "Complete finite occurrence portion: literal third/half/zero/certain/2^-64/positive2^-65/near-one/wide/1-in1000/1-in10000 cutoffs, strict below/equal/above scalar comparisons, exact stored probabilities unchanged and zero entropy at Never/Always/public Below(0). Opt-in lazy scalar and MSB-first masked bit-plane draws retain the native remaining-cutoff-zero stop, including half one plane and wide63 planes. Preserve all560 original transposed MT19937-64 trials,35840 scalar comparisons and36393 ordinary input-word position at seed20260927. Independently compare output with scalar strict less-than and actual provider consumption with shrinking scalar PREFIX INTERVAL endpoints, including inactive lanes, partial/empty masks, exact-boundary rejection and no-extra-plane controls. The complete unchanged original native numerical method runs separately through its standalone O2 CPP probe with active assertions and no native/helper extension rebuild.",
-      "remaining_gap": "Rust counterparts remain missing for the original uniform_index(15) incomplete modulo-bucket rejection and count-one zero-entropy assertions, all512 hardware/general exact scalar ratio comparisons and the FE_UPWARD fallback/rounding restoration assertions. This whole original method is partial, not verified; no native RNG/class ABI or paper performance claim.",
+      "status": "verified",
+      "contract": "Complete original finite occurrence plus modulo index and scalar-conversion contract: retain prior560 packed prefix trials/35840 scalar comparisons/36393 original MT words; literal cutoffs and lazy endpoints; opt-in full-word modulo rejection returns1 after words0,1 at bound15;bound1 uses0words. All512 original odd53-bit ratio pairs match independent Fraction mantissa bits/exponents. Isolated Unix FE_UPWARD checks all512 plus1/3 and RAII mode restoration after normal return and injected panic. Rust integer export has no hardware/general route distinction; default masked RNG policy is unchanged.",
       "rust_tests": [
         {
           "package": "rmagna",
@@ -2549,6 +2596,24 @@
           "target": "original_finite_occurrence",
           "test": "original_packed_occurrence_matches_all_560_scalar_prefix_trials",
           "source_sha256": "5ae0f8e4b6da2fa6896077ce40804e34cc34b7864a70b77bd913f484460a021f"
+        },
+        {
+          "package": "rmagna",
+          "target": "remaining_numeric_contracts",
+          "test": "original_uniform_index_rejects_the_incomplete_bucket_and_bound_one_uses_no_entropy",
+          "source_sha256": "3ba1032fbbd2a566265115fd08e03e38f16a2dcee0929604a78d6d6db20cc25e"
+        },
+        {
+          "package": "rmagna",
+          "target": "remaining_numeric_contracts",
+          "test": "modulo_and_masked_conventions_are_explicit_and_preserve_boundary_words",
+          "source_sha256": "3ba1032fbbd2a566265115fd08e03e38f16a2dcee0929604a78d6d6db20cc25e"
+        },
+        {
+          "package": "rmagna",
+          "target": "remaining_numeric_contracts",
+          "test": "all_512_original_scalar_ratios_match_independent_fraction_rounding",
+          "source_sha256": "3ba1032fbbd2a566265115fd08e03e38f16a2dcee0929604a78d6d6db20cc25e"
         }
       ]
     },
@@ -3631,8 +3696,16 @@
     },
     {
       "id": "test_simulator_optimization.OptimizationTests.test_unbiased_noise_preserves_exact_rng_stream",
-      "status": "unmapped",
-      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+      "status": "verified",
+      "contract": "Complete original100 physical and20x2 effective-rate/unit-scale noise draws: SequentialNoiseSampler replays every exact occurrence/channel range request, checks fault action/report-flip results and exact unit likelihood per draw, exhausts both captured state-equal public streams, and rejects physical_rate2. Default SplitMix64 is not Python Random(123/12); explicit caller-owned protocols are the typed boundary.",
+      "rust_tests": [
+        {
+          "package": "rmagna",
+          "target": "remaining_numeric_contracts",
+          "test": "all_original_unbiased_noise_draws_keep_public_range_protocol_and_scaled_identity",
+          "source_sha256": "3ba1032fbbd2a566265115fd08e03e38f16a2dcee0929604a78d6d6db20cc25e"
+        }
+      ]
     },
     {
       "id": "test_single_trace.SingleTraceTests.test_entangled_trace_and_postselection_are_distinct",

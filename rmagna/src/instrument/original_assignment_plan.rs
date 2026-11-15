@@ -53,6 +53,13 @@ impl OriginalSharedFaults {
 mod trace_cache;
 pub use trace_cache::{OriginalTraceCache, OriginalTraceCacheStatistics};
 
+#[path = "original_record_proposals.rs"]
+mod record_proposals;
+pub use record_proposals::{
+    OriginalAffineRecordProposal, OriginalIndependentRecordProposal, OriginalProposalDraw,
+    OriginalProposalDrawError, OriginalProposalOptions,
+};
+
 struct Snapshot {
     instrument: OriginalInstrument,
     strategy: CompilerStrategy,

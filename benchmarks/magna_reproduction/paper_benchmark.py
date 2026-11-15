@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Bounded, source-pinned paper-task pilot; not a paper precision campaign."""
+"""Pinned paper-task pilots and exact importance-proposal checks."""
 
 import argparse
 import hashlib
@@ -403,10 +403,17 @@ def main(argv=None):
     check = sub.add_parser("check")
     check.add_argument("--manifest", type=Path, required=True)
     check.add_argument("--results", type=Path, required=True)
+    proposal = sub.add_parser("proposal-check")
+    proposal.add_argument("--manifest", type=Path, required=True)
+    proposal.add_argument("--rust-probe", type=Path, default=os.environ.get("MAGNA_PAPER_PROPOSAL_PROBE"))
     args = parser.parse_args(argv)
     try:
         manifest = read_json(args.manifest)
-        result = capture(args, manifest) if args.command == "run" else check_capture(manifest, args.results)
+        if args.command == "proposal-check":
+            from paper_proposal_check import check_with_runtime
+            result = check_with_runtime(manifest, args.rust_probe)
+        else:
+            result = capture(args, manifest) if args.command == "run" else check_capture(manifest, args.results)
         print(json.dumps(result, sort_keys=True))
         return 0
     except (ValueError, KeyError, TypeError, OSError) as error:

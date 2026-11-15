@@ -1,0 +1,206 @@
+{
+  "schema": "rmagna.paper-proposals.v1",
+  "reference_sha256": "c49203a586f5a451e3183b435793df693dd486857356aed8826df5dc723e5454",
+  "paper": "2610.22315v1",
+  "historical_driver_source": "hash_only_distribution_reconstruction",
+  "residual_fixture": {
+    "file": "paper/logical-residuals.json",
+    "sha256": "ca4d6781ea514926b1e315f0050ecc7ee7ac3da1213e80b99c86f23bf0d4c644"
+  },
+  "cultivation": {
+    "extra_faults": "3",
+    "mixture": "19/20",
+    "closing_sites": {
+      "color3": 1,
+      "color5": 1,
+      "rp2-d3-T": 1,
+      "rp2-d5-T": 2
+    }
+  },
+  "logical": {
+    "proposal_rate": "1/100",
+    "nonidentity": "1/5",
+    "rates": [
+      "1/1000",
+      "3/1000",
+      "1/100"
+    ],
+    "patches_per_draw": 15
+  },
+  "finite_cultivation_cases": [
+    {
+      "id": "mixed-1",
+      "signatures": [
+        [
+          0,
+          1,
+          2
+        ],
+        [
+          1
+        ],
+        [
+          0,
+          1,
+          3
+        ],
+        [
+          2
+        ]
+      ],
+      "rate": "1/1000",
+      "closing_sites": 1,
+      "offset": 0
+    },
+    {
+      "id": "nonuniform-1",
+      "signatures": [
+        [
+          0,
+          1,
+          2
+        ],
+        [
+          1
+        ],
+        [
+          0,
+          1,
+          3
+        ],
+        [
+          2
+        ]
+      ],
+      "rate": "1/1000",
+      "closing_sites": 1,
+      "offset": 0,
+      "channel_weights": [
+        [
+          "1/2",
+          "1/3",
+          "1/6"
+        ],
+        [
+          "1"
+        ],
+        [
+          "1/4",
+          "1/4",
+          "1/2"
+        ],
+        [
+          "1"
+        ]
+      ]
+    },
+    {
+      "id": "impossible-1",
+      "signatures": [
+        [
+          0,
+          0
+        ],
+        [
+          0
+        ],
+        [
+          0
+        ],
+        [
+          0
+        ]
+      ],
+      "rate": "1/1000",
+      "closing_sites": 1,
+      "offset": 1
+    },
+    {
+      "id": "mixed-2",
+      "signatures": [
+        [
+          0,
+          1,
+          2
+        ],
+        [
+          1
+        ],
+        [
+          0,
+          1,
+          3
+        ],
+        [
+          2
+        ]
+      ],
+      "rate": "1/1000",
+      "closing_sites": 2,
+      "offset": 0
+    },
+    {
+      "id": "nonuniform-2",
+      "signatures": [
+        [
+          0,
+          1,
+          2
+        ],
+        [
+          1
+        ],
+        [
+          0,
+          1,
+          3
+        ],
+        [
+          2
+        ]
+      ],
+      "rate": "1/1000",
+      "closing_sites": 2,
+      "offset": 0,
+      "channel_weights": [
+        [
+          "1/2",
+          "1/3",
+          "1/6"
+        ],
+        [
+          "1"
+        ],
+        [
+          "1/4",
+          "1/4",
+          "1/2"
+        ],
+        [
+          "1"
+        ]
+      ]
+    },
+    {
+      "id": "impossible-2",
+      "signatures": [
+        [
+          0,
+          0
+        ],
+        [
+          0
+        ],
+        [
+          0
+        ],
+        [
+          0
+        ]
+      ],
+      "rate": "1/1000",
+      "closing_sites": 2,
+      "offset": 1
+    }
+  ]
+}

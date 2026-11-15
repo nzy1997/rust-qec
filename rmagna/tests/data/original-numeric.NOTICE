@@ -1,0 +1,28 @@
+SPDX-License-Identifier: MPL-2.0
+
+original-numeric-contracts.json, original-numeric-512.json and the corresponding
+remaining_numeric_contracts.rs cases are adapted from itpyi/magna at revision
+56847478c840395735146ef1e1ccdc3d8aedc10f. Original sources:
+- tests/core/test_native_proposals.py
+- tests/core/test_simulator_optimization.py
+- tests/core/test_noise_numeric_fastpaths.py
+- tests/native/rational_random.cpp
+- tests/support/decimal_estimator.py
+
+Original repository: https://github.com/itpyi/magna
+Full license: ../fixtures/original_many_record_input.LICENSE.
+Producers: benchmarks/magna_reproduction/original_numeric_contracts.py and
+benchmarks/magna_reproduction/original_numeric_512.py.
+
+The first fixture executes five complete unchanged original methods and records
+explicit range/bit protocols, exact input strings, Native Decimal results and
+estimator exports. Nonfinite Native float exports are tagged strict JSON values.
+The second retains all original standalone C++ assertions, adds observational
+logging without additional RNG calls and checks all 512 pairs independently
+using Python Fraction rounding. Native/helper/frontend/source/producer/compiler
+identities are retained as applicable. Temporary standalone executables are
+removed. Neither producer rebuilds the Native extension or copies an environment.
+
+Rust checks explicit protocols and exact fields/statistics with scientific and
+binary64 output. Python Random state representations and Decimal context/string
+formatting are reference observations, not promised Rust interfaces.

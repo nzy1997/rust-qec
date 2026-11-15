@@ -96,11 +96,13 @@ pub use assignment_stream::{
 #[path = "original_assignment_plan.rs"]
 mod assignment_plan;
 pub use assignment_plan::{
-    OriginalAssignmentBatch, OriginalAssignmentBatchStatistics, OriginalAssignmentCertificate,
-    OriginalAssignmentExecutionPolicy, OriginalAssignmentInput, OriginalAssignmentPlan,
-    OriginalCompactAssignment, OriginalCompactNoiseChannel, OriginalCompactNoiseLayout,
-    OriginalNoiseAssignmentStream, OriginalNoiseCodeSelection, OriginalSharedFaults,
-    OriginalTraceCache, OriginalTraceCacheStatistics,
+    OriginalAffineRecordProposal, OriginalAssignmentBatch, OriginalAssignmentBatchStatistics,
+    OriginalAssignmentCertificate, OriginalAssignmentExecutionPolicy, OriginalAssignmentInput,
+    OriginalAssignmentPlan, OriginalCompactAssignment, OriginalCompactNoiseChannel,
+    OriginalCompactNoiseLayout, OriginalIndependentRecordProposal, OriginalNoiseAssignmentStream,
+    OriginalNoiseCodeSelection, OriginalProposalDraw, OriginalProposalDrawError,
+    OriginalProposalOptions, OriginalSharedFaults, OriginalTraceCache,
+    OriginalTraceCacheStatistics,
 };
 
 pub type OriginalWire = i64;
