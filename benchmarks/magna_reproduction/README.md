@@ -3478,7 +3478,9 @@ errors and quota refusals propagate once. `compile_with_kernel` is the same
 captured/collected pipeline with a caller-supplied exact kernel, enabling backend
 comparisons without replay. `compile` returns an owned certificate with independent
 JSON exports and an input-only diagnostic SHA256; source identity is separate.
-Probability queries perform no input hashing and have no probability-value cache.
+Probability queries perform no input hashing and have no probability-value cache. Downstream type probes locate existing artifacts in both Cargo deps and
+per-target build output layouts, including a real relocated library/test binary.
+They reuse dependency artifacts without nested Cargo builds.
 There is no implicit Native preparation, automatic backend fallback, or mutable
 Python option dictionary.
 

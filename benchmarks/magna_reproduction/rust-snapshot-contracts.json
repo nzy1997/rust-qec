@@ -41,7 +41,7 @@
           "package": "rmagna",
           "target": "rust_snapshot_contracts",
           "test": "original_sampler_reconfiguration_is_an_explicit_fresh_preparation",
-          "source_sha256": "47227eadf480b8ff0eb81f60f514e2628e2abbe9c47002338a92d7b29b2e34fd"
+          "source_sha256": "361e89079517d0b9295f04e320e85fc175f412f820aaec67368e60797a3c8d3c"
         }
       ]
     },
@@ -62,7 +62,7 @@
           "package": "rmagna",
           "target": "rust_snapshot_contracts",
           "test": "original_partial_feedback_incidence_matches_all_162_queries",
-          "source_sha256": "47227eadf480b8ff0eb81f60f514e2628e2abbe9c47002338a92d7b29b2e34fd"
+          "source_sha256": "361e89079517d0b9295f04e320e85fc175f412f820aaec67368e60797a3c8d3c"
         }
       ]
     },
@@ -83,7 +83,7 @@
           "package": "rmagna",
           "target": "rust_snapshot_contracts",
           "test": "original_trace_cache_obeys_source_and_budget_identity_and_weak_eviction",
-          "source_sha256": "47227eadf480b8ff0eb81f60f514e2628e2abbe9c47002338a92d7b29b2e34fd"
+          "source_sha256": "361e89079517d0b9295f04e320e85fc175f412f820aaec67368e60797a3c8d3c"
         }
       ]
     },
@@ -104,13 +104,13 @@
           "package": "rmagna",
           "target": "rust_snapshot_contracts",
           "test": "original_compiled_misuses_and_legacy_private_entries_are_rejected_downstream",
-          "source_sha256": "47227eadf480b8ff0eb81f60f514e2628e2abbe9c47002338a92d7b29b2e34fd"
+          "source_sha256": "361e89079517d0b9295f04e320e85fc175f412f820aaec67368e60797a3c8d3c"
         },
         {
           "package": "rmagna",
           "target": "rust_snapshot_contracts",
           "test": "original_public_trace_boundary_is_available_as_a_typed_rust_service",
-          "source_sha256": "47227eadf480b8ff0eb81f60f514e2628e2abbe9c47002338a92d7b29b2e34fd"
+          "source_sha256": "361e89079517d0b9295f04e320e85fc175f412f820aaec67368e60797a3c8d3c"
         }
       ]
     },
@@ -131,7 +131,7 @@
           "package": "rmagna",
           "target": "rust_snapshot_contracts",
           "test": "original_unexpected_kernel_error_propagates_once_without_another_backend_attempt",
-          "source_sha256": "47227eadf480b8ff0eb81f60f514e2628e2abbe9c47002338a92d7b29b2e34fd"
+          "source_sha256": "361e89079517d0b9295f04e320e85fc175f412f820aaec67368e60797a3c8d3c"
         }
       ]
     },
@@ -152,7 +152,7 @@
           "package": "rmagna",
           "target": "rust_snapshot_contracts",
           "test": "original_noise_layout_rejects_all_four_bad_code_rows_and_cancels_duplicate_reports",
-          "source_sha256": "47227eadf480b8ff0eb81f60f514e2628e2abbe9c47002338a92d7b29b2e34fd"
+          "source_sha256": "361e89079517d0b9295f04e320e85fc175f412f820aaec67368e60797a3c8d3c"
         }
       ]
     },
@@ -173,7 +173,7 @@
           "package": "rmagna",
           "target": "rust_snapshot_contracts",
           "test": "original_compact_batch_retains_owner_while_callbacks_execute_on_every_assignment",
-          "source_sha256": "47227eadf480b8ff0eb81f60f514e2628e2abbe9c47002338a92d7b29b2e34fd"
+          "source_sha256": "361e89079517d0b9295f04e320e85fc175f412f820aaec67368e60797a3c8d3c"
         }
       ]
     },
@@ -194,13 +194,13 @@
           "package": "rmagna",
           "target": "rust_snapshot_contracts",
           "test": "original_shared_fault_group_keeps_records_report_errors_and_independent_snapshots",
-          "source_sha256": "47227eadf480b8ff0eb81f60f514e2628e2abbe9c47002338a92d7b29b2e34fd"
+          "source_sha256": "361e89079517d0b9295f04e320e85fc175f412f820aaec67368e60797a3c8d3c"
         },
         {
           "package": "rmagna",
           "target": "rust_snapshot_contracts",
           "test": "original_noise_rows_snapshot_before_yield_and_share_true_record_inversions",
-          "source_sha256": "47227eadf480b8ff0eb81f60f514e2628e2abbe9c47002338a92d7b29b2e34fd"
+          "source_sha256": "361e89079517d0b9295f04e320e85fc175f412f820aaec67368e60797a3c8d3c"
         }
       ]
     },
@@ -221,7 +221,7 @@
           "package": "rmagna",
           "target": "rust_snapshot_contracts",
           "test": "original_probability_queries_generate_no_input_key_but_explicit_compile_does",
-          "source_sha256": "47227eadf480b8ff0eb81f60f514e2628e2abbe9c47002338a92d7b29b2e34fd"
+          "source_sha256": "361e89079517d0b9295f04e320e85fc175f412f820aaec67368e60797a3c8d3c"
         }
       ]
     },
@@ -242,7 +242,7 @@
           "package": "rmagna",
           "target": "rust_snapshot_contracts",
           "test": "original_ordinary_faults_are_copied_again_after_each_mutating_yield",
-          "source_sha256": "47227eadf480b8ff0eb81f60f514e2628e2abbe9c47002338a92d7b29b2e34fd"
+          "source_sha256": "361e89079517d0b9295f04e320e85fc175f412f820aaec67368e60797a3c8d3c"
         }
       ]
     },
@@ -263,7 +263,7 @@
           "package": "rmagna",
           "target": "rust_snapshot_contracts",
           "test": "original_no_feedback_stream_releases_all_sixty_four_consumed_assignments",
-          "source_sha256": "47227eadf480b8ff0eb81f60f514e2628e2abbe9c47002338a92d7b29b2e34fd"
+          "source_sha256": "361e89079517d0b9295f04e320e85fc175f412f820aaec67368e60797a3c8d3c"
         }
       ]
     },
@@ -284,7 +284,7 @@
           "package": "rmagna",
           "target": "rust_snapshot_contracts",
           "test": "original_empty_fault_sharing_cannot_bypass_foreign_snapshot_validation",
-          "source_sha256": "47227eadf480b8ff0eb81f60f514e2628e2abbe9c47002338a92d7b29b2e34fd"
+          "source_sha256": "361e89079517d0b9295f04e320e85fc175f412f820aaec67368e60797a3c8d3c"
         }
       ]
     },
@@ -305,7 +305,7 @@
           "package": "rmagna",
           "target": "rust_snapshot_contracts",
           "test": "original_certificate_keeps_both_captured_inputs_before_the_evaluation_kernel_returns",
-          "source_sha256": "47227eadf480b8ff0eb81f60f514e2628e2abbe9c47002338a92d7b29b2e34fd"
+          "source_sha256": "361e89079517d0b9295f04e320e85fc175f412f820aaec67368e60797a3c8d3c"
         }
       ]
     },
@@ -326,7 +326,7 @@
           "package": "rmagna",
           "target": "rust_snapshot_contracts",
           "test": "original_explicit_literal_policy_compiles_once_without_structural_preparation",
-          "source_sha256": "47227eadf480b8ff0eb81f60f514e2628e2abbe9c47002338a92d7b29b2e34fd"
+          "source_sha256": "361e89079517d0b9295f04e320e85fc175f412f820aaec67368e60797a3c8d3c"
         }
       ]
     },
@@ -347,7 +347,7 @@
           "package": "rmagna",
           "target": "rust_snapshot_contracts",
           "test": "original_literal_policy_retains_packed_values_and_never_replays_the_phase_rule",
-          "source_sha256": "47227eadf480b8ff0eb81f60f514e2628e2abbe9c47002338a92d7b29b2e34fd"
+          "source_sha256": "361e89079517d0b9295f04e320e85fc175f412f820aaec67368e60797a3c8d3c"
         }
       ]
     },
@@ -368,7 +368,7 @@
           "package": "rmagna",
           "target": "rust_snapshot_contracts",
           "test": "original_unpaired_environment_surrogate_rejects_at_the_shared_json_import_boundary",
-          "source_sha256": "47227eadf480b8ff0eb81f60f514e2628e2abbe9c47002338a92d7b29b2e34fd"
+          "source_sha256": "361e89079517d0b9295f04e320e85fc175f412f820aaec67368e60797a3c8d3c"
         }
       ]
     },
@@ -389,7 +389,7 @@
           "package": "rmagna",
           "target": "rust_snapshot_contracts",
           "test": "original_environment_unicode_nul_and_non_bmp_labels_survive_both_tensor_services",
-          "source_sha256": "47227eadf480b8ff0eb81f60f514e2628e2abbe9c47002338a92d7b29b2e34fd"
+          "source_sha256": "361e89079517d0b9295f04e320e85fc175f412f820aaec67368e60797a3c8d3c"
         }
       ]
     },
@@ -424,7 +424,7 @@
           "package": "rmagna",
           "target": "rust_snapshot_contracts",
           "test": "original_borrowed_and_owned_traces_keep_all_sixty_four_control_fault_event_queries",
-          "source_sha256": "47227eadf480b8ff0eb81f60f514e2628e2abbe9c47002338a92d7b29b2e34fd"
+          "source_sha256": "361e89079517d0b9295f04e320e85fc175f412f820aaec67368e60797a3c8d3c"
         }
       ]
     },
@@ -445,7 +445,7 @@
           "package": "rmagna",
           "target": "rust_snapshot_contracts",
           "test": "original_guarded_supplied_noise_retains_owned_actions_after_inputs_are_dropped",
-          "source_sha256": "47227eadf480b8ff0eb81f60f514e2628e2abbe9c47002338a92d7b29b2e34fd"
+          "source_sha256": "361e89079517d0b9295f04e320e85fc175f412f820aaec67368e60797a3c8d3c"
         }
       ]
     },
@@ -466,7 +466,7 @@
           "package": "rmagna",
           "target": "rust_snapshot_contracts",
           "test": "original_borrowed_and_owned_traces_keep_all_sixty_four_control_fault_event_queries",
-          "source_sha256": "47227eadf480b8ff0eb81f60f514e2628e2abbe9c47002338a92d7b29b2e34fd"
+          "source_sha256": "361e89079517d0b9295f04e320e85fc175f412f820aaec67368e60797a3c8d3c"
         }
       ]
     },
@@ -487,7 +487,7 @@
           "package": "rmagna",
           "target": "rust_snapshot_contracts",
           "test": "original_borrowed_and_owned_traces_keep_all_sixty_four_control_fault_event_queries",
-          "source_sha256": "47227eadf480b8ff0eb81f60f514e2628e2abbe9c47002338a92d7b29b2e34fd"
+          "source_sha256": "361e89079517d0b9295f04e320e85fc175f412f820aaec67368e60797a3c8d3c"
         }
       ]
     },
@@ -508,19 +508,19 @@
           "package": "rmagna",
           "target": "rust_snapshot_contracts",
           "test": "original_sparse_actions_match_all_hundred_dense_draws_and_remain_isolated",
-          "source_sha256": "47227eadf480b8ff0eb81f60f514e2628e2abbe9c47002338a92d7b29b2e34fd"
+          "source_sha256": "361e89079517d0b9295f04e320e85fc175f412f820aaec67368e60797a3c8d3c"
         },
         {
           "package": "rmagna",
           "target": "rust_snapshot_contracts",
           "test": "original_direct_sparse_action_table_owns_nested_factors_and_rejects_shape_errors",
-          "source_sha256": "47227eadf480b8ff0eb81f60f514e2628e2abbe9c47002338a92d7b29b2e34fd"
+          "source_sha256": "361e89079517d0b9295f04e320e85fc175f412f820aaec67368e60797a3c8d3c"
         },
         {
           "package": "rmagna",
           "target": "rust_snapshot_contracts",
           "test": "original_compiled_misuses_and_legacy_private_entries_are_rejected_downstream",
-          "source_sha256": "47227eadf480b8ff0eb81f60f514e2628e2abbe9c47002338a92d7b29b2e34fd"
+          "source_sha256": "361e89079517d0b9295f04e320e85fc175f412f820aaec67368e60797a3c8d3c"
         }
       ]
     },
@@ -541,7 +541,7 @@
           "package": "rmagna",
           "target": "rust_snapshot_contracts",
           "test": "original_parent_list_replacement_changes_source_identity_and_uses_new_callback_inputs",
-          "source_sha256": "47227eadf480b8ff0eb81f60f514e2628e2abbe9c47002338a92d7b29b2e34fd"
+          "source_sha256": "361e89079517d0b9295f04e320e85fc175f412f820aaec67368e60797a3c8d3c"
         }
       ]
     },
@@ -562,19 +562,19 @@
           "package": "rmagna",
           "target": "rust_snapshot_contracts",
           "test": "original_probability_queries_generate_no_input_key_but_explicit_compile_does",
-          "source_sha256": "47227eadf480b8ff0eb81f60f514e2628e2abbe9c47002338a92d7b29b2e34fd"
+          "source_sha256": "361e89079517d0b9295f04e320e85fc175f412f820aaec67368e60797a3c8d3c"
         },
         {
           "package": "rmagna",
           "target": "rust_snapshot_contracts",
           "test": "original_lazy_batches_capture_one_source_while_next_single_query_uses_replacement",
-          "source_sha256": "47227eadf480b8ff0eb81f60f514e2628e2abbe9c47002338a92d7b29b2e34fd"
+          "source_sha256": "361e89079517d0b9295f04e320e85fc175f412f820aaec67368e60797a3c8d3c"
         },
         {
           "package": "rmagna",
           "target": "rust_snapshot_contracts",
           "test": "original_borrowed_and_owned_traces_keep_all_sixty_four_control_fault_event_queries",
-          "source_sha256": "47227eadf480b8ff0eb81f60f514e2628e2abbe9c47002338a92d7b29b2e34fd"
+          "source_sha256": "361e89079517d0b9295f04e320e85fc175f412f820aaec67368e60797a3c8d3c"
         }
       ]
     },
@@ -595,13 +595,13 @@
           "package": "rmagna",
           "target": "rust_snapshot_contracts",
           "test": "original_lazy_batches_capture_one_source_while_next_single_query_uses_replacement",
-          "source_sha256": "47227eadf480b8ff0eb81f60f514e2628e2abbe9c47002338a92d7b29b2e34fd"
+          "source_sha256": "361e89079517d0b9295f04e320e85fc175f412f820aaec67368e60797a3c8d3c"
         },
         {
           "package": "rmagna",
           "target": "rust_snapshot_contracts",
           "test": "original_probability_queries_generate_no_input_key_but_explicit_compile_does",
-          "source_sha256": "47227eadf480b8ff0eb81f60f514e2628e2abbe9c47002338a92d7b29b2e34fd"
+          "source_sha256": "361e89079517d0b9295f04e320e85fc175f412f820aaec67368e60797a3c8d3c"
         }
       ]
     },
@@ -622,7 +622,7 @@
           "package": "rmagna",
           "target": "rust_snapshot_contracts",
           "test": "original_compiled_misuses_and_legacy_private_entries_are_rejected_downstream",
-          "source_sha256": "47227eadf480b8ff0eb81f60f514e2628e2abbe9c47002338a92d7b29b2e34fd"
+          "source_sha256": "361e89079517d0b9295f04e320e85fc175f412f820aaec67368e60797a3c8d3c"
         }
       ]
     }

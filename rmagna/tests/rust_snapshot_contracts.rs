@@ -2,6 +2,8 @@
 // Source-bound ownership cases from itpyi/magna@56847478c840395735146ef1e1ccdc3d8aedc10f:
 // test_native_batch.py, test_native_global_fastpath.py and test_simulator_optimization.py.
 // Full license: fixtures/original_many_record_input.LICENSE.
+#[path = "support/build_artifacts.rs"]
+mod build_artifacts;
 use rmagna::{
     clifford::CliffordCircuit,
     gf2::BitVector,
@@ -1123,22 +1125,8 @@ fn original_compiled_misuses_and_legacy_private_entries_are_rejected_downstream(
             let _ = std::fs::remove_dir_all(&self.0);
         }
     }
-    let deps = std::env::current_exe()
-        .unwrap()
-        .parent()
-        .unwrap()
-        .to_path_buf();
-    let library = std::fs::read_dir(&deps)
-        .unwrap()
-        .filter_map(Result::ok)
-        .map(|e| e.path())
-        .filter(|p| {
-            p.file_name()
-                .and_then(|s| s.to_str())
-                .is_some_and(|s| s.starts_with("librmagna-") && s.ends_with(".rlib"))
-        })
-        .max_by_key(|p| p.metadata().unwrap().modified().unwrap())
-        .expect("owning crate's built rlib");
+    let artifacts = build_artifacts::rmagna().unwrap();
+    let library = &artifacts.library;
     static NEXT: AtomicUsize = AtomicUsize::new(0);
     let dir = Scratch(std::env::temp_dir().join(format!(
         "rmagna-snapshot-types-{}-{}",
@@ -1186,7 +1174,13 @@ fn original_compiled_misuses_and_legacy_private_entries_are_rejected_downstream(
     for (name, code, error) in cases {
         let input = dir.0.join(format!("{name}.rs"));
         std::fs::write(&input, code).unwrap();
-        let output = Command::new(std::env::var_os("RUSTC").unwrap_or_else(|| "rustc".into()))
+        let mut command = Command::new(std::env::var_os("RUSTC").unwrap_or_else(|| "rustc".into()));
+        for directory in &artifacts.dependencies {
+            command
+                .arg("-L")
+                .arg(format!("dependency={}", directory.display()));
+        }
+        let output = command
             .args([
                 "--edition=2024",
                 "--crate-type=lib",
@@ -1195,8 +1189,6 @@ fn original_compiled_misuses_and_legacy_private_entries_are_rejected_downstream(
             ])
             .arg("--extern")
             .arg(format!("rmagna={}", library.display()))
-            .arg("-L")
-            .arg(format!("dependency={}", deps.display()))
             .arg(&input)
             .arg("-o")
             .arg(dir.0.join(format!("{name}.rmeta")))
@@ -1216,8 +1208,55 @@ fn original_compiled_misuses_and_legacy_private_entries_are_rejected_downstream(
             );
         }
     }
+    if std::env::var_os("RMAGNA_SNAPSHOT_LAYOUT_CHILD").is_none() {
+        let executable = std::env::current_exe().unwrap();
+        let already_in_deps = executable
+            .ancestors()
+            .any(|p| p.file_name().is_some_and(|n| n == "deps"));
+        let parent = artifacts
+            .profile
+            .join(if already_in_deps { "build" } else { "deps" });
+        std::fs::create_dir_all(&parent).unwrap();
+        let relocated = Scratch(parent.join(format!(
+            "rmagna-snapshot-layout-{}-{}",
+            std::process::id(),
+            NEXT.fetch_add(1, Ordering::SeqCst)
+        )));
+        let directory = if already_in_deps {
+            relocated.0.join("out")
+        } else {
+            relocated.0.clone()
+        };
+        std::fs::create_dir_all(&directory).unwrap();
+        let binary =
+            directory.join("snapshot-layout-probe".to_owned() + std::env::consts::EXE_SUFFIX);
+        std::fs::copy(&executable, &binary).unwrap();
+        let copied_library = Scratch(artifacts.profile.join("build").join(format!(
+            "rmagna-snapshot-library-{}-{}",
+            std::process::id(),
+            NEXT.fetch_add(1, Ordering::SeqCst)
+        )));
+        let output = copied_library.0.join("out");
+        std::fs::create_dir_all(&output).unwrap();
+        std::fs::copy(library, output.join(library.file_name().unwrap())).unwrap();
+        let child = Command::new(&binary)
+            .env("RMAGNA_SNAPSHOT_LAYOUT_CHILD", "1")
+            .args([
+                "--exact",
+                "original_compiled_misuses_and_legacy_private_entries_are_rejected_downstream",
+                "--nocapture",
+            ])
+            .output()
+            .unwrap();
+        assert!(
+            child.status.success(),
+            "relocated Cargo layout failed: stdout={} stderr={}",
+            String::from_utf8_lossy(&child.stdout),
+            String::from_utf8_lossy(&child.stderr)
+        );
+    }
     eprintln!(
-        "downstream types:one current-library positive control;two compiled-object misuses;two legacy-binding exclusions;two invalid sparse-action type checks;no Cargo/environment copies"
+        "downstream types:current-library positive control;two compiled-object misuses,two legacy entries,two sparse-action misuses;actual deps/build-output layouts;no Cargo/environment copies"
     );
 }
 #[test]
