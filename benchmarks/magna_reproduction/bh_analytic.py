@@ -20,7 +20,7 @@ def matrix(k, circuit):
         if words == ['H', str(n+k)]:
             end = True
             break
-        if words[0] in {'S', 'S_DAG', 'Z', 'CZ'}:
+        if words[0] in {'I', 'S', 'S_DAG', 'Z', 'CZ'}:
             if len(words) < 2 or (words[0] == 'CZ' and len(words[1:]) % 2):
                 raise ValueError('BH diagonal prefix has incomplete targets')
             if any(not 0 <= int(q) < n+k for q in words[1:]):

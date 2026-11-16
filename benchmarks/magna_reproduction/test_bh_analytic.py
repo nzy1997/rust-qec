@@ -19,6 +19,9 @@ class BhAnalyticTests(unittest.TestCase):
     def test_literal_encoding_and_all_published_exact_points_agree(self):
         prefix = self.fixture['codes'][0]['encoding_prefix']
         self.assertEqual(bh.matrix(2, prefix), self.codes[2])
+        # Matched S inputs can retain explicit identity placeholders for the
+        # removed diagonal corrections, including multi-target identities.
+        self.assertEqual(bh.matrix(2, prefix.replace('S 0', 'I 0 1')), self.codes[2])
         for row in self.fixture['curves']:
             actual = bh.exact_from_rows(row['k'], self.codes[row['k']], str(row['p']))
             for key, value in row['reference'].items():
@@ -68,7 +71,8 @@ class BhAnalyticTests(unittest.TestCase):
     def test_invalid_or_non_symmetric_codes_and_changed_prefixes_are_rejected(self):
         prefix = self.fixture['codes'][0]['encoding_prefix']
         for text in ['', prefix.replace('CX 0 14', 'CX 0 999'),
-                     prefix.replace('S 0', 'CZ 0'), prefix.replace('H 16', 'T 16')]:
+                     prefix.replace('S 0', 'CZ 0'), prefix.replace('S 0', 'I 999'),
+                     prefix.replace('S 0', 'I'), prefix.replace('H 16', 'T 16')]:
             with self.subTest(text=text[:50]), self.assertRaises(ValueError):
                 bh.matrix(2, text)
         for k, rows, p in [(1, self.codes[2], 0), (2, self.codes[2][:-1], 0),
