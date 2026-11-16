@@ -2334,3 +2334,6 @@ mod replay;
 
 #[path = "support/fixed_reference_networks.rs"]
 mod networks;
+
+#[path = "support/fixed_reference_tasks.rs"]
+mod source_tasks;

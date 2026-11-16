@@ -6950,3 +6950,16 @@ labels are checked cell by cell through explicit scalar event rows. Forty-eight
 shared-query plans retain three actual projection/contraction geometries with
 45 observed reuses, while each effect retains its own phase resource. Conflicting
 repeated events return zero, and invalid warm requests fail before preparation.
+
+The full original task fixtures additionally check nonzero constrained readout
+history domains (128 draws with literal biased physical/proposal masses),
+three-bit nonlinear selection (512 draws and exact A=3/4, E=1/4, fidelity=2/3),
+and twelve redundant decoded labels under one independent-bit/two-branch
+limits. Both compilers and both causal enumeration strategies preserve the two
+complete histories, while rank-zero and branch-one bounds refuse before actual
+callbacks. Four affine task configurations check exactly the two planned
+terminal roles and no sampling-support request, including a magic target.
+Sixteen batched and sixteen individual draws per configuration preserve every
+evaluation field and the caller RNG state, with 32 actual target-frame reuses.
+These are source qualification results; automatic runtime LRU integration and
+remaining continuation/storage contracts remain separate R09 work.
