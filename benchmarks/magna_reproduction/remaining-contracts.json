@@ -4,13 +4,13 @@
   "upstream_commit": "56847478c840395735146ef1e1ccdc3d8aedc10f",
   "parity_claim": "static_requirements_only",
   "ledger_snapshot": {
-    "verified": 313,
-    "unmapped": 32,
-    "partial": 7
+    "verified": 315,
+    "partial": 7,
+    "unmapped": 30
   },
   "category_counts": {
     "G": 0,
-    "P": 27,
+    "P": 25,
     "V": 0,
     "E": 10,
     "U": 2
@@ -1498,106 +1498,6 @@
         {
           "path": "rmagna/tests/native_core.rs",
           "anchor": "fn "
-        }
-      ]
-    },
-    {
-      "id": "test_native_compact_suffix.NativeCompactSuffixTests.test_lossless_storage_and_ordered_faults_without_cpython",
-      "ledger_status": "unmapped",
-      "category": "P",
-      "issue": "R11",
-      "source": {
-        "path": "tests/core/test_native_compact_suffix.py",
-        "source_sha256": "f8089fed9fae7548577daa65a53584fc65ccdd42334bf3c14d1fcdcdba17dd3e",
-        "line": 12,
-        "end_line": 24
-      },
-      "method": {
-        "method_sha256": "6cdd80243979070ff6ef8116de935cef0bc359fba24e529eeb89e70b8e47cb12",
-        "required_checks": [
-          "self.assertIsNotNone(compiler, 'C++17 compiler required for suffix storage checks')",
-          "self.assertEqual(build.returncode, 0, build.stderr)",
-          "self.assertEqual(result.returncode, 0, result.stdout + result.stderr)",
-          "self.assertIn('native compact suffix checks passed', result.stdout)"
-        ],
-        "loops": [],
-        "module_helpers": [],
-        "module_imports": [
-          "from pathlib import Path",
-          "import shutil",
-          "import subprocess",
-          "import tempfile",
-          "import unittest"
-        ]
-      },
-      "remaining_requirement": "Adaptive suffix storage includes sparse offsets up to word-index boundaries and payload bytes; ordered Pauli phase equality covers only part of this method.",
-      "assessment": "Ordered fault transport and exact phases exist. The standalone test also requires adaptive sparse/contiguous suffix storage, high sparse offsets and payload bounds; the batch test requires packing shared immutable faults once within a batch and repacking in the next batch. Existing value witnesses do not prove those storage/packing properties.",
-      "rust_owners": [
-        {
-          "path": "rmagna/tests/original_reference_layer.rs",
-          "anchor": "fn original_compact_suffix"
-        },
-        {
-          "path": "rmagna/src/unitary/shared.rs",
-          "anchor": "pub(super) fn compile"
-        },
-        {
-          "path": "rmagna/src/gf2.rs",
-          "anchor": "pub struct BitVector"
-        }
-      ]
-    },
-    {
-      "id": "test_native_global_fastpath.NativeGlobalFastpathTests.test_shared_immutable_faults_keep_distinct_records_and_batch_scope",
-      "ledger_status": "unmapped",
-      "category": "P",
-      "issue": "R11",
-      "source": {
-        "path": "tests/core/test_native_global_fastpath.py",
-        "source_sha256": "ee4b59147bd36e0bdfd5d871c740c699094bf450324be46313c410f983285ac5",
-        "line": 31,
-        "end_line": 45
-      },
-      "method": {
-        "method_sha256": "4465a6465831e010d9b08c8611c4dbde1e40e8e847bebec25811e805dd6da8a7",
-        "required_checks": [
-          "self.assertIs(assignments[0].faults, assignments[1].faults)",
-          "self.assertNotEqual(*expected)",
-          "self.assertEqual(found, expected)",
-          "self.assertEqual(count, 2)",
-          "self.assertEqual(plan.info['packed_fault_groups'] - before, 1)",
-          "self.assertEqual(plan.evaluate(assignments)[0], expected)",
-          "self.assertEqual(plan.info['packed_fault_groups'] - before, 2)"
-        ],
-        "loops": [],
-        "module_helpers": [
-          "NativeGlobalFastpathTests.instrument",
-          "NativeGlobalFastpathTests.simulator"
-        ],
-        "module_imports": [
-          "from fractions import Fraction",
-          "from magna import _native",
-          "from magna.batch import CompactAssignment",
-          "from magna.operations import InstrumentIR, StabilizerKet, Simulator, Options, SampleAssignment, NoiseModel, NoiseSite",
-          "from unittest.mock import patch",
-          "import unittest",
-          "import weakref"
-        ]
-      },
-      "remaining_requirement": "Only immutable shared fault groups may be packed once; record values remain distinct and the next batch repacks.",
-      "assessment": "Ordered fault transport and exact phases exist. The standalone test also requires adaptive sparse/contiguous suffix storage, high sparse offsets and payload bounds; the batch test requires packing shared immutable faults once within a batch and repacking in the next batch. Existing value witnesses do not prove those storage/packing properties.",
-      "rust_owners": [
-        {
-          "path": "rmagna/tests/original_reference_layer.rs",
-          "anchor": "fn original_compact_suffix"
-        },
-        {
-          "path": "rmagna/src/unitary/shared.rs",
-          "anchor": "pub(super) fn compile"
-        },
-        {
-          "path": "rmagna/src/gf2.rs",
-          "anchor": "pub struct BitVector"
         }
       ]
     },

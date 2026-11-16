@@ -7079,14 +7079,68 @@ assert_eq!(plan.statistics().packed_groups, 1);
 ```
 
 The owning `prepared_noise_batches` target includes all five pinned R10 methods:
-139 interleaved sites and a partial block (64 seeds, 23/41 partitions), a 63-site
-100-digit category fixture (128 seeds, 47/81 partitions), 513-site table fallback,
+139 interleaved sites and a partial block (64 seeds, 23/41 partitions), a seven-site
+100-digit category fixture with 15 alternatives at site 3 (128 seeds, 47/81 partitions), 513-site table fallback,
 all group sizes 1/2/17/308/512/513 with actual packed/scalar choices, and the
 316-site weighted/plain unit-factor fixture. Literal integer products and exact
 physical laws check 850 real source-fixture draw evaluations. Additional checks
-cover 4,096 joint-law draws across lanes/blocks, forced rational boundaries through
+cover forced last-alternative selection before/after caller input replacement,
+4,096 joint-law draws across lanes/blocks, forced rational boundaries through
 lane 63, near-zero/near-one laws, entropy-free resource admission,
 returned snapshots and concurrent reuse. Dyadic occurrence work is observed at
 at most six planes for 131 sites versus 131 scalar words; this is an entropy-work
 ablation, not a throughput speedup claim. Native/Python bit-stream identity and
 finite64 probability truncation are not the Rust contract.
+
+### Compact suffix storage and static assignment batches
+
+Prepared insertion tables use `compact::CompactBitVector` and
+`CompactPauliWord` for their actual generator images, transported entries and
+shared observation effects. Empty/single-word masks have no separate heap
+buffer. Other masks choose a contiguous offset span or sparse `usize` word/value
+pairs by logical payload size, preserving declared dimensions and all eighth-root
+phases. `PreparedInsertions::transported_frame` returns an owned selected frame
+in stable circuit-time/input order; `storage_statistics` reports actual mask
+capacities, inline/table bytes and buffer counts. Its preparation suffix figures
+are one final snapshot, not a transient peak or process RSS. Referenced compiled
+programs and allocator overhead are excluded.
+
+Preparation still uses a conservative dense worst-case admission bound that
+includes compact headers and scratch. It can reject a sparse request whose actual
+storage is small; increasing `max_table_bytes` explicitly does not change that
+bound into a measured allocation guarantee. The high-offset diagnostic raises
+this ceiling for two 100,065-wire zero-state compilers, checks only two suffix
+table buffers with zero separate mask payload, and retains under 32 MiB of table
+and inline storage. It avoids constructing a full dense output-query matrix.
+An empty catalog skips tables and retains the existing zero admission estimate;
+its fixed owner header is still included in the storage statistics.
+
+`OriginalAssignmentPlan::prepare_packed_probabilities` creates an explicit
+no-control coherent source for repeated complete assignments. Each returned
+`OriginalPackedAssignmentBatch` resolves/transports an immutable group's faults
+and prepares its full record law once for consecutive shared group references.
+Record words are evaluated independently. The batch releases its last group/law
+on exhaustion or error; a new batch repacks even the same group. Ordinary inputs
+are always snapshotted and repacked, and compact owner identity is checked before
+shared-empty reuse. Per-batch statistics count actual successful fault packing,
+record-law preparation and values. No probability law is cached on the source.
+
+Compact words and ordinary/JSON record assignments carry true record values.
+`OriginalCompactNoiseLayout::assignments` accepts reported words and converts
+report flips before producing compact inputs. Report flips are validated but
+cannot affect quantum evolution in this no-control service. Inverted readouts
+remain part of the original instrument. All controls are rejected before any
+callback; the existing literal `probabilities` pipeline retains its separate
+execution policy. Phase-resource, record-occurrence and original geometry/scalar
+limits still apply, including to the full record law; no fallback is implicit.
+
+The `compact_fault_storage` target includes every pinned standalone storage/range
+and manually supplied suffix scenario, independent set-valued phase oracles,
+real compiler/lifetime tests and the complete shared-fault two-record/two-batch
+fixture. The arbitrary manual rows exercise public compact operators and are
+separate from valid compiled Clifford images. Extra Rust guards reach word index
+65,536 (bit 4,194,304) and a nonmaterialized `usize` endpoint; the Native storage
+fixture itself reaches bit 100,000. Complex direct/prepared comparisons cover
+both compilers, all eight phases, repeated/equal-time insertions and shared sign
+updates. Static batches are a library service, not automatic FileTask batching
+or a proof of the remaining protocol-to-target continuation contract.

@@ -1438,13 +1438,13 @@
     {
       "id": "test_file_reuse.FileReuseTests.test_prepared_noise_weights_and_batch_partition",
       "status": "verified",
-      "contract": "Complete original 63-site arbitrary100-digit category/factor fixture;128seeds,47/81partitions,single/full identity,input replacement,exact raw products,zero/one categories and malformed-law rejection. SplitMix64 and exact physical-law sampling explicitly replace Native/Python streams.",
+      "contract": "Complete original seven-site 100-digit category/factor fixture with row lengths0/1/2/15/2/2/2,128seeds,47/81partitions,single/full identity,clearing the15-alternative input row,exact raw products,zero/one categories and four malformed-law rejections. Forced choice14 before/after caller replacement makes the15-way conditional observable. SplitMix64 and exact physical-law sampling explicitly replace Native/Python streams.",
       "rust_tests": [
         {
           "package": "rmagna",
           "target": "prepared_noise_batches",
           "test": "full_arbitrary_category_fixture_retains_128_seeds_partitions_inputs_and_exact_declared_factors",
-          "source_sha256": "848b73da9889b900d73d0f329d2ecce5dbef1c9d5181f1cc78b3151bd83752ec"
+          "source_sha256": "495a810b9894860be011c2ab68cb1438977cca3083b3ca327dfa7d04c9aa420a"
         }
       ]
     },
@@ -2299,8 +2299,40 @@
     },
     {
       "id": "test_native_compact_suffix.NativeCompactSuffixTests.test_lossless_storage_and_ordered_faults_without_cpython",
-      "status": "unmapped",
-      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+      "status": "verified",
+      "contract": "Full pinned compact_suffix.cpp storage/range and arbitrary-row phase scenarios using public adaptive masks/frames; source MT streams, sparse/contiguous/inline high offsets, padded endpoints and copy lifetimes, set-valued ordered Pauli oracle, real compact suffix/entry/effect integration in both compilers, actual 100065-wire table capacities, and actual original wire-lifetime rejection. Rust fixed widths retain zero dimensions separately; additional word65536/usize guards extend source scope. Payload/table snapshots are not RSS or a total peak claim.",
+      "rust_tests": [
+        {
+          "package": "rmagna",
+          "target": "compact_fault_storage",
+          "test": "complete_original_storage_and_ranges",
+          "source_sha256": "4b11fb534d404422a54087bf7abcd452b00481b9d882a23c85a692794ce5f3b4"
+        },
+        {
+          "package": "rmagna",
+          "target": "compact_fault_storage",
+          "test": "complete_original_manual_order_phase_lifetime_oracle",
+          "source_sha256": "4b11fb534d404422a54087bf7abcd452b00481b9d882a23c85a692794ce5f3b4"
+        },
+        {
+          "package": "rmagna",
+          "target": "compact_fault_storage",
+          "test": "real_compiler_retains_compact_high_offset_suffix_and_exact_ordered_phase",
+          "source_sha256": "4b11fb534d404422a54087bf7abcd452b00481b9d882a23c85a692794ce5f3b4"
+        },
+        {
+          "package": "rmagna",
+          "target": "compact_fault_storage",
+          "test": "actual_prepared_selection_matches_complex_direct_queries_with_shared_phase_updates",
+          "source_sha256": "4b11fb534d404422a54087bf7abcd452b00481b9d882a23c85a692794ce5f3b4"
+        },
+        {
+          "package": "rmagna",
+          "target": "compact_fault_storage",
+          "test": "actual_packed_lifetimes_and_named_validation_preserve_error_prefixes",
+          "source_sha256": "4b11fb534d404422a54087bf7abcd452b00481b9d882a23c85a692794ce5f3b4"
+        }
+      ]
     },
     {
       "id": "test_native_core.NativeTests.test_malformed_native_data_and_initialization_errors_are_not_fallbacks",
@@ -2408,8 +2440,28 @@
     },
     {
       "id": "test_native_global_fastpath.NativeGlobalFastpathTests.test_shared_immutable_faults_keep_distinct_records_and_batch_scope",
-      "status": "unmapped",
-      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+      "status": "verified",
+      "contract": "Complete pinned no-feedback shared-immutable-fault 0/1 record fixture: common owned group, distinct exact literal probabilities and actual transport once in each fresh batch. Explicit prepared static service retains only consecutive immutable groups within a batch; ordinary inputs repack, foreign owners reject before shared-empty reuse, true/report words and inversions remain distinct, and controls reject before callbacks. Existing literal default execution remains separate.",
+      "rust_tests": [
+        {
+          "package": "rmagna",
+          "target": "compact_fault_storage",
+          "test": "original_shared_immutable_faults_pack_once_with_distinct_records_and_each_batch_restarts",
+          "source_sha256": "4b11fb534d404422a54087bf7abcd452b00481b9d882a23c85a692794ce5f3b4"
+        },
+        {
+          "package": "rmagna",
+          "target": "compact_fault_storage",
+          "test": "packed_batches_repack_mutable_inputs_and_reject_foreign_owners_before_empty_group_reuse",
+          "source_sha256": "4b11fb534d404422a54087bf7abcd452b00481b9d882a23c85a692794ce5f3b4"
+        },
+        {
+          "package": "rmagna",
+          "target": "compact_fault_storage",
+          "test": "true_and_reported_words_inversions_and_controls_have_explicit_static_boundaries",
+          "source_sha256": "4b11fb534d404422a54087bf7abcd452b00481b9d882a23c85a692794ce5f3b4"
+        }
+      ]
     },
     {
       "id": "test_native_global_fastpath.NativeGlobalFastpathTests.test_snapshot_check_precedes_shared_empty_fault_reuse",
@@ -3107,7 +3159,7 @@
           "package": "rmagna",
           "target": "prepared_noise_batches",
           "test": "full_513_group_reuses_exact_occurrence_model_and_avoids_weight_count_table",
-          "source_sha256": "848b73da9889b900d73d0f329d2ecce5dbef1c9d5181f1cc78b3151bd83752ec"
+          "source_sha256": "495a810b9894860be011c2ab68cb1438977cca3083b3ca327dfa7d04c9aa420a"
         }
       ]
     },
@@ -3133,7 +3185,7 @@
           "package": "rmagna",
           "target": "prepared_noise_batches",
           "test": "full_139_site_sparse_actions_weights_and_seed_partitions_use_real_prepared_groups",
-          "source_sha256": "848b73da9889b900d73d0f329d2ecce5dbef1c9d5181f1cc78b3151bd83752ec"
+          "source_sha256": "495a810b9894860be011c2ab68cb1438977cca3083b3ca327dfa7d04c9aa420a"
         }
       ]
     },
@@ -4703,7 +4755,7 @@
           "package": "rmagna",
           "target": "prepared_noise_batches",
           "test": "all_original_group_sizes_use_actual_packed_and_scalar_choices_with_literal_product_oracles",
-          "source_sha256": "848b73da9889b900d73d0f329d2ecce5dbef1c9d5181f1cc78b3151bd83752ec"
+          "source_sha256": "495a810b9894860be011c2ab68cb1438977cca3083b3ca327dfa7d04c9aa420a"
         }
       ]
     },
@@ -4716,7 +4768,7 @@
           "package": "rmagna",
           "target": "prepared_noise_batches",
           "test": "original_316_site_grouped_factors_keep_actual_plain_choices_and_skip_unreduced_units",
-          "source_sha256": "848b73da9889b900d73d0f329d2ecce5dbef1c9d5181f1cc78b3151bd83752ec"
+          "source_sha256": "495a810b9894860be011c2ab68cb1438977cca3083b3ca327dfa7d04c9aa420a"
         }
       ]
     },

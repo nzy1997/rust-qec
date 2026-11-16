@@ -3889,3 +3889,31 @@ reject reordered Pauli factors and perturbed weights. Removing the exact residua
 must reject the forced cutoff case. Finite proposal and estimator contracts from
 R06/B02 remain separate; a declared raw factor is not automatically an unbiased
 importance likelihood.
+
+### R11 compact transport and batch-local immutable packing
+
+`cargo test --locked -p rmagna --test compact_fault_storage -- --show-output`
+executes the complete pinned `compact_suffix.cpp` storage/range/manual-frame
+scenarios against public adaptive Rust masks and phased frames, with the original
+MT inputs and an independent set-valued Pauli oracle. Actual prepared suffixes,
+retained entries and shared sign effects use the same compact representation.
+An explicit high-width compiler diagnostic reports allocated mask/table scopes;
+these are neither RSS nor an entire preparation peak. Admission remains a
+conservative worst-case bound and can reject sparse instances.
+
+The complete immutable-fault method uses its original +X/T/MX source, Z faults,
+both record values, fresh batch boundaries and literal scalar comparisons.
+`prepare_packed_probabilities` performs real static fault transport/law preparation
+once for consecutive immutable group references in each batch. Mutable inputs
+repack, foreign source tokens reject before shared-empty reuse, and controls
+reject before callbacks. Existing literal/default task execution is unchanged.
+Ordinary and compact inputs are true words; the noise-layout reported-word adapter
+still applies report flips. Distinct inversions and strict JSON values are checked.
+
+Actual production mutations truncate a high sparse word index, reuse the first
+packed law across batches, and truncate the restored R10 15-way conditional.
+The first two violate structural witnesses even when simple scalar values agree;
+the last is caught by forced alternative14 selection. Together R10/R11 qualify
+seven original methods (315 verified / 7 partial / 30 unmapped); full parity and
+the R09 continuation/resource work remain open. Retained compiler/list/run
+receipts bind every new witness to the final source and executed binary.

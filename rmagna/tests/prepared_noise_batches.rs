@@ -406,13 +406,12 @@ fn full_513_group_reuses_exact_occurrence_model_and_avoids_weight_count_table() 
 fn full_arbitrary_category_fixture_retains_128_seeds_partitions_inputs_and_exact_declared_factors()
 {
     let big = num_bigint::BigInt::from(10u32).pow(100);
-    let pattern = [
+    let mut laws = vec![
         vec![],
         vec![p(0, 1)],
         vec![p(1, 1), p(0, 3)],
-        vec![p(1, 15000)],
+        vec![p(1, 15000); 15],
     ];
-    let mut laws = (0..60).map(|j| pattern[j % 4].clone()).collect::<Vec<_>>();
     laws.push(vec![p(1, 10), p(1, 5)]);
     laws.push(vec![
         Probability::from_ratio(&big - 1, big.clone()).unwrap(),
@@ -435,7 +434,11 @@ fn full_arbitrary_category_fixture_retains_128_seeds_partitions_inputs_and_exact
         .collect::<Vec<_>>();
     let factors = vec![(f(2, 3), f(4, 7)); laws.len()];
     let plan = PreparedNoiseSchedule::new(&laws, &actions, &factors, Default::default()).unwrap();
-    assert_eq!(plan.statistics().sites, 63);
+    assert_eq!(
+        laws.iter().map(Vec::len).collect::<Vec<_>>(),
+        [0, 1, 2, 15, 2, 2, 2]
+    );
+    assert_eq!(plan.statistics().sites, 7);
     assert!(plan.statistics().exact_tail_groups >= 3);
     let seeds = (0..128).collect::<Vec<_>>();
     let actual = plan.draw_seeded_many(&seeds).unwrap();
@@ -469,8 +472,38 @@ fn full_arbitrary_category_fixture_retains_128_seeds_partitions_inputs_and_exact
             (&n, &d)
         );
     }
+    // The source's rare 15-way category must also execute observably: each
+    // occurrence plane has lane0 clear, while exact uniform sampling sees14.
+    // This forces its last alternative without depending on the 128 seed run.
+    struct Fourteen;
+    impl RandomSource for Fourteen {
+        fn next_u64(&mut self) -> u64 {
+            14
+        }
+    }
+    let distinct = (0..15)
+        .map(|j| SparseNoiseAction::ReportFlip {
+            record: format!("alternative{j}"),
+        })
+        .collect::<Vec<_>>();
+    let conditional = PreparedNoiseSchedule::new(
+        std::slice::from_ref(&laws[3]),
+        std::slice::from_ref(&distinct),
+        &[(f(2, 3), f(4, 7))],
+        Default::default(),
+    )
+    .unwrap();
+    let forced = conditional.draw(&mut Fourteen).unwrap();
+    assert_eq!(forced.choices, [Some(14)]);
+    assert_eq!(forced.actions, [distinct[14].clone()]);
+    assert_eq!(
+        forced.physical_probability,
+        BigRational::new(1.into(), 15000.into())
+    );
+    assert_eq!(forced.raw_weight, f(4, 7));
     laws[3].clear();
     assert_eq!(plan.draw_seeded_many(&seeds).unwrap(), actual);
+    assert_eq!(conditional.draw(&mut Fourteen).unwrap(), forced);
     assert!(Probability::from_ratio(1.into(), 0.into()).is_err());
     assert!(Probability::from_ratio((-1).into(), 2.into()).is_err());
     assert!(Probability::from_ratio(1.into(), (-2).into()).is_err());
@@ -488,7 +521,7 @@ fn full_arbitrary_category_fixture_retains_128_seeds_partitions_inputs_and_exact
         Err(PreparedNoiseError::Category(0))
     ));
     println!(
-        "512 real draws over the original 63-site / 100-digit category fixture: full, 47/81 partition, singles and source replacement, with exact declared factors"
+        "512 real draws over the original seven-site / 100-digit category fixture: 15 alternatives at site3, full, 47/81 partition, singles and source replacement; two forced last-alternative draws prove its conditional law and owned capture"
     );
 }
 #[test]

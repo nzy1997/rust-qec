@@ -1,11 +1,14 @@
 //! Catalog-specific suffix Clifford transport, prepared once per program.
 use super::*;
+use crate::compact::{CompactBitVector, CompactPauliWord};
 use std::{cmp::Reverse, mem::size_of};
 
 #[derive(Clone, Copy, Debug)]
 pub struct InsertionPreparationOptions {
     pub max_catalog_entries: usize,
-    /// Conservative packed payload/metadata/scratch estimate; not process memory.
+    /// Conservative nonempty-catalog payload/metadata/scratch estimate, not RSS.
+    /// Empty catalogs skip tables and report zero estimate, excluding their
+    /// fixed owner header (which storage_statistics still reports).
     pub max_table_bytes: usize,
 }
 impl Default for InsertionPreparationOptions {
@@ -17,17 +20,116 @@ impl Default for InsertionPreparationOptions {
     }
 }
 struct Entry {
-    original: PauliInsertion,
-    transported: PauliWord,
-    shared_effect: Option<BitVector>,
+    before_gate: usize,
+    transported: CompactPauliWord,
+    shared_effect: Option<CompactBitVector>,
+}
+/// Actual retained capacities and one final preparation snapshot, not peak RSS.
+/// Payload counts only adaptive mask vectors; inline/table bytes include vector
+/// elements and owner headers. The referenced compiled program is excluded.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct PreparedInsertionStorageStatistics {
+    pub catalog_entries: usize,
+    pub retained_mask_payload_bytes: u128,
+    pub retained_inline_and_table_bytes: u128,
+    pub retained_heap_buffers: usize,
+    pub final_suffix_mask_payload_bytes: u128,
+    pub final_suffix_inline_and_table_bytes: u128,
+    pub final_suffix_heap_buffers: usize,
 }
 pub struct PreparedInsertions {
     program: Arc<InsertionProgram>,
     entries: Vec<Entry>,
     lookup: Vec<usize>,
     estimated_peak_bytes: u128,
+    storage: PreparedInsertionStorageStatistics,
 }
 impl PreparedInsertions {
+    /// Exact selected fault frame in stable circuit-time/input order. The
+    /// returned compact snapshot owns its masks and retains every scalar phase.
+    pub fn transported_frame(&self, indices: &[usize]) -> Result<CompactPauliWord, UnitaryError> {
+        Ok(self.compose(indices)?.0)
+    }
+    fn ordered(&self, indices: &[usize]) -> Result<BTreeMap<usize, Vec<&Entry>>, UnitaryError> {
+        let mut ordered = BTreeMap::<usize, Vec<&Entry>>::new();
+        for &index in indices {
+            let Some(&position) = self.lookup.get(index) else {
+                return Err(UnitaryError::InvalidPreparedInsertion {
+                    index,
+                    count: self.len(),
+                });
+            };
+            let entry = &self.entries[position];
+            ordered.entry(entry.before_gate).or_default().push(entry);
+        }
+        Ok(ordered)
+    }
+    fn compose(
+        &self,
+        indices: &[usize],
+    ) -> Result<(CompactPauliWord, Option<CompactBitVector>), UnitaryError> {
+        let ordered = self.ordered(indices)?;
+        let mut frame = CompactPauliWord::identity(self.program.reference.width());
+        let mut effects = self
+            .program
+            .shared
+            .as_ref()
+            .map(|s| CompactBitVector::zeros(s.effect_dimensions().1));
+        for entries in ordered.values() {
+            for entry in entries {
+                frame = entry.transported.multiply(&frame)?;
+                if let (Some(total), Some(effect)) = (&mut effects, &entry.shared_effect) {
+                    total.xor_assign(effect)?;
+                }
+            }
+        }
+        Ok((frame, effects))
+    }
+
+    pub fn storage_statistics(&self) -> PreparedInsertionStorageStatistics {
+        self.storage
+    }
+    fn capture_storage(&mut self, suffix: Option<&Suffix>) {
+        let masks = self.entries.iter().flat_map(|entry| {
+            [
+                Some(entry.transported.x()),
+                Some(entry.transported.z()),
+                entry.shared_effect.as_ref(),
+            ]
+            .into_iter()
+            .flatten()
+        });
+        let mut storage = PreparedInsertionStorageStatistics {
+            catalog_entries: self.entries.len(),
+            retained_inline_and_table_bytes: size_of::<Self>() as u128
+                + self.entries.capacity() as u128 * size_of::<Entry>() as u128
+                + self.lookup.capacity() as u128 * size_of::<usize>() as u128,
+            retained_heap_buffers: usize::from(self.entries.capacity() > 0)
+                + usize::from(self.lookup.capacity() > 0),
+            ..Default::default()
+        };
+        for mask in masks {
+            let stats = mask.statistics();
+            storage.retained_mask_payload_bytes += stats.heap_payload_bytes as u128;
+            storage.retained_heap_buffers += stats.heap_buffers;
+        }
+        if let Some(suffix) = suffix {
+            storage.final_suffix_inline_and_table_bytes = size_of::<Suffix>() as u128
+                + (suffix.x.capacity() as u128 + suffix.z.capacity() as u128)
+                    * size_of::<CompactPauliWord>() as u128;
+            storage.final_suffix_heap_buffers =
+                usize::from(suffix.x.capacity() > 0) + usize::from(suffix.z.capacity() > 0);
+            for frame in suffix.x.iter().chain(&suffix.z) {
+                for mask in [frame.x(), frame.z()] {
+                    let stats = mask.statistics();
+                    storage.final_suffix_mask_payload_bytes += stats.heap_payload_bytes as u128;
+                    storage.final_suffix_heap_buffers += stats.heap_buffers;
+                }
+            }
+        }
+        self.storage = storage;
+    }
+
     pub fn len(&self) -> usize {
         self.entries.len()
     }
@@ -39,11 +141,11 @@ impl PreparedInsertions {
     }
 }
 struct Suffix {
-    x: Vec<PauliWord>,
-    z: Vec<PauliWord>,
+    x: Vec<CompactPauliWord>,
+    z: Vec<CompactPauliWord>,
 }
-fn phase(word: &PauliWord, extra: u8) -> Result<PauliWord, PauliError> {
-    PauliWord::new(
+fn phase(word: &CompactPauliWord, extra: u8) -> Result<CompactPauliWord, PauliError> {
+    CompactPauliWord::new(
         word.x().clone(),
         word.z().clone(),
         (word.phase() + extra) & 7,
@@ -54,14 +156,14 @@ impl Suffix {
         let mut x = Vec::with_capacity(width);
         let mut z = Vec::with_capacity(width);
         for q in 0..width {
-            x.push(PauliWord::new(
-                BitVector::from_indices(width, [q])?,
-                BitVector::zeros(width)?,
+            x.push(CompactPauliWord::new(
+                CompactBitVector::basis(width, q)?,
+                CompactBitVector::zeros(width),
                 0,
             )?);
-            z.push(PauliWord::new(
-                BitVector::zeros(width)?,
-                BitVector::from_indices(width, [q])?,
+            z.push(CompactPauliWord::new(
+                CompactBitVector::zeros(width),
+                CompactBitVector::basis(width, q)?,
                 0,
             )?);
         }
@@ -94,12 +196,8 @@ impl Suffix {
         }
         Ok(())
     }
-    fn image(&self, word: &PauliWord, width: usize) -> Result<PauliWord, UnitaryError> {
-        let mut image = PauliWord::new(
-            BitVector::zeros(width)?,
-            BitVector::zeros(width)?,
-            word.phase(),
-        )?;
+    fn image(&self, word: &PauliWord, width: usize) -> Result<CompactPauliWord, UnitaryError> {
+        let mut image = CompactPauliWord::identity(width).with_phase(word.phase())?;
         for q in word.x().ones() {
             image = image.multiply(&self.x[q])?;
         }
@@ -118,11 +216,11 @@ fn estimated_bytes(width: usize, physical: usize, count: usize) -> u128 {
     // compiled-program storage, caller catalog and allocator rounding excluded.
     (width as u128)
         .saturating_mul(2)
-        .saturating_mul(full + size_of::<PauliWord>() as u128)
+        .saturating_mul(full + size_of::<CompactPauliWord>() as u128)
         .saturating_add((count as u128).saturating_mul(
             full + input + size_of::<Entry>() as u128 + 2 * size_of::<usize>() as u128,
         ))
-        .saturating_add(8 * (full + size_of::<PauliWord>() as u128))
+        .saturating_add(8 * (full + size_of::<CompactPauliWord>() as u128))
         .saturating_add(
             size_of::<PreparedInsertions>() as u128 + 4 * size_of::<Vec<usize>>() as u128,
         )
@@ -133,7 +231,7 @@ fn effect_bytes(width: usize, observations: usize, count: usize) -> u128 {
     }
     let masks = (observations.div_ceil(64) as u128).saturating_mul(8);
     (2 * (width as u128) + 8)
-        .saturating_mul(masks + size_of::<BitVector>() as u128)
+        .saturating_mul(masks + size_of::<CompactBitVector>() as u128)
         .saturating_add((count as u128).saturating_mul(masks))
         .saturating_add(size_of::<shared::InsertionEffects<'_>>() as u128)
 }
@@ -193,12 +291,15 @@ impl CompiledUnitary {
             }
         }
         if catalog.is_empty() {
-            return Ok(PreparedInsertions {
+            let mut prepared = PreparedInsertions {
                 program: Arc::clone(&self.program),
                 entries: vec![],
                 lookup: vec![],
                 estimated_peak_bytes: 0,
-            });
+                storage: Default::default(),
+            };
+            prepared.capture_storage(None);
+            return Ok(prepared);
         }
         let width = self.program.reference.width();
         let mut order = (0..catalog.len()).collect::<Vec<_>>();
@@ -228,17 +329,20 @@ impl CompiledUnitary {
                 .transpose()?;
             lookup[index] = entries.len();
             entries.push(Entry {
-                original: original.clone(),
+                before_gate: original.before_gate,
                 transported,
-                shared_effect,
+                shared_effect: shared_effect.as_ref().map(CompactBitVector::from_dense),
             });
         }
-        Ok(PreparedInsertions {
+        let mut prepared = PreparedInsertions {
             program: Arc::clone(&self.program),
             entries,
             lookup,
             estimated_peak_bytes,
-        })
+            storage: Default::default(),
+        };
+        prepared.capture_storage(Some(&suffix));
+        Ok(prepared)
     }
     /// Apply chosen catalog entries in stable circuit-time order. Repeated
     /// indices are permitted; each assignment replaces the previous view.
@@ -254,39 +358,11 @@ impl CompiledUnitary {
         if indices.is_empty() {
             return self.with_insertions(&[], arithmetic);
         }
-        let mut ordered = BTreeMap::<usize, Vec<&Entry>>::new();
-        for &index in indices {
-            let Some(&position) = prepared.lookup.get(index) else {
-                return Err(UnitaryError::InvalidPreparedInsertion {
-                    index,
-                    count: prepared.len(),
-                });
-            };
-            let entry = &prepared.entries[position];
-            ordered
-                .entry(entry.original.before_gate)
-                .or_default()
-                .push(entry);
-        }
-        let mut frame = PauliWord::identity(self.program.reference.width())?;
-        let mut effects = self
-            .program
-            .shared
+        let (frame, effects) = prepared.compose(indices)?;
+        let effects = effects
             .as_ref()
-            .map(|s| BitVector::zeros(s.effect_dimensions().1))
+            .map(CompactBitVector::materialize)
             .transpose()?;
-        let mut grouped = BTreeMap::new();
-        for (&position, entries) in &ordered {
-            let mut words = Vec::with_capacity(entries.len());
-            for entry in entries {
-                frame = entry.transported.multiply(&frame)?;
-                if let (Some(total), Some(effect)) = (&mut effects, &entry.shared_effect) {
-                    total.xor_assign(effect)?;
-                }
-                words.push(&entry.original.word);
-            }
-            grouped.insert(position, words);
-        }
         let phase = self
             .program
             .shared
@@ -294,7 +370,7 @@ impl CompiledUnitary {
             .zip(effects.as_ref())
             .map(|(s, e)| s.phase_from_effects(e).map(Arc::new))
             .transpose()?;
-        self.with_insertion_frame(&frame, &grouped, phase, arithmetic)
+        self.with_insertion_frame(&frame.materialize()?, &BTreeMap::new(), phase, arithmetic)
     }
 }
 
@@ -333,7 +409,10 @@ mod tests {
                         for &gate in &gates[start..] {
                             forward = forward.conjugated(gate).unwrap();
                         }
-                        assert_eq!(suffix.image(&word, 3).unwrap(), forward);
+                        assert_eq!(
+                            suffix.image(&word, 3).unwrap().materialize().unwrap(),
+                            forward
+                        );
                     }
                 }
             }
