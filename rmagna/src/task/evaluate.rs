@@ -61,6 +61,14 @@ enum Execution {
     },
     Causal(Box<CausalProgram>),
 }
+/// Independent retained source/target program snapshots. This excludes cold
+/// transient owners, manual phase APIs and logical query-cache cardinalities.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, serde::Serialize)]
+pub struct TaskQueryWorkStatistics {
+    pub source: Option<crate::unitary::QueryWorkStatistics>,
+    pub target: Option<crate::unitary::QueryWorkStatistics>,
+}
+
 pub struct TaskEvaluator {
     task: ValidatedTask,
     target: Option<Target>,
@@ -117,6 +125,19 @@ fn error(field: &str, e: impl fmt::Display) -> TaskError {
     TaskError::new(field, e.to_string())
 }
 impl TaskEvaluator {
+    pub fn query_work_statistics(&self) -> TaskQueryWorkStatistics {
+        TaskQueryWorkStatistics {
+            source: match &self.execution {
+                Execution::Linear { instrument, .. } => Some(instrument.query_work_statistics()),
+                Execution::Causal(program) => program.query_work_statistics(),
+            },
+            target: self
+                .target
+                .as_ref()
+                .map(|target| target.unitary.query_work_statistics()),
+        }
+    }
+
     /// Actual execution route selected by task composition and runtime options.
     pub fn execution_route(&self) -> &'static str {
         match &self.execution {

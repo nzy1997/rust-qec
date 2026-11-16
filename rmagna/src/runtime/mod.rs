@@ -658,6 +658,13 @@ impl CausalProgram {
     pub fn strategy(&self) -> CausalStrategy {
         self.options.strategy
     }
+    /// The retained reference owner only; cold-prefix programs are transient
+    /// and their compilations remain visible through the execution meter.
+    pub fn query_work_statistics(&self) -> Option<crate::unitary::QueryWorkStatistics> {
+        self.reference
+            .as_ref()
+            .map(CompiledInstrument::query_work_statistics)
+    }
     pub fn reference_compilations(&self) -> usize {
         1
     }

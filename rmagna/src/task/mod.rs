@@ -13,10 +13,10 @@ pub use evaluate::{
     RunTimings, SamplingPreparationOptions, SamplingPreparationReport, StreamRecordRetention,
     SuppliedActionEvaluator, SuppliedActionLimits, SuppliedNoiseActions, SuppliedPauliAction,
     TaskEnumeration, TaskEnumerationOptions, TaskEvaluation, TaskEvaluator, TaskPatternResponse,
-    TaskRunOptions, TaskRunResult, TaskRunStatistics, TaskSampleDiagnosticOptions,
-    TaskSampleDiagnostics, TaskSectorMasses, TaskStream, TaskStreamIdentity, TaskStreamOptions,
-    TaskStreamReport, TaskStreamStatus, TaskVariances, TaskWeightSector, run_task_batch,
-    run_task_batch_cancellable,
+    TaskQueryWorkStatistics, TaskRunOptions, TaskRunResult, TaskRunStatistics,
+    TaskSampleDiagnosticOptions, TaskSampleDiagnostics, TaskSectorMasses, TaskStream,
+    TaskStreamIdentity, TaskStreamOptions, TaskStreamReport, TaskStreamStatus, TaskVariances,
+    TaskWeightSector, run_task_batch, run_task_batch_cancellable,
 };
 pub(crate) use evaluate::{RunHooks, run_task_batch_inspected};
 mod parse;

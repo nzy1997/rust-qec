@@ -14,6 +14,7 @@ struct FixedResource {
 }
 
 struct ScalarClosure {
+    work: Arc<super::work::QueryWorkCounters>,
     projection: PreparedZProjection,
     contraction: PreparedAffineContraction,
     keep: Vec<usize>,
@@ -25,11 +26,14 @@ impl ScalarClosure {
         reference: &AffineKet,
         rows: &[BitVector],
         legs: Vec<Vec<usize>>,
+        work: &Arc<super::work::QueryWorkCounters>,
     ) -> Result<Self, UnitaryError> {
         let projection = PreparedZProjection::new(reference, rows)?;
         let keep = legs.iter().flatten().copied().collect::<Vec<_>>();
         let contraction = projection.prepare_sum(&keep)?;
+        work.record(&work.affine_closures);
         Ok(Self {
+            work: Arc::clone(work),
             projection,
             contraction,
             keep,
@@ -47,6 +51,7 @@ impl ScalarClosure {
     ) -> Result<(), UnitaryError> {
         let phase_map =
             PhaseRestriction::new(&self.widths, phases, self.contraction.output_columns())?;
+        self.work.record(&self.work.phase_maps);
         let phase = phase_map.apply(phases, &BitVector::zeros(self.keep.len())?)?;
         let mut decomposition = options.prepare(&phase, max_terms, catalogue, arithmetic)?;
         let transport = decomposition.prepare_native_transport(
@@ -55,6 +60,7 @@ impl ScalarClosure {
             || Ok(self.contraction.symbolic_boundary(0)?),
             arithmetic,
         )?;
+        self.work.record(&self.work.phase_resources);
         self.resource = Some(FixedResource {
             decomposition,
             phase_map,
@@ -70,6 +76,7 @@ impl ScalarClosure {
         max_terms: usize,
         arithmetic: &ScalarArithmetic,
     ) -> Result<NetworkValue, UnitaryError> {
+        self.work.record(&self.work.evaluations);
         let retained = self
             .projection
             .project(joint, outcomes)?
@@ -80,8 +87,10 @@ impl ScalarClosure {
             None => None,
         };
         let Some(resource) = &self.resource else {
+            self.work.record(&self.work.cold);
             return close_retained(contracted, &self.widths, phases, max_terms, arithmetic);
         };
+        self.work.record(&self.work.fixed);
         let Some(ket) = contracted else {
             return Ok(zero_network_value());
         };
@@ -185,7 +194,7 @@ impl PreparedProbability {
             program: Arc::clone(&state.program),
             physical_width: state.width(),
             event_count: rows.len(),
-            closure: ScalarClosure::new(&joint, &constraints, legs)?,
+            closure: ScalarClosure::new(&joint, &constraints, legs, &state.program.work)?,
         })
     }
     /// Freeze an explicit phase resource against this family's original reference.
@@ -327,7 +336,12 @@ impl PreparedPauliMoment {
                 (state.width()..half).collect(),
                 (half + state.width()..total).collect(),
             ];
-            Some(ScalarClosure::new(&joint, &constraints, legs)?)
+            Some(ScalarClosure::new(
+                &joint,
+                &constraints,
+                legs,
+                &state.program.work,
+            )?)
         };
         Ok(Self {
             program: Arc::clone(&state.program),
@@ -488,7 +502,7 @@ impl PreparedDensityOverlap {
             left_events: boundary.event_rows.len(),
             right_events: target_boundary.event_rows.len(),
             trace_count,
-            closure: ScalarClosure::new(&joint, &rows, legs)?,
+            closure: ScalarClosure::new(&joint, &rows, legs, &left.program.work)?,
         })
     }
     /// Freeze an explicit phase resource against this family's original reference.

@@ -439,6 +439,10 @@ impl CompiledInstrument {
                 estimated_peak_bytes: c.plan.estimated_peak_bytes(),
             })
     }
+    /// Actual scalar-closure factories/evaluations shared by this program's views.
+    pub fn query_work_statistics(&self) -> crate::unitary::QueryWorkStatistics {
+        self.unitary.query_work_statistics()
+    }
     pub fn compilation(&self) -> &crate::unitary::CompilationDiagnostics {
         self.unitary.compilation()
     }

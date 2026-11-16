@@ -15,10 +15,12 @@ pub use insertions::{InsertionPreparationOptions, PreparedInsertions};
 mod prepared;
 mod shared;
 mod support;
+mod work;
 pub use prepared::{
     DensityLayout, PreparedDensityOverlap, PreparedPauliMoment, PreparedProbability,
 };
 pub use support::{PreparedProbabilitySupport, ProbabilitySupportExpansion};
+pub use work::QueryWorkStatistics;
 
 use crate::clifford::{CliffordCircuit, CliffordError, CliffordGate};
 use crate::gf2::{AffineSupport, BitVector, Gf2Error};
@@ -377,6 +379,7 @@ impl UnitaryCircuit {
             raw_path_variables,
         });
         let program = Arc::new(InsertionProgram {
+            work: Arc::default(),
             reference: Arc::clone(&boundary),
             query_reference: Arc::clone(&boundary),
             observation_reduction: None,
@@ -439,6 +442,7 @@ pub struct CompiledUnitary {
     compilation: Arc<CompilationDiagnostics>,
 }
 struct InsertionProgram {
+    work: Arc<work::QueryWorkCounters>,
     reference: Arc<AffineKet>,
     query_reference: Arc<AffineKet>,
     observation_reduction: Option<observations::ObservationReduction>,
@@ -475,6 +479,12 @@ impl<'a> DensityBoundary<'a> {
 }
 
 impl CompiledUnitary {
+    /// Cumulative events from actual closure/map/resource factories. Program
+    /// views share this owner; no physics, RNG or callback is run to inspect it.
+    pub fn query_work_statistics(&self) -> QueryWorkStatistics {
+        self.program.work.snapshot()
+    }
+
     pub fn width(&self) -> usize {
         self.physical_width
     }
