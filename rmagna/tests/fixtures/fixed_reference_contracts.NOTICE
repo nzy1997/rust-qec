@@ -1,0 +1,32 @@
+SPDX-License-Identifier: MPL-2.0
+
+The original circuit schedules and finite query cases in
+fixed_reference_contracts.rs, support/fixed_reference_replay.rs and
+support/fixed_reference_networks.rs are adapted from itpyi/magna,
+revision 56847478c840395735146ef1e1ccdc3d8aedc10f:
+
+tests/core/test_file_reuse.py
+tests/core/test_incremental_history.py
+tests/core/test_query_reuse.py
+tests/core/test_reference_networks.py
+tests/core/test_runtime_ownership.py
+tests/core/test_shared_query_preparation.py
+tests/core/test_simulator_optimization.py
+tests/core/test_unified_simulator.py
+
+Original repository: https://github.com/itpyi/magna
+Original source is distributed under Mozilla Public License 2.0.
+The full license is in original_many_record_input.LICENSE in this directory.
+
+The Rust assertions, actual factory instrumentation, resource-free affine probe,
+explicit typed cache interfaces, dense matrix oracles and historical Rust stream
+capture are independent adaptations. The retained incremental-stream hashes
+come from Rust commit fbe56895852a92afb547e15e6ef3a016c4b67917, not the upstream
+Python MT19937 stream. Fixed-template and cold-prefix affine bases have distinct
+seeded conventions. The source fixture records both.
+
+Native private parent counts, Python graph identity and numeric exception ABI
+are not copied as Rust guarantees. Prepared scalar geometry, resource ownership,
+actual factory events, typed admission, caller-owned random words and actual
+callbacks are checked explicitly. Retained classical-label distributions in the
+shared query fixture are checked cell by cell using explicit scalar event rows.

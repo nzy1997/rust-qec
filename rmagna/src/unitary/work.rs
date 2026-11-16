@@ -3,6 +3,7 @@ use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 
 /// Work observed for one immutable insertion-program owner and all its views.
 /// Factory/evaluation counts are monotonic; live geometry retention is separate.
+/// Direct unprepared expansion and bare phase operations are outside this scope.
 /// These observations are not logical query-cache sizes or Native private
 /// object counts. Bare phase APIs and unrelated compiled owners are excluded.
 /// Snapshot at quiescent boundaries when comparing concurrent workloads.

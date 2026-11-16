@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MPL-2.0
 //! Initial R09 probes, not the complete25-method reproduction witness yet.
 use rmagna::{
     circuit::{ParseOptions, parse_circuit},

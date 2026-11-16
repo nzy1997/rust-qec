@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MPL-2.0
 //! Exact original query-reuse fixtures, using literal fixed-record branch sums.
 use super::{bits, original_op, preparations};
 use rmagna::{

@@ -38,6 +38,8 @@ class ProbeIdentityTests(unittest.TestCase):
                     patch.object(checks,"check_finite",side_effect=lambda _:dict(status="PASS")):
                 self.assertEqual(checks.check_with_runtime({},binary)["decoder_runtime_integration"],"PASS")
                 for name in ("rmagna/src/runtime.rs", "Cargo.lock", "Cargo.toml", "rmagna/build.rs",
+                             "rmagna/examples/evaluate_task.rs",
+                             "benchmarks/magna_reproduction/paper_query_work.py",
                              "benchmarks/magna_reproduction/paper_proposals.py",
                              "benchmarks/magna_reproduction/paper_proposal_runtime_vectors.py",
                              "benchmarks/magna_reproduction/paper_proposal_draws.py"):

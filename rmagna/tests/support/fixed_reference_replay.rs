@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MPL-2.0
 //! Full upstream incremental-history circuit, with a declared Rust stream.
 //! Python MT19937 digests and private max_plans are not Rust ABI promises.
 //! Native max_plans=1 is covered by the explicit scalar-plan eviction witness;

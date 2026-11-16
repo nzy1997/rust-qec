@@ -19,6 +19,8 @@ HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
 import remaining_contracts as contracts
 import native_options
+import paper_query_work
+from paper_probe_identity import source_identity
 from controller_task_compare import validate_warm_result
 
 reference = contracts.reference
@@ -26,6 +28,7 @@ require = contracts.require
 read_json = contracts.read_json
 OUTPUT_CONTRACT = "integrated_joint_acceptance_error_masses"
 RAW_KEYS = ("raw_acceptance", "raw_error", "raw_target_success", "history_mass", "target_normalization")
+RUNNER_FILES = ("paper_benchmark.py", "paper_reference.py", "worker.py", "native_options.py", "paper_query_work.py", "paper_probe_identity.py")
 PILOT_SCOPE = "physical_noise_after_prescribed_query_setup_not_paper_throughput"
 
 
@@ -230,7 +233,7 @@ def cell_result(cell, manifest):
     return "complete" if noisy_complete and all(stage_success(s) for s in stages.values()) else "negative"
 
 
-def check_capture(manifest, results, pinned=None):
+def check_capture(manifest, results, pinned=None, *, require_query_work=False):
     results = results.resolve()
     pinned = reference.load_manifest() if pinned is None else pinned
     validate_manifest(manifest, pinned)
@@ -249,8 +252,12 @@ def check_capture(manifest, results, pinned=None):
         require(receipt["before"]["decoder_files"] == len(pinned["upstream"]["decoder_files"]),
                 "missing author decoder identities")
     require(sha(receipt["rust_binary_sha256"]) and sha(receipt["native_sha256"]), "missing engine identity")
-    for name in ("paper_benchmark.py", "paper_reference.py", "worker.py", "native_options.py"):
+    for name in RUNNER_FILES:
         require(receipt["runner_files"][name] == reference.digest(HERE / name), f"runner changed: {name}")
+    expected_source = None
+    if require_query_work:
+        expected_source = source_identity(HERE.parents[1])
+        require(receipt.get("rust_source_sha256") == expected_source, "pilot source identity is stale")
     rows = receipt["cells"]
     require([r["task"] for r in rows] == manifest["tasks"], "missing or reordered selected cell")
     outcomes = {}
@@ -260,6 +267,11 @@ def check_capture(manifest, results, pinned=None):
         cell = read_json(path)
         require(cell["task"] == row["task"] and cell["inputs"] == task_inputs(row["task"], pinned), "task input/decoder identities changed")
         require(cell["output_contract"] == OUTPUT_CONTRACT, "mixed cell output contract")
+        for stage_name in ("rust_prescribed", "rust_noisy"):
+            stage = cell["stages"][stage_name]
+            if stage_success(stage):
+                paper_query_work.validate(stage["payload"], required=require_query_work,
+                                          expected_source_sha256=expected_source)
         outcome = cell_result(cell, manifest)
         require(cell["outcome"] == row["outcome"] == outcome, "cell outcome changed")
         for key in ("reference_prescribed", "reference_noisy"):
@@ -345,7 +357,8 @@ def capture(args, manifest):
         cpu = subprocess.check_output(["sysctl", "-n", "machdep.cpu.brand_string"], text=True).strip()
     receipt = dict(schema="rmagna.paper-pilot.v1", status="running", manifest_sha256=json_hash(manifest),
         output_contract=OUTPUT_CONTRACT, before=before, rust_binary_sha256=reference.digest(binary),
-        runner_files={n: reference.digest(HERE / n) for n in ("paper_benchmark.py", "paper_reference.py", "worker.py", "native_options.py")},
+        rust_source_sha256=source_identity(HERE.parents[1]),
+        runner_files={n: reference.digest(HERE / n) for n in RUNNER_FILES},
         host=dict(platform=platform.platform(), machine=platform.machine(), cpu=cpu, python=sys.version),
         rust_source=dict(commit=git.stdout.strip(), dirty=bool(dirty.stdout), rustc=rustc.stdout.strip()), cells=[])
     save(args.out / "receipt.json", receipt)
@@ -388,7 +401,7 @@ def capture(args, manifest):
     require(reference.digest(binary) == receipt["rust_binary_sha256"], "Rust executable changed")
     receipt.update(status="recorded", native_sha256=native_hashes.pop())
     save(args.out / "receipt.json", receipt)
-    return check_capture(manifest, args.out, pinned)
+    return check_capture(manifest, args.out, pinned, require_query_work=True)
 
 
 def main(argv=None):
@@ -403,6 +416,7 @@ def main(argv=None):
     check = sub.add_parser("check")
     check.add_argument("--manifest", type=Path, required=True)
     check.add_argument("--results", type=Path, required=True)
+    check.add_argument("--require-query-work", action="store_true")
     proposal = sub.add_parser("proposal-check")
     proposal.add_argument("--manifest", type=Path, required=True)
     proposal.add_argument("--rust-probe", type=Path, default=os.environ.get("MAGNA_PAPER_PROPOSAL_PROBE"))
@@ -413,7 +427,7 @@ def main(argv=None):
             from paper_proposal_check import check_with_runtime
             result = check_with_runtime(manifest, args.rust_probe)
         else:
-            result = capture(args, manifest) if args.command == "run" else check_capture(manifest, args.results)
+            result = capture(args, manifest) if args.command == "run" else check_capture(manifest, args.results, require_query_work=args.require_query_work)
         print(json.dumps(result, sort_keys=True))
         return 0
     except (ValueError, KeyError, TypeError, OSError) as error:
