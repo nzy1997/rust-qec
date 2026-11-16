@@ -4,15 +4,15 @@
   "upstream_commit": "56847478c840395735146ef1e1ccdc3d8aedc10f",
   "parity_claim": "static_requirements_only",
   "ledger_snapshot": {
-    "verified": 340,
+    "verified": 341,
     "partial": 7,
-    "unmapped": 5
+    "unmapped": 4
   },
   "category_counts": {
     "G": 0,
     "P": 0,
     "V": 0,
-    "E": 10,
+    "E": 9,
     "U": 2
   },
   "category_meanings": {
@@ -1194,8 +1194,8 @@
           "import unittest"
         ]
       },
-      "remaining_requirement": "Preserve every original helper/loop/assertion shown in the source-bound method, not only the test name.",
-      "assessment": "The causal C++ standalone contains an online-knowledge suite; foundation.cpp contains over 1,800 lines spanning compiler, boundary, covariance, resources, history, enumeration and statistics. Passing or mapping a few foundation operations cannot close the aggregate method. Extract an assertion inventory with Rust owners, split uncovered subcontracts, and keep a single aggregate completion gate. Header self-containment maps to a clean downstream Rust consumer without Python; it does not prove all foundation semantics.",
+      "remaining_requirement": "Qualify every source-bound helper/assertion/loop group in standalone-contracts.json with executable Rust receipts; retain the aggregate as unmapped while any obligation is unresolved.",
+      "assessment": "R12 now inventories 22 helpers / 66 groups / 217 assertions / 226 loop headers and 16 existing candidate witness declarations. These remain unresolved semantic qualifications:47 existing owner candidates, 6 groups in two missing services, 4 explicit representation differences and 9 helper contexts. Follow-ups #1319/#1320/#1321 record the actual service gaps and full foundation qualification. The four public header equivalents are separately compilation-qualified, not proof of these aggregates.",
       "rust_owners": [
         {
           "path": "rmagna/src/runtime/mod.rs",
@@ -1378,58 +1378,8 @@
           "import unittest"
         ]
       },
-      "remaining_requirement": "Preserve every original helper/loop/assertion shown in the source-bound method, not only the test name.",
-      "assessment": "The causal C++ standalone contains an online-knowledge suite; foundation.cpp contains over 1,800 lines spanning compiler, boundary, covariance, resources, history, enumeration and statistics. Passing or mapping a few foundation operations cannot close the aggregate method. Extract an assertion inventory with Rust owners, split uncovered subcontracts, and keep a single aggregate completion gate. Header self-containment maps to a clean downstream Rust consumer without Python; it does not prove all foundation semantics.",
-      "rust_owners": [
-        {
-          "path": "rmagna/src/runtime/mod.rs",
-          "anchor": "pub struct CausalProgram"
-        },
-        {
-          "path": "rmagna/tests/initialized_histories.rs",
-          "anchor": "fn "
-        },
-        {
-          "path": "rmagna/tests/native_core.rs",
-          "anchor": "fn "
-        }
-      ]
-    },
-    {
-      "id": "test_native_standalone.NativeStandaloneTest.test_reference_runtime_headers_are_self_contained",
-      "ledger_status": "unmapped",
-      "category": "E",
-      "issue": "R12",
-      "source": {
-        "path": "tests/core/test_native_standalone.py",
-        "source_sha256": "5bc19e67cdc16a54676a8305390d3009a6228cb1de9c82351a90eb851cd18c06",
-        "line": 11,
-        "end_line": 20
-      },
-      "method": {
-        "method_sha256": "aa35d9af0632c4eaabbd968bdd0c0c7a0925d9cf95069201f63e11c68839b31a",
-        "required_checks": [
-          "self.assertIsNotNone(compiler, 'C++17 compiler required for native-only acceptance')",
-          "self.assertEqual(result.returncode, 0, result.stderr)"
-        ],
-        "loops": [
-          {
-            "line": 14,
-            "target": "header",
-            "iterable": "('evaluate/reference_network.hpp', 'runtime/affine_proposal.hpp', 'runtime/file_execution.hpp', 'runtime/file_enumeration.hpp')"
-          }
-        ],
-        "module_helpers": [],
-        "module_imports": [
-          "from pathlib import Path",
-          "import shutil",
-          "import subprocess",
-          "import tempfile",
-          "import unittest"
-        ]
-      },
-      "remaining_requirement": "Preserve every original helper/loop/assertion shown in the source-bound method, not only the test name.",
-      "assessment": "The causal C++ standalone contains an online-knowledge suite; foundation.cpp contains over 1,800 lines spanning compiler, boundary, covariance, resources, history, enumeration and statistics. Passing or mapping a few foundation operations cannot close the aggregate method. Extract an assertion inventory with Rust owners, split uncovered subcontracts, and keep a single aggregate completion gate. Header self-containment maps to a clean downstream Rust consumer without Python; it does not prove all foundation semantics.",
+      "remaining_requirement": "Qualify every source-bound helper/assertion/loop group in standalone-contracts.json with executable Rust receipts; retain the aggregate as unmapped while any obligation is unresolved.",
+      "assessment": "R12 now inventories 22 helpers / 66 groups / 217 assertions / 226 loop headers and 16 existing candidate witness declarations. These remain unresolved semantic qualifications:47 existing owner candidates, 6 groups in two missing services, 4 explicit representation differences and 9 helper contexts. Follow-ups #1319/#1320/#1321 record the actual service gaps and full foundation qualification. The four public header equivalents are separately compilation-qualified, not proof of these aggregates.",
       "rust_owners": [
         {
           "path": "rmagna/src/runtime/mod.rs",

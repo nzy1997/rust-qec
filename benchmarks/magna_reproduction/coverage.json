@@ -2339,7 +2339,7 @@
     {
       "id": "test_native_causal.NativeCausalTest.test_online_basis_without_cpython",
       "status": "unmapped",
-      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+      "reason": "The standalone catalogue binds all 8 causal helpers / 25 assertions / 29 loop headers. Full value-aware request/observe behavior is unresolved in #1319; rank-only diagnostics and conditioned quantum samples are ownership candidates, not a completed service qualification. The aggregate remains unmapped."
     },
     {
       "id": "test_native_compact_suffix.NativeCompactSuffixTests.test_lossless_storage_and_ordered_faults_without_cpython",
@@ -2794,12 +2794,20 @@
     {
       "id": "test_native_standalone.NativeStandaloneTest.test_foundation_without_cpython",
       "status": "unmapped",
-      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+      "reason": "The standalone catalogue binds all 14 foundation helpers / 192 assertions / 197 loop headers and their complete semantic groups. Existing Rust owners and16 candidate witnesses are not full source-fixture qualification. Online-knowledge and complete-snapshot gaps are tracked in #1319/#1320; complete foundation qualification is #1321. This aggregate remains unmapped."
     },
     {
       "id": "test_native_standalone.NativeStandaloneTest.test_reference_runtime_headers_are_self_contained",
-      "status": "unmapped",
-      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+      "status": "verified",
+      "contract": "The four original self-contained includes map to four independently imported public Rust modules: OriginalStaticTrace.prepare_network_probability, OriginalAffineRecordProposal.new, FileTask.run and FileTask.enumerate. The same checked-in fixture compiles as a clean external dependency via cargo check --locked --offline with 28 workspace-pinned packages and no Python runtime or private imports, and the unconditional owning test type-checks all four facades. This is a compilation-only Rust module-boundary contract, not qualification of either causal/foundation aggregate or C++ header ABI.",
+      "rust_tests": [
+        {
+          "package": "rmagna",
+          "target": "standalone_headers",
+          "test": "four_public_facades_type_check_without_python",
+          "source_sha256": "f60717c4a1a034f7b240483d60ab853087290395f573acd8654d6e62cf41e744"
+        }
+      ]
     },
     {
       "id": "test_noise_law_cache.NoiseLawCacheTests.test_cache_eviction_keeps_the_original_channel_order",

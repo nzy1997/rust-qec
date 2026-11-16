@@ -1,0 +1,56 @@
+{
+  "schema": "rmagna.paper-bh-plan.v1",
+  "reference_sha256": "c49203a586f5a451e3183b435793df693dd486857356aed8826df5dc723e5454",
+  "upstream_commit": "56847478c840395735146ef1e1ccdc3d8aedc10f",
+  "paper": "2610.22315v1",
+  "archive_sha256": "73de3979469d3cd39975ac5976303a71bd921eca7a29bd7de6119f7acc84b3f6",
+  "historical_kernel": "853fa2369817e1be65a710b42ff80606e219e464",
+  "output_contract": "integrated_joint_acceptance_error_masses",
+  "max_signature_work": 17179869184,
+  "timeout_seconds": 600,
+  "timing": {
+    "k": [
+      2,
+      4,
+      6,
+      10,
+      20,
+      40,
+      60,
+      80,
+      100
+    ],
+    "variants": [
+      "T",
+      "S"
+    ],
+    "p": "1/1000",
+    "shots": 2048,
+    "repetitions": 3,
+    "overrides": {
+      "40": 10,
+      "60": 10
+    },
+    "seed_base": 2026100100,
+    "excluded_warmup_draws": 1
+  },
+  "precision": {
+    "k": [
+      2,
+      6,
+      10
+    ],
+    "p": [
+      "1/10000",
+      "3/10000",
+      "1/1000"
+    ],
+    "shots": 65536,
+    "seed_base": 2026101000,
+    "excluded_warmup_draws": 1
+  },
+  "timing_pairing": "T/S share each k/repetition seed; paired timing observations are never pooled for precision",
+  "proposal": "q=2/(3*k+8); exact common rate scale q/p",
+  "uncertainty": "IID physical draws; weighted joint means and paired delta covariance; pointwise 5-SE correctness gate",
+  "serial_execution": "one process/thread at a time; no Native campaign rerun"
+}

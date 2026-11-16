@@ -1,0 +1,708 @@
+{
+  "schema": "rmagna.bh-checker-reference.v1",
+  "scope": "One actual 2048-draw Rust execution for checker regression, not a complete paper campaign",
+  "stage": {
+    "case": {
+      "id": "timing-bh2-T-r00",
+      "campaign": "timing",
+      "k": 2,
+      "variant": "T",
+      "p": "1/1000",
+      "shots": 2048,
+      "seed": 2026100300
+    },
+    "status": "complete",
+    "returncode": 0,
+    "payload": {
+      "build": {
+        "architecture": "aarch64",
+        "debug_assertions": false,
+        "os": "macos"
+      },
+      "checkpoint": {
+        "actual_settings": "19307532ea689b21a8e08a1acaafc68ac3114ae41e16e5281bc5560eda8735e5",
+        "attestation": "caller_declared_unverified",
+        "committed": "2048",
+        "completed_history_groups": "0",
+        "completed_network_compilations": "0",
+        "efficiency": "{\"schema_version\":1,\"kind\":\"history_efficiency\",\"statistics\":{\"schema_version\":1,\"kind\":\"exact_statistics\",\"count\":\"2048\",\"sums\":[[[\"32859709208116779478011254618967773189355937344363\",\"16384000000000000000000000000000000000000000000\"],[\"0\",\"1\"],[\"0\",\"1\"],[\"0\",\"1\"]],[[\"38060217361065098960882593006827448426596417\",\"2048000000000000000000000000000000000000000000\"],[\"0\",\"1\"],[\"0\",\"1\"],[\"0\",\"1\"]]],\"products\":[[[\"918928067393315737730832634842003103037968212900222839818187860024447924363542939422700638599839\",\"53687091200000000000000000000000000000000000000000000000000000000000000000000000000000000000\"],[\"0\",\"1\"],[\"0\",\"1\"],[\"0\",\"1\"]],[[\"186339077358051001074763597878231133858549111323895759604418337629924489717282765639\",\"32768000000000000000000000000000000000000000000000000000000000000000000000000000000000000\"],[\"0\",\"1\"],[\"0\",\"1\"],[\"0\",\"1\"]],[[\"186339077358051001074763597878231133858549111323895759604418337629924489717282765639\",\"32768000000000000000000000000000000000000000000000000000000000000000000000000000000000000\"],[\"0\",\"1\"],[\"0\",\"1\"],[\"0\",\"1\"]]],\"weight\":[[\"33334478079357089326507433043160024637543604384963\",\"16384000000000000000000000000000000000000000000\"],[\"0\",\"1\"],[\"0\",\"1\"],[\"0\",\"1\"]],\"weight_squared\":[[\"4595036712567608733804345943733456547699678246384873534495070292619471169223390883596040646590003\",\"268435456000000000000000000000000000000000000000000000000000000000000000000000000000000000000\"],[\"0\",\"1\"],[\"0\",\"1\"],[\"0\",\"1\"]]},\"reference\":[[[\"918928067393315737730832634842003103037968212900222839818187860024447924363542939422700638599839\",\"53687091200000000000000000000000000000000000000000000000000000000000000000000000000000000000\"],[\"0\",\"1\"],[\"0\",\"1\"],[\"0\",\"1\"]],[[\"186339077358051001074763597878231133858549111323895759604418337629924489717282765639\",\"32768000000000000000000000000000000000000000000000000000000000000000000000000000000000000\"],[\"0\",\"1\"],[\"0\",\"1\"],[\"0\",\"1\"]],[[\"186339077358051001074763597878231133858549111323895759604418337629924489717282765639\",\"32768000000000000000000000000000000000000000000000000000000000000000000000000000000000000\"],[\"0\",\"1\"],[\"0\",\"1\"],[\"0\",\"1\"]]],\"zero_weights\":\"0\",\"missing_error\":false}",
+        "failed": "0",
+        "failure": null,
+        "has_error": true,
+        "identity": {
+          "circuit": "3844e7215b1e1ad28eb4ae412171b6cd5ef1f8dc87f05ba4ac5ea7c2883bc189",
+          "controllers": "ca4df23e7812c4fd2e0211fcccddcf4b12882b32645a319afa3a739f8582f735",
+          "ideal_state": "50155dcebf3a498bb6d2d29cfe66ca8df49d06508984e2a8175e95a1edb8d2a6",
+          "implementation": "95365e9eaa0092a60fa9cdbccf8e0a514e659037ef3c35071887e9cf8d16d1b4",
+          "options": "a356a9cbfffe6f87db5fde14311e6457feadcc32e5be08232fcbfabc5a3331c5",
+          "recovery": "06f6e08ea4ec7a1559fce325e15f46f2cdc3b531e85fac8fdddeac8ad7a63a40",
+          "sampling": "6cc791b3061bee2dca8337cfcb43b502b30ae9509ce2127ff32315d198179a53",
+          "task": "694723f06795a4d855afa20be3fafbed30ee166fa441c469021d08fa28b00b9d"
+        },
+        "kind": "task_stream",
+        "meter": {
+          "compilation": {
+            "attempted": "0",
+            "failed": "0",
+            "seconds": "0000000000000000",
+            "succeeded": "0"
+          },
+          "decoder": {
+            "attempted": "0",
+            "failed": "0",
+            "seconds": "0000000000000000",
+            "succeeded": "0"
+          },
+          "elapsed": {
+            "nanoseconds": "967549375",
+            "seconds": "0"
+          },
+          "max_duration": null,
+          "max_queries": "18446744073709551615",
+          "query": {
+            "attempted": "4096",
+            "failed": "0",
+            "seconds": "3fd6565112f5ae9e",
+            "succeeded": "4096"
+          },
+          "support": {
+            "attempted": "0",
+            "failed": "0",
+            "seconds": "0000000000000000",
+            "succeeded": "0"
+          }
+        },
+        "not_attempted": "0",
+        "original_seed": "2026100300",
+        "random_state": "59549579477415994",
+        "record_policy": "discard",
+        "records": null,
+        "requested": "2048",
+        "sampling_seconds": "3feecb169553f5dd",
+        "schema_version": 1,
+        "statistics": "{\"schema_version\":1,\"kind\":\"exact_statistics\",\"count\":\"2048\",\"sums\":[[[\"32859709208116779478011254618967773189355937344363\",\"16384000000000000000000000000000000000000000000\"],[\"0\",\"1\"],[\"0\",\"1\"],[\"0\",\"1\"]],[[\"38060217361065098960882593006827448426596417\",\"2048000000000000000000000000000000000000000000\"],[\"0\",\"1\"],[\"0\",\"1\"],[\"0\",\"1\"]]],\"products\":[[[\"918928067393315737730832634842003103037968212900222839818187860024447924363542939422700638599839\",\"53687091200000000000000000000000000000000000000000000000000000000000000000000000000000000000\"],[\"0\",\"1\"],[\"0\",\"1\"],[\"0\",\"1\"]],[[\"186339077358051001074763597878231133858549111323895759604418337629924489717282765639\",\"32768000000000000000000000000000000000000000000000000000000000000000000000000000000000000\"],[\"0\",\"1\"],[\"0\",\"1\"],[\"0\",\"1\"]],[[\"186339077358051001074763597878231133858549111323895759604418337629924489717282765639\",\"32768000000000000000000000000000000000000000000000000000000000000000000000000000000000000\"],[\"0\",\"1\"],[\"0\",\"1\"],[\"0\",\"1\"]]],\"weight\":[[\"33334478079357089326507433043160024637543604384963\",\"16384000000000000000000000000000000000000000000\"],[\"0\",\"1\"],[\"0\",\"1\"],[\"0\",\"1\"]],\"weight_squared\":[[\"4595036712567608733804345943733456547699678246384873534495070292619471169223390883596040646590003\",\"268435456000000000000000000000000000000000000000000000000000000000000000000000000000000000000\"],[\"0\",\"1\"],[\"0\",\"1\"],[\"0\",\"1\"]]}",
+        "status": "draws_complete",
+        "total_seconds": "3feef629d8409e56"
+      },
+      "configuration": {
+        "max_signature_work": 17179869184,
+        "outputs": 2,
+        "proposal_scale": "1000/7",
+        "schema": "rmagna.paper-bh-configuration.v1",
+        "seed": 2026100300,
+        "shots": 2048
+      },
+      "excluded_warmup": {
+        "draws": 1,
+        "metrics": {
+          "completed": 1,
+          "completed_resources": {
+            "history_groups": 0,
+            "network_compilations": 0
+          },
+          "efficiency": {
+            "comparison": "same noise proposal and terminal estimator; exact_marginal draws histories from their true conditionals",
+            "completed": 1,
+            "ess": 1.0,
+            "ess_scientific": {
+              "exponent2": 1,
+              "mantissa": 0.5
+            },
+            "exact_marginal_variance_coefficient": null,
+            "exact_marginal_variance_coefficient_scientific": null,
+            "kappa": null,
+            "kappa_scientific": null,
+            "mean_weight": 0.0003078530171533549,
+            "mean_weight_scientific": {
+              "exponent2": -11,
+              "mantissa": 0.6304829791300708
+            },
+            "rho": 1.0,
+            "rho_scientific": {
+              "exponent2": 1,
+              "mantissa": 0.5
+            },
+            "status": "insufficient_samples",
+            "variance_coefficient": null,
+            "variance_coefficient_scientific": null,
+            "zero_weights": 0
+          },
+          "estimates": {
+            "acceptance": 0.0,
+            "conditional_error": null,
+            "error": 0.0,
+            "moments": []
+          },
+          "estimates_scientific": {
+            "acceptance": {
+              "exponent2": 0,
+              "mantissa": 0.0
+            },
+            "conditional_error": null,
+            "error": {
+              "exponent2": 0,
+              "mantissa": 0.0
+            },
+            "moments": []
+          },
+          "execution_costs": {
+            "compilation": {
+              "attempted": 0,
+              "failed": 0,
+              "seconds": 0.0,
+              "succeeded": 0
+            },
+            "decoder": {
+              "attempted": 0,
+              "failed": 0,
+              "seconds": 0.0,
+              "succeeded": 0
+            },
+            "query": {
+              "attempted": 2,
+              "failed": 0,
+              "seconds": 0.000269457,
+              "succeeded": 2
+            },
+            "scope": "this_call_including_failed_attempts",
+            "support": {
+              "attempted": 0,
+              "failed": 0,
+              "seconds": 0.0,
+              "succeeded": 0
+            },
+            "timing": "inclusive_wall_seconds"
+          },
+          "execution_limits": {
+            "max_duration": null,
+            "max_queries": 18446744073709551615
+          },
+          "failed": 0,
+          "failures": [],
+          "interrupted": 0,
+          "normalization": "mean joint contributions; conditional error is ratio of aggregate means",
+          "not_attempted": 0,
+          "numerics": {
+            "overflow_fields": [],
+            "representation": "mantissa * 2**exponent2",
+            "underflow_fields": []
+          },
+          "requested": 1,
+          "sampled_records": null,
+          "seed": 0,
+          "standard_errors": {
+            "acceptance": null,
+            "conditional_error": null,
+            "error": null,
+            "moments": []
+          },
+          "standard_errors_scientific": {
+            "acceptance": null,
+            "conditional_error": null,
+            "error": null,
+            "moments": []
+          },
+          "status": "complete",
+          "timings": {
+            "preparation_seconds": null,
+            "sampling_seconds": 0.000515542,
+            "total_seconds": 0.0017665
+          },
+          "uncertainty": "IID draw standard errors; conditional ratio uses paired delta method; null for fewer than two draws",
+          "weights": {
+            "completed": 1,
+            "convention": "complete noise likelihood times history mass / history proposal; no history factor for exact_marginal",
+            "ess": 1.0,
+            "ess_scientific": {
+              "exponent2": 1,
+              "mantissa": 0.5
+            },
+            "ess_scope": "complete importance weights; not a guarantee of error-rate precision",
+            "mean": 0.0003078530171533549,
+            "mean_scientific": {
+              "exponent2": -11,
+              "mantissa": 0.6304829791300708
+            }
+          }
+        },
+        "seed": 0
+      },
+      "executable_sha256": "95365e9eaa0092a60fa9cdbccf8e0a514e659037ef3c35071887e9cf8d16d1b4",
+      "inputs": {
+        "fingerprints": {
+          "algorithm": "sha256",
+          "circuit": "3844e7215b1e1ad28eb4ae412171b6cd5ef1f8dc87f05ba4ac5ea7c2883bc189",
+          "controller_attestation": "caller_declared_unverified",
+          "controllers": "ca4df23e7812c4fd2e0211fcccddcf4b12882b32645a319afa3a739f8582f735",
+          "encoding": "rmagna-provenance-v1",
+          "ideal_state": "50155dcebf3a498bb6d2d29cfe66ca8df49d06508984e2a8175e95a1edb8d2a6",
+          "options": "a356a9cbfffe6f87db5fde14311e6457feadcc32e5be08232fcbfabc5a3331c5",
+          "recovery": "06f6e08ea4ec7a1559fce325e15f46f2cdc3b531e85fac8fdddeac8ad7a63a40",
+          "sampling": "6cc791b3061bee2dca8337cfcb43b502b30ae9509ce2127ff32315d198179a53",
+          "task": "694723f06795a4d855afa20be3fafbed30ee166fa441c469021d08fa28b00b9d"
+        },
+        "physical_sha256": "2e143ccbd3e2207eae1582ad913c9589587d779b3743218a5da28ebc526832fd",
+        "task_sha256": "d3715d9b5c0cfd0747ed9d524987c31946d3825b6ae5e6b1c75fba23cb424039"
+      },
+      "inventory": {
+        "after_preparation": {
+          "source_assignments": 0,
+          "storage": {
+            "source": {
+              "expanded_clifford_gates": 486,
+              "geometry_slot_capacity": 4,
+              "geometry_weak_slots": 2,
+              "live_geometries": 2,
+              "original_positions": 374,
+              "physical_width": 59,
+              "query_boundary_width": 78,
+              "raw_boundary_width": 87,
+              "raw_phase_variables": 28,
+              "unique_reference_boundaries": 2
+            },
+            "target": {
+              "expanded_clifford_gates": 8,
+              "geometry_slot_capacity": 0,
+              "geometry_weak_slots": 0,
+              "live_geometries": 0,
+              "original_positions": 4,
+              "physical_width": 2,
+              "query_boundary_width": 4,
+              "raw_boundary_width": 4,
+              "raw_phase_variables": 2,
+              "unique_reference_boundaries": 1
+            }
+          },
+          "work": {
+            "source": {
+              "affine_closures_prepared": 2,
+              "affine_geometry_preparations": 2,
+              "affine_geometry_reuses": 0,
+              "closure_evaluations": 0,
+              "cold_evaluations": 0,
+              "fixed_evaluations": 0,
+              "live_affine_geometries": 2,
+              "phase_maps_prepared": 2,
+              "phase_resources_prepared": 2,
+              "saturated": false,
+              "support_boundary_maps_prepared": 0,
+              "support_changed_boundary_fallbacks": 0,
+              "support_contractions_prepared": 0,
+              "support_evaluations": 0,
+              "support_parents_prepared": 0,
+              "support_phase_maps_prepared": 0,
+              "support_phase_resources_prepared": 0,
+              "support_projections_prepared": 0
+            },
+            "target": {
+              "affine_closures_prepared": 0,
+              "affine_geometry_preparations": 0,
+              "affine_geometry_reuses": 0,
+              "closure_evaluations": 0,
+              "cold_evaluations": 0,
+              "fixed_evaluations": 0,
+              "live_affine_geometries": 0,
+              "phase_maps_prepared": 0,
+              "phase_resources_prepared": 0,
+              "saturated": false,
+              "support_boundary_maps_prepared": 0,
+              "support_changed_boundary_fallbacks": 0,
+              "support_contractions_prepared": 0,
+              "support_evaluations": 0,
+              "support_parents_prepared": 0,
+              "support_phase_maps_prepared": 0,
+              "support_phase_resources_prepared": 0,
+              "support_projections_prepared": 0
+            }
+          }
+        },
+        "after_sampling": {
+          "source_assignments": 2049,
+          "storage": {
+            "source": {
+              "expanded_clifford_gates": 486,
+              "geometry_slot_capacity": 4,
+              "geometry_weak_slots": 2,
+              "live_geometries": 2,
+              "original_positions": 374,
+              "physical_width": 59,
+              "query_boundary_width": 78,
+              "raw_boundary_width": 87,
+              "raw_phase_variables": 28,
+              "unique_reference_boundaries": 2
+            },
+            "target": {
+              "expanded_clifford_gates": 8,
+              "geometry_slot_capacity": 0,
+              "geometry_weak_slots": 0,
+              "live_geometries": 0,
+              "original_positions": 4,
+              "physical_width": 2,
+              "query_boundary_width": 4,
+              "raw_boundary_width": 4,
+              "raw_phase_variables": 2,
+              "unique_reference_boundaries": 1
+            }
+          },
+          "work": {
+            "source": {
+              "affine_closures_prepared": 2,
+              "affine_geometry_preparations": 2,
+              "affine_geometry_reuses": 0,
+              "closure_evaluations": 4098,
+              "cold_evaluations": 0,
+              "fixed_evaluations": 4098,
+              "live_affine_geometries": 2,
+              "phase_maps_prepared": 2,
+              "phase_resources_prepared": 2,
+              "saturated": false,
+              "support_boundary_maps_prepared": 0,
+              "support_changed_boundary_fallbacks": 0,
+              "support_contractions_prepared": 0,
+              "support_evaluations": 0,
+              "support_parents_prepared": 0,
+              "support_phase_maps_prepared": 0,
+              "support_phase_resources_prepared": 0,
+              "support_projections_prepared": 0
+            },
+            "target": {
+              "affine_closures_prepared": 0,
+              "affine_geometry_preparations": 0,
+              "affine_geometry_reuses": 0,
+              "closure_evaluations": 0,
+              "cold_evaluations": 0,
+              "fixed_evaluations": 0,
+              "live_affine_geometries": 0,
+              "phase_maps_prepared": 0,
+              "phase_resources_prepared": 0,
+              "saturated": false,
+              "support_boundary_maps_prepared": 0,
+              "support_changed_boundary_fallbacks": 0,
+              "support_contractions_prepared": 0,
+              "support_evaluations": 0,
+              "support_parents_prepared": 0,
+              "support_phase_maps_prepared": 0,
+              "support_phase_resources_prepared": 0,
+              "support_projections_prepared": 0
+            }
+          }
+        },
+        "after_warmup": {
+          "source_assignments": 1,
+          "storage": {
+            "source": {
+              "expanded_clifford_gates": 486,
+              "geometry_slot_capacity": 4,
+              "geometry_weak_slots": 2,
+              "live_geometries": 2,
+              "original_positions": 374,
+              "physical_width": 59,
+              "query_boundary_width": 78,
+              "raw_boundary_width": 87,
+              "raw_phase_variables": 28,
+              "unique_reference_boundaries": 2
+            },
+            "target": {
+              "expanded_clifford_gates": 8,
+              "geometry_slot_capacity": 0,
+              "geometry_weak_slots": 0,
+              "live_geometries": 0,
+              "original_positions": 4,
+              "physical_width": 2,
+              "query_boundary_width": 4,
+              "raw_boundary_width": 4,
+              "raw_phase_variables": 2,
+              "unique_reference_boundaries": 1
+            }
+          },
+          "work": {
+            "source": {
+              "affine_closures_prepared": 2,
+              "affine_geometry_preparations": 2,
+              "affine_geometry_reuses": 0,
+              "closure_evaluations": 2,
+              "cold_evaluations": 0,
+              "fixed_evaluations": 2,
+              "live_affine_geometries": 2,
+              "phase_maps_prepared": 2,
+              "phase_resources_prepared": 2,
+              "saturated": false,
+              "support_boundary_maps_prepared": 0,
+              "support_changed_boundary_fallbacks": 0,
+              "support_contractions_prepared": 0,
+              "support_evaluations": 0,
+              "support_parents_prepared": 0,
+              "support_phase_maps_prepared": 0,
+              "support_phase_resources_prepared": 0,
+              "support_projections_prepared": 0
+            },
+            "target": {
+              "affine_closures_prepared": 0,
+              "affine_geometry_preparations": 0,
+              "affine_geometry_reuses": 0,
+              "closure_evaluations": 0,
+              "cold_evaluations": 0,
+              "fixed_evaluations": 0,
+              "live_affine_geometries": 0,
+              "phase_maps_prepared": 0,
+              "phase_resources_prepared": 0,
+              "saturated": false,
+              "support_boundary_maps_prepared": 0,
+              "support_changed_boundary_fallbacks": 0,
+              "support_contractions_prepared": 0,
+              "support_evaluations": 0,
+              "support_parents_prepared": 0,
+              "support_phase_maps_prepared": 0,
+              "support_phase_resources_prepared": 0,
+              "support_projections_prepared": 0
+            }
+          }
+        }
+      },
+      "metrics": {
+        "completed": 2048,
+        "completed_resources": {
+          "history_groups": 0,
+          "network_compilations": 0
+        },
+        "diagnostics": {
+          "efficiency": {
+            "error": null,
+            "status": "available"
+          },
+          "statistics": {
+            "error": null,
+            "status": "available"
+          }
+        },
+        "draw_status": "draws_complete",
+        "efficiency": {
+          "comparison": "same noise proposal and terminal estimator; exact_marginal draws histories from their true conditionals",
+          "completed": 2048,
+          "ess": 241.82340606419888,
+          "ess_scientific": {
+            "exponent2": 8,
+            "mantissa": 0.9446226799382769
+          },
+          "exact_marginal_variance_coefficient": 3.6435193539025517e-09,
+          "exact_marginal_variance_coefficient_scientific": {
+            "exponent2": -28,
+            "mantissa": 0.9780497792096569
+          },
+          "kappa": 1.0,
+          "kappa_scientific": {
+            "exponent2": 1,
+            "mantissa": 0.5
+          },
+          "mean_weight": 0.9934448623465624,
+          "mean_weight_scientific": {
+            "exponent2": 0,
+            "mantissa": 0.9934448623465624
+          },
+          "rho": 8.468989968060827,
+          "rho_scientific": {
+            "exponent2": 4,
+            "mantissa": 0.5293118730038017
+          },
+          "status": "available",
+          "variance_coefficient": 3.6435193539025517e-09,
+          "variance_coefficient_scientific": {
+            "exponent2": -28,
+            "mantissa": 0.9780497792096569
+          },
+          "zero_weights": 0
+        },
+        "estimates": {
+          "acceptance": 0.9792956473862166,
+          "conditional_error": 9.266111789367564e-06,
+          "error": 9.074262943521762e-06,
+          "moments": []
+        },
+        "estimates_scientific": {
+          "acceptance": {
+            "exponent2": 0,
+            "mantissa": 0.9792956473862166
+          },
+          "conditional_error": {
+            "exponent2": -16,
+            "mantissa": 0.6072639022279926
+          },
+          "error": {
+            "exponent2": -16,
+            "mantissa": 0.5946908962666422
+          },
+          "moments": []
+        },
+        "estimation_status": "final",
+        "execution_costs": {
+          "compilation": {
+            "attempted": 0,
+            "failed": 0,
+            "seconds": 0.0,
+            "succeeded": 0
+          },
+          "decoder": {
+            "attempted": 0,
+            "failed": 0,
+            "seconds": 0.0,
+            "succeeded": 0
+          },
+          "query": {
+            "attempted": 4096,
+            "failed": 0,
+            "seconds": 0.34901835299999984,
+            "succeeded": 4096
+          },
+          "scope": "cumulative_stream_including_failed_attempts",
+          "support": {
+            "attempted": 0,
+            "failed": 0,
+            "seconds": 0.0,
+            "succeeded": 0
+          },
+          "timing": "inclusive_wall_seconds"
+        },
+        "execution_limits": {
+          "max_duration": null,
+          "max_queries": 18446744073709551615
+        },
+        "failed": 0,
+        "failure": null,
+        "kind": "stream_metrics",
+        "normalization": "mean joint contributions; conditional error is ratio of aggregate means",
+        "not_attempted": 0,
+        "numerics": {
+          "overflow_fields": [],
+          "representation": "mantissa * 2**exponent2",
+          "underflow_fields": []
+        },
+        "random_state": 59549579477415994,
+        "requested": 2048,
+        "sampled_records": null,
+        "seed": 2026100300,
+        "standard_errors": {
+          "acceptance": 0.06011949556893427,
+          "conditional_error": 1.3341406566021089e-06,
+          "error": 1.1472714344212023e-06,
+          "moments": []
+        },
+        "standard_errors_scientific": {
+          "acceptance": {
+            "exponent2": -4,
+            "mantissa": 0.9619119291029483
+          },
+          "conditional_error": {
+            "exponent2": -19,
+            "mantissa": 0.6994739365686065
+          },
+          "error": {
+            "exponent2": -19,
+            "mantissa": 0.6015006458098233
+          },
+          "moments": []
+        },
+        "status": "complete",
+        "timings": {
+          "preparation_seconds": null,
+          "sampling_seconds": 0.962291042,
+          "total_seconds": 0.967474291
+        },
+        "uncertainty": "IID draw standard errors; conditional ratio uses paired delta method; null for fewer than two draws",
+        "weights": {
+          "completed": 2048,
+          "convention": "complete noise likelihood times history mass / history proposal; no history factor for exact_marginal",
+          "ess": 241.82340606419888,
+          "ess_scientific": {
+            "exponent2": 8,
+            "mantissa": 0.9446226799382769
+          },
+          "ess_scope": "complete importance weights; not a guarantee of error-rate precision",
+          "mean": 0.9934448623465624,
+          "mean_scientific": {
+            "exponent2": 0,
+            "mantissa": 0.9934448623465624
+          }
+        }
+      },
+      "output_contract": "integrated_joint_acceptance_error_masses",
+      "policy": {
+        "compiler": "SharedCommutingLayer",
+        "max_quotient_rank": 0,
+        "max_terms": 1,
+        "native": {
+          "injection": null,
+          "mode": "native",
+          "selection": {
+            "construction": {
+              "max_constraint_rows": 1048576,
+              "max_dimension": 20,
+              "max_entries": 1024,
+              "max_json_bytes": 16777216,
+              "max_parity_rows": 1048576,
+              "max_table_values": 1048576,
+              "max_terms": 1048576,
+              "max_verification_work": "16777216"
+            },
+            "max_core_table_bytes": 67108864,
+            "max_quotient_rank": 0,
+            "max_signature_work": "17179869184",
+            "max_transform_work": "67108864",
+            "preparation": {
+              "core": {
+                "max_dimension": 20,
+                "max_table_values": 1048576,
+                "max_work": "67108864"
+              },
+              "max_geometry_words": 16777216,
+              "max_terms": 1
+            }
+          },
+          "transport": {
+            "max_construction_work": "1099511627776",
+            "max_geometry_words": 16777216,
+            "max_terms": 256,
+            "mode": "prepared"
+          }
+        }
+      },
+      "preparation": {
+        "compile_seconds": 0.002010333,
+        "created": 2,
+        "planned": 2,
+        "reused": 0,
+        "seconds": 0.002765875
+      },
+      "resources": {
+        "acceptance": {
+          "maximum_quotient_rank": 0,
+          "maximum_terms": 1,
+          "queries": 1,
+          "resources": 1
+        },
+        "target": {
+          "maximum_quotient_rank": 0,
+          "maximum_terms": 1,
+          "queries": 1,
+          "resources": 1
+        }
+      },
+      "rust_source_sha256": "cdd74efe21418381ab84b6f4a857660ef713858cc6e70edb04888495032aa8d2",
+      "schema": "rmagna.paper-bh-run.v1",
+      "status": "complete",
+      "widths": {
+        "compiled": 78,
+        "physical": 30,
+        "reference": 87
+      }
+    }
+  },
+  "identity": {
+    "rust_source_sha256": "cdd74efe21418381ab84b6f4a857660ef713858cc6e70edb04888495032aa8d2",
+    "rust_binary_sha256": "95365e9eaa0092a60fa9cdbccf8e0a514e659037ef3c35071887e9cf8d16d1b4"
+  },
+  "inputs": {
+    "physical.magna": "H 0 1 2 3 4\nCX 0 14\nCX 1 15\nS 0\nS 1\nCX 13 12\nCX 13 11\nCX 13 10\nCX 13 8\nCX 13 5\nCX 13 4\nCX 13 3\nCX 13 2\nCX 13 1\nCX 12 13\nCX 12 10\nCX 12 9\nCX 12 8\nCX 12 7\nCX 12 3\nCX 12 0\nCX 11 13\nCX 11 10\nCX 11 7\nCX 11 6\nCX 11 3\nCX 11 2\nCX 11 1\nCX 11 0\nCX 11 10\nCX 10 11\nCX 11 10\nCX 9 13\nCX 9 12\nCX 9 11\nCX 9 10\nCX 9 6\nCX 9 5\nCX 9 4\nCX 9 3\nCX 8 13\nCX 8 12\nCX 8 7\nCX 8 6\nCX 8 5\nCX 8 4\nCX 8 1\nCX 11 8\nCX 8 11\nCX 11 8\nCX 7 13\nCX 7 11\nCX 7 9\nCX 7 8\nCX 7 5\nCX 7 4\nCX 7 2\nCX 7 0\nCX 8 6\nCX 6 8\nCX 8 6\nCX 5 11\nCX 5 10\nCX 5 9\nCX 5 8\nCX 5 7\nCX 5 4\nCX 5 3\nCX 5 1\nCX 6 5\nCX 5 6\nCX 6 5\nCX 4 11\nCX 4 10\nCX 4 9\nCX 4 8\nCX 4 7\nCX 4 6\nCX 4 3\nCX 4 1\nCX 3 13\nCX 3 10\nCX 3 8\nCX 3 6\nCX 3 5\nCX 3 2\nCX 3 1\nCX 3 0\nCX 2 12\nCX 2 9\nCX 2 8\nCX 2 7\nCX 2 5\nCX 2 1\nCX 2 0\nCX 3 2\nCX 2 3\nCX 3 2\nCX 1 13\nCX 1 12\nCX 1 11\nCX 1 10\nCX 1 9\nCX 1 0\nCX 8 1\nCX 1 8\nCX 8 1\nCX 0 10\nCX 0 9\nCX 0 8\nCX 0 7\nCX 0 6\nCX 0 5\nCX 4 0\nCX 0 4\nCX 4 0\nH 16\nT 16\nZ_ERROR(1/1000) 16\nCX 16 0\nM 0\nCX rec[-1] 16\nCONTROL[XOR](1) rec[-1] -> ctrl[0]\nCS_DAG ctrl[0] 16\nS 16\nH 17\nT 17\nZ_ERROR(1/1000) 17\nCX 17 1\nM 1\nCX rec[-1] 17\nCONTROL[XOR](1) rec[-1] -> ctrl[0]\nCS_DAG ctrl[0] 17\nS 17\nH 18\nT 18\nZ_ERROR(1/1000) 18\nCX 18 2\nM 2\nCX rec[-1] 18\nCONTROL[XOR](1) rec[-1] -> ctrl[0]\nCS_DAG ctrl[0] 18\nS 18\nH 19\nT 19\nZ_ERROR(1/1000) 19\nCX 19 3\nM 3\nCX rec[-1] 19\nCONTROL[XOR](1) rec[-1] -> ctrl[0]\nCS_DAG ctrl[0] 19\nS 19\nH 20\nT 20\nZ_ERROR(1/1000) 20\nCX 20 4\nM 4\nCX rec[-1] 20\nCONTROL[XOR](1) rec[-1] -> ctrl[0]\nCS_DAG ctrl[0] 20\nS 20\nH 21\nT 21\nZ_ERROR(1/1000) 21\nCX 21 5\nM 5\nCX rec[-1] 21\nCONTROL[XOR](1) rec[-1] -> ctrl[0]\nCS_DAG ctrl[0] 21\nS 21\nH 22\nT 22\nZ_ERROR(1/1000) 22\nCX 22 6\nM 6\nCX rec[-1] 22\nCONTROL[XOR](1) rec[-1] -> ctrl[0]\nCS_DAG ctrl[0] 22\nS 22\nH 23\nT 23\nZ_ERROR(1/1000) 23\nCX 23 7\nM 7\nCX rec[-1] 23\nCONTROL[XOR](1) rec[-1] -> ctrl[0]\nCS_DAG ctrl[0] 23\nS 23\nH 24\nT 24\nZ_ERROR(1/1000) 24\nCX 24 8\nM 8\nCX rec[-1] 24\nCONTROL[XOR](1) rec[-1] -> ctrl[0]\nCS_DAG ctrl[0] 24\nS 24\nH 25\nT 25\nZ_ERROR(1/1000) 25\nCX 25 9\nM 9\nCX rec[-1] 25\nCONTROL[XOR](1) rec[-1] -> ctrl[0]\nCS_DAG ctrl[0] 25\nS 25\nH 26\nT 26\nZ_ERROR(1/1000) 26\nCX 26 10\nM 10\nCX rec[-1] 26\nCONTROL[XOR](1) rec[-1] -> ctrl[0]\nCS_DAG ctrl[0] 26\nS 26\nH 27\nT 27\nZ_ERROR(1/1000) 27\nCX 27 11\nM 11\nCX rec[-1] 27\nCONTROL[XOR](1) rec[-1] -> ctrl[0]\nCS_DAG ctrl[0] 27\nS 27\nH 28\nT 28\nZ_ERROR(1/1000) 28\nCX 28 12\nM 12\nCX rec[-1] 28\nCONTROL[XOR](1) rec[-1] -> ctrl[0]\nCS_DAG ctrl[0] 28\nS 28\nH 29\nT 29\nZ_ERROR(1/1000) 29\nCX 29 13\nM 13\nCX rec[-1] 29\nCONTROL[XOR](1) rec[-1] -> ctrl[0]\nCS_DAG ctrl[0] 29\nS 29\nMX 16 17 18 19 20 21 22 23 24 25 26 27 28 29\nDETECTOR rec[-13] rec[-11] rec[-9] rec[-7] rec[-6] rec[-4] rec[-3] rec[-1]\nDETECTOR rec[-12] rec[-11] rec[-8] rec[-7] rec[-5] rec[-4] rec[-2] rec[-1]\nDETECTOR rec[-14] rec[-13] rec[-12] rec[-11] rec[-10] rec[-9] rec[-8] rec[-7]\nCONTROL[XOR] rec[-10] rec[-9] rec[-8] rec[-7] rec[-6] rec[-5] rec[-4] -> ctrl[1]\nCZ ctrl[1] 14\nCONTROL[XOR] rec[-10] rec[-9] rec[-8] rec[-7] rec[-3] rec[-2] rec[-1] -> ctrl[2]\nCZ ctrl[2] 15\nPOSTSELECT det[0] det[1] det[2]\n",
+    "task.json": "{\n  \"outputs\": [\n    14,\n    15\n  ],\n  \"ideal_state\": \"ideal.magna\"\n}\n",
+    "ideal.magna": "H 0 1\nT 0 1\n"
+  }
+}

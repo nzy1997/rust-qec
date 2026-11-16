@@ -115,6 +115,10 @@ def check_contracts(catalog, ledger, manifest, *, root=ROOT, upstream=None):
     from snapshot_contracts import check_decisions
     check_decisions(read_json(HERE / "rust-snapshot-contracts.json"), ledger, manifest,
                     root=root, upstream=upstream)
+    import standalone_contracts
+    standalone_contracts.check_inventory(
+        read_json(HERE / "standalone-contracts.json"), ledger, manifest,
+        reference.digest(HERE / "reference.json"), root)
     return dict(status="PASS", scope=catalog["parity_claim"], outstanding=len(rows),
                 ledger_snapshot=snapshot, categories=catalog["category_counts"],
                 tasks=len(catalog["packaged_tasks"]), paper_files=len(paper["files"]),
@@ -124,13 +128,37 @@ def check_contracts(catalog, ledger, manifest, *, root=ROOT, upstream=None):
 
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("command", choices=["check"])
-    parser.add_argument("--manifest", type=Path, default=HERE / "remaining-contracts.json")
+    parser.add_argument("command", choices=["check", "standalone"])
+    parser.add_argument("--manifest", type=Path,
+                        help="contract catalogue; defaults to the selected command's catalogue")
     parser.add_argument("--upstream", type=Path)
+    parser.add_argument("--catalogue-only", action="store_true",
+                        help="standalone only: skip the external locked Cargo consumer check")
     args = parser.parse_args(argv)
     try:
-        result = check_contracts(read_json(args.manifest), read_json(HERE / "coverage.json"),
-                                 reference.load_manifest(), upstream=args.upstream)
+        pinned = reference.load_manifest()
+        ledger = read_json(HERE / "coverage.json")
+        if args.command == "standalone":
+            import standalone_contracts
+            import standalone_consumer
+            require(args.upstream is not None, "standalone requires --upstream with the pinned source")
+            before = reference.verify_source(args.upstream, pinned)
+            sources = {name: reference.relative_file(args.upstream, path).read_text()
+                       for name, path in standalone_contracts.SOURCES.items()}
+            result = standalone_contracts.check_catalogue(
+                sources, read_json(args.manifest or HERE / "standalone-contracts.json"),
+                ledger, pinned, reference.digest(HERE / "reference.json"), ROOT)
+            result["consumer"] = (
+                dict(status="not_run", scope="catalogue_only_no_header_compilation_claim")
+                if args.catalogue_only else standalone_consumer.check_consumer(
+                    ROOT, ROOT / "rmagna/tests/fixtures/standalone_consumer.rs"))
+            require(reference.verify_source(args.upstream, pinned) == before,
+                    "standalone source inventory changed during verification")
+        else:
+            require(not args.catalogue_only, "--catalogue-only requires standalone")
+            result = check_contracts(
+                read_json(args.manifest or HERE / "remaining-contracts.json"), ledger,
+                pinned, upstream=args.upstream)
         print(json.dumps(result, sort_keys=True))
         return 0
     except (ValueError, KeyError, TypeError, OSError, SyntaxError) as error:

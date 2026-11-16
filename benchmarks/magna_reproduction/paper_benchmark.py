@@ -411,9 +411,12 @@ def main(argv=None):
     run = sub.add_parser("run")
     run.add_argument("--manifest", type=Path, required=True)
     run.add_argument("--upstream", type=Path, required=True)
-    run.add_argument("--python", type=Path, required=True)
+    run.add_argument("--python", type=Path,
+                     help="protected Native Python executable; required for pilot manifests")
     run.add_argument("--rust-example", type=Path, required=True)
     run.add_argument("--out", type=Path, required=True)
+    run.add_argument("--resume", action="store_true",
+                     help="BH only: validate and reuse an existing ordered campaign prefix")
     check = sub.add_parser("check")
     check.add_argument("--manifest", type=Path, required=True)
     check.add_argument("--results", type=Path, required=True)
@@ -424,10 +427,18 @@ def main(argv=None):
     args = parser.parse_args(argv)
     try:
         manifest = read_json(args.manifest)
+        require(isinstance(manifest, dict), "paper manifest must be a JSON object")
         if args.command == "proposal-check":
             from paper_proposal_check import check_with_runtime
             result = check_with_runtime(manifest, args.rust_probe)
+        elif manifest.get("schema") == "rmagna.paper-bh-plan.v1":
+            import bh_benchmark
+            result = (bh_benchmark.capture(args, manifest) if args.command == "run"
+                      else bh_benchmark.check_capture(manifest, args.results))
         else:
+            if args.command == "run":
+                require(args.python is not None, "pilot run requires --python with the protected Native environment")
+                require(not args.resume, "--resume is currently supported only by BH campaigns")
             result = capture(args, manifest) if args.command == "run" else check_capture(manifest, args.results, require_query_work=args.require_query_work)
         print(json.dumps(result, sort_keys=True))
         return 0
