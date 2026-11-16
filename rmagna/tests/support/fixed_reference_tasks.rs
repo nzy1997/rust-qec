@@ -83,8 +83,8 @@ fn field(value: &ExactScalar) -> ExactField {
 fn quarter() -> ExactField {
     field(&ScalarArithmetic::default().omega(0, -4).unwrap())
 }
-#[test]
-fn exact_source_nonzero_constrained_domains_reuse_fixed_factories_and_preserve_biased_weights() {
+pub fn exact_source_nonzero_constrained_domains_reuse_fixed_factories_and_preserve_biased_weights()
+{
     let files = Files::new();
     let a = ScalarArithmetic::default();
     let f = FieldArithmetic::default();
@@ -160,8 +160,7 @@ fn exact_source_nonzero_constrained_domains_reuse_fixed_factories_and_preserve_b
         "128 original nonzero-domain draws: both compilers/samplers, exact biased physical and proposal masses, both actual callback RHS values, zero hot observed construction and32targetreuses per configuration"
     );
 }
-#[test]
-fn original_three_bit_selection_has_literal_joint_masses_and_exact_three_quarter_one_quarter_totals()
+pub fn original_three_bit_selection_has_literal_joint_masses_and_exact_three_quarter_one_quarter_totals()
  {
     let files = Files::new();
     let a = ScalarArithmetic::default();
@@ -264,8 +263,7 @@ fn original_three_bit_selection_has_literal_joint_masses_and_exact_three_quarter
         "512 original three-bit selection draws and4exact enumerations: all input pairs, actual AND calls, rejected histories retained, literal A3/4 E1/4 and zero hot construction"
     );
 }
-#[test]
-fn twelve_redundant_decoded_labels_enumerate_two_histories_under_one_independent_bit() {
+pub fn twelve_redundant_decoded_labels_enumerate_two_histories_under_one_independent_bit() {
     let files = Files::new();
     let a = ScalarArithmetic::default();
     let mut source = "H 0\n".to_owned();
@@ -355,9 +353,8 @@ fn twelve_redundant_decoded_labels_enumerate_two_histories_under_one_independent
         "4 original twelve-label compiler/causal configurations: one free bit/two complete histories, all twelve actual logical callback inputs and exact A1 E0; branch-one and rank-zero refusals precede callbacks"
     );
 }
-#[test]
-fn original_affine_tasks_have_only_terminal_roles_and_batch_target_reuse_preserves_the_word_stream()
-{
+pub fn original_affine_tasks_have_only_terminal_roles_and_batch_target_reuse_preserves_the_word_stream()
+ {
     let files = Files::new();
     let a = ScalarArithmetic::default();
     let mut draws = 0;
@@ -393,6 +390,7 @@ fn original_affine_tasks_have_only_terminal_roles_and_batch_target_reuse_preserv
             assert_eq!(prep.counts.planned, 2);
             assert!(!prep.by_kind.contains_key("reported_support"));
             let before = e.query_work_statistics();
+            let assignments = e.source_insertion_assignments().unwrap();
             let mut batched = SplitMix64::new(9);
             let rows = e
                 .samples(&mut batched, 16)
@@ -432,6 +430,11 @@ fn original_affine_tasks_have_only_terminal_roles_and_batch_target_reuse_preserv
             assert_eq!(errors.len(), 2);
             assert_eq!(e.prepared_density_reuses(), Some(32));
             assert_eq!(
+                e.source_insertion_assignments().unwrap() - assignments,
+                32,
+                "each affine draw assigns the protocol once for acceptance and target together"
+            );
+            assert_eq!(
                 preparations(e.query_work_statistics().source.unwrap()),
                 preparations(before.source.unwrap())
             );
@@ -452,8 +455,323 @@ fn prepare(e: &TaskEvaluator) -> rmagna::task::SamplingPreparationReport {
     report
 }
 
-#[test]
-fn original_parity_feedback_uses_all_eight_manual_report_offsets_without_reconstructing_query_families()
+pub fn completed_source_assignment_feeds_acceptance_target_and_all_paulis_once() {
+    let files = Files::new();
+    let a = ScalarArithmetic::default();
+    let mut cases = 0;
+    for compiler in COMPILERS {
+        for sampler in SAMPLERS {
+            for magic in [false, true] {
+                let mut registry = ControllerRegistry::default();
+                registry
+                    .register("echo", "1", |b: &[bool]| Ok(b.to_vec()))
+                    .unwrap();
+                let prefix = if magic {
+                    "H 0\nT 0\nMX 0\n"
+                } else {
+                    "X 0\nM 0\n"
+                };
+                let source = format!(
+                    "{prefix}DETECTOR rec[-1]\nCONTROL[echo] det[-1] -> ctrl[0]\nCX ctrl[0] 1\nDETECTOR rec[-1]\nCONTROL[echo] det[-1] -> ctrl[1]\nZ_ERROR(1) ctrl[1] 2"
+                );
+                let configured = options(compiler, sampler);
+                let e = files.evaluator(&source,
+                    json!({"outputs":[1],"sample_records":[0],"ideal_state":"zero.magna","observables":[[0,0],[1,0],[0,1],[1,1]]}),
+                    &registry, configured);
+                let prep = prepare(&e);
+                assert!(prep.all_families_retained());
+                let circuit = parse_circuit(
+                    &source,
+                    &ParseOptions {
+                        controllers: registry.names(),
+                        ..Default::default()
+                    },
+                )
+                .unwrap();
+                let program =
+                    CausalProgram::new(&circuit, &registry, configured.runtime, &a).unwrap();
+                let parities = [rmagna::circuit::BitExpr::atom(
+                    rmagna::circuit::BitAtom::Record(0),
+                )];
+                let work = e.query_work_statistics();
+                let storage = e.reference_storage_statistics().unwrap();
+                for seed in 0..16 {
+                    let mut rng = SplitMix64::new(seed);
+                    let mut oracle_rng = SplitMix64::new(seed);
+                    let history_before = program.insertion_assignments().unwrap();
+                    let history = program.resolve(&parities, &mut oracle_rng, &a).unwrap();
+                    let history_assignments =
+                        program.insertion_assignments().unwrap() - history_before;
+                    let before = e.source_insertion_assignments().unwrap();
+                    let result = e.sample(&mut rng).unwrap();
+                    assert_eq!(
+                        e.source_insertion_assignments().unwrap() - before,
+                        history_assignments + u64::from(history.history_mass_reused()),
+                        "completion mass view is consumed directly; otherwise exactly one terminal assignment serves all six scalar queries"
+                    );
+                    let bit = result.sampled_records[0];
+                    assert_eq!(result.sampled_records, history.requested_values());
+                    assert_eq!(rng.state(), oracle_rng.state());
+                    assert_eq!(result.controller_calls.len(), 2);
+                    for call in &result.controller_calls {
+                        assert_eq!(call.inputs, [bit]);
+                        assert_eq!(call.outputs, [bit]);
+                    }
+                    let mass = if magic {
+                        let plus = a
+                            .scalar([2.into(), 1.into(), 0.into(), (-1).into()], -2)
+                            .unwrap();
+                        if bit {
+                            a.subtract(&ExactScalar::one(), &plus).unwrap()
+                        } else {
+                            plus
+                        }
+                    } else {
+                        assert!(bit);
+                        ExactScalar::one()
+                    };
+                    assert_eq!(result.history_mass, mass);
+                    assert_eq!(result.raw_acceptance, mass);
+                    let success = if bit {
+                        ExactScalar::zero()
+                    } else {
+                        mass.clone()
+                    };
+                    assert_eq!(result.raw_target_success, Some(success.clone()));
+                    assert_eq!(result.raw_error, a.subtract(&mass, &success).unwrap());
+                    assert_eq!(
+                        result.raw_moments,
+                        [
+                            mass.clone(),
+                            ExactScalar::zero(),
+                            if bit { mass.negated() } else { mass },
+                            ExactScalar::zero()
+                        ]
+                    );
+                    cases += 1;
+                }
+                assert_eq!(
+                    preparations(e.query_work_statistics().source.unwrap()),
+                    preparations(work.source.unwrap())
+                );
+                assert_eq!(e.reference_storage_statistics().unwrap(), storage);
+                assert_eq!(e.prepared_density_reuses(), Some(16));
+            }
+        }
+    }
+    assert_eq!(cases, 128);
+    println!(
+        "128 complete original exact-mass fixtures: two source prefixes, both compilers/samplers, sixteen seeds; unchanged full histories and RNG, one shared final assignment across acceptance/target/I/X/Y/Z, sixteen actual target reuses per configuration"
+    );
+}
+
+pub fn original_eager_lazy_fault_report_event_and_pauli_cells() {
+    use rmagna::instrument::{
+        CompileOptions, FaultSelection, InstrumentQueryLayout, compile_affine,
+    };
+    let a = ScalarArithmetic::default();
+    let mut counts = [0; 2];
+    for compiler in COMPILERS {
+        for outcome in 0..2 {
+            // Zero-probability channels expose the original supplied Pauli and
+            // report offsets without changing its physical no-fault circuit.
+            let selected = if outcome == 0 { "" } else { "!" };
+            let source = format!(
+                "H 0 1\nT 0\nPAULI_CHANNEL_1(0,0,0) 0\nCX 0 1\nM(0) 1\nCY rec[-1] 0\nT 0\nH 0\nDETECTOR rec[-1]\nPOSTSELECT {selected}det[0]"
+            );
+            let circuit = parse_circuit(&source, &Default::default()).unwrap();
+            let options = CompileOptions {
+                compiler_strategy: compiler,
+                moment_preparation: QueryPreparation::Native(Default::default()),
+                ..Default::default()
+            };
+            let eager = compile_affine(&circuit, &options, &a).unwrap();
+            assert_eq!(eager.noise_sites().len(), 2);
+            let effects = [(0, 0), (1, 0), (0, 1), (1, 1)].map(|(x, z)| {
+                rmagna::pauli::PauliWord::new(
+                    super::bits(1, x),
+                    super::bits(1, z),
+                    if x & z != 0 { 2 } else { 0 },
+                )
+                .unwrap()
+            });
+            for word in &effects {
+                eager
+                    .prepare_query(
+                        InstrumentQueryLayout::PauliMoment {
+                            outputs: &[0],
+                            word,
+                        },
+                        256,
+                        &a,
+                    )
+                    .unwrap();
+            }
+            let before = eager.query_work_statistics();
+            let storage = eager.reference_storage_statistics().unwrap();
+            for fault in 0..4 {
+                for flip in [false, true] {
+                    let mut faults = vec![];
+                    if fault != 0 {
+                        faults.push(FaultSelection {
+                            site: 0,
+                            alternative: fault - 1,
+                        });
+                    }
+                    if flip {
+                        faults.push(FaultSelection {
+                            site: 1,
+                            alternative: 0,
+                        });
+                    }
+                    let (sx, sy) = [(1, 1), (1, -1), (-1, 1), (-1, -1)][fault];
+                    let sign = if outcome == 0 { 1 } else { -1 };
+                    // Independent one-qubit Bloch calculation: first T gives
+                    // (1,1,0)/sqrt(2); apply Pauli, reported CY, second T, H.
+                    // The other initial |+> wire has fair independent MZ.
+                    let expected = [
+                        a.omega(0, -2).unwrap(),
+                        ExactScalar::zero(),
+                        a.scalar([(sx * sign - sy).into(), 0.into(), 0.into(), 0.into()], -2)
+                            .unwrap(),
+                        a.scalar([(-sx * sign - sy).into(), 0.into(), 0.into(), 0.into()], -2)
+                            .unwrap(),
+                    ];
+                    for (word, expected) in effects.iter().zip(expected) {
+                        let fresh = compile_affine(
+                            &circuit,
+                            &CompileOptions {
+                                moment_preparation: QueryPreparation::Cold,
+                                ..options
+                            },
+                            &a,
+                        )
+                        .unwrap();
+                        let cold = fresh.pauli_moment(&[0], word, &faults, 256, &a).unwrap();
+                        let warm = eager.pauli_moment(&[0], word, &faults, 256, &a).unwrap();
+                        assert_eq!(
+                            warm.value, expected,
+                            "{compiler:?} outcome={outcome} fault={fault} flip={flip}"
+                        );
+                        assert_eq!(cold.value, expected);
+                        counts[usize::from(expected.is_zero())] += 1;
+                    }
+                }
+            }
+            assert_eq!(
+                preparations(eager.query_work_statistics()),
+                preparations(before)
+            );
+            assert_eq!(eager.reference_storage_statistics().unwrap(), storage);
+        }
+    }
+    assert_eq!(counts.iter().sum::<usize>(), 128);
+    assert!(counts.iter().all(|&count| count > 0));
+    println!(
+        "128 original H,H,T,CX,M,CY,T,H cells:all I/X/Y/Z faults,report flips,event outcomes andPaulis; literal Bloch oracle and fresh cold plans agree; zero/nonzero={counts:?},no hot resources/maps/geometries"
+    );
+}
+
+pub fn original_protocol_recovery_prepares_before_callbacks_and_captures_preparation_failure() {
+    use rmagna::costs::ExecutionMeter;
+    use rmagna::task::{RunPhase, RunStatus, TaskRunOptions};
+    let files = Files::new();
+    std::fs::write(files.0.join("plus.magna"), "H 0\n").unwrap();
+    std::fs::write(
+        files.0.join("recovery.magna"),
+        // Recovery modules address selected outputs from zero. Native wire1
+        // is selected output0 here; its now-traced wire0 is an auxiliary slot.
+        "H 0\nM 0\nDETECTOR rec[-1]\nCONTROL[echo] det[-1] -> ctrl[0]\nCX ctrl[0] 1\n",
+    )
+    .unwrap();
+    let source = "H 0\nM 0\nDETECTOR rec[-1]\nCONTROL[echo] det[-1] -> ctrl[0]\nCH ctrl[0] 1";
+    for compiler in COMPILERS {
+        for sampler in SAMPLERS {
+            let calls = Arc::new(AtomicUsize::new(0));
+            let seen = calls.clone();
+            let mut registry = ControllerRegistry::default();
+            registry
+                .register("echo", "1", move |b: &[bool]| {
+                    seen.fetch_add(1, Ordering::Relaxed);
+                    Ok(b.to_vec())
+                })
+                .unwrap();
+            let e = files.evaluator(source, json!({"outputs":[1],"sample_records":[0],"recovery":"recovery.magna","ideal_state":{"circuit":"plus.magna","outputs":[0]}}), &registry, options(compiler, sampler));
+            assert_eq!(calls.load(Ordering::Relaxed), 0);
+            let meter = ExecutionMeter::default();
+            let prepared = e.prepare_sampling_queries(Default::default(), &meter);
+            assert!(prepared.all_families_retained());
+            assert_eq!(calls.load(Ordering::Relaxed), 0);
+            assert_eq!(meter.snapshot(), Default::default());
+            let work = e.query_work_statistics();
+            let storage = e.reference_storage_statistics().unwrap();
+            for seed in 0..4 {
+                let draw = e.sample(&mut SplitMix64::new(seed)).unwrap();
+                assert_eq!(draw.controller_calls.len(), 2);
+                assert_eq!(draw.accepted, draw.history_weight);
+                assert_eq!(
+                    draw.error,
+                    FieldArithmetic::default()
+                        .divide(
+                            &draw.accepted,
+                            &field(&ScalarArithmetic::default().omega(0, 2).unwrap())
+                        )
+                        .unwrap()
+                );
+                assert_eq!(draw.target_success, Some(draw.error.clone()));
+            }
+            assert_eq!(calls.load(Ordering::Relaxed), 8);
+            assert_eq!(
+                preparations(e.query_work_statistics().source.unwrap()),
+                preparations(work.source.unwrap())
+            );
+            assert_eq!(e.reference_storage_statistics().unwrap(), storage);
+            let mut failed_options = options(compiler, sampler);
+            failed_options.runtime.sampling.max_terms = 0;
+            let failed_source = parse_circuit("H 0\nT 0\nH 0\nM 0", &Default::default()).unwrap();
+            let failed_modules = parse_task(
+                r#"{"outputs":[0],"ideal_state":"zero.magna"}"#,
+                &files.0,
+                &TaskOptions::default(),
+            )
+            .unwrap()
+            .load_modules(&failed_source, &Default::default())
+            .unwrap();
+            let failed = rmagna::task::run_task_batch(
+                &failed_source,
+                &failed_modules,
+                &ControllerRegistry::default(),
+                failed_options,
+                &rmagna::noise::NoiseSampling::Physical,
+                &TaskRunOptions {
+                    shots: 3,
+                    ..Default::default()
+                },
+            )
+            .unwrap();
+            assert_eq!(failed.status, RunStatus::Failed);
+            assert_eq!(
+                (failed.completed, failed.failed, failed.not_attempted),
+                (0, 0, 3)
+            );
+            assert_eq!(failed.failures[0].phase, RunPhase::Preparation);
+            // Rust counts the failed target-normalization query explicitly;
+            // no terminal sampling query or draw has started.
+            assert_eq!(failed.execution_costs.query.attempted, 1);
+            assert_eq!(failed.execution_costs.query.failed, 1);
+            assert!(
+                failed.failures[0]
+                    .message
+                    .contains("ideal_state.normalization")
+            );
+        }
+    }
+    println!(
+        "4 complete protocol/recovery/target preparations:0callbacks/RNG/queryexecution before16actualdraws with32calls;four max_terms0 preparations keep all3shots unattempted andcount onefailed targetnormalization query each"
+    );
+}
+
+pub fn original_parity_feedback_uses_all_eight_manual_report_offsets_without_reconstructing_query_families()
  {
     use rmagna::task::{SuppliedActionLimits, SuppliedNoiseActions};
     let files = Files::new();

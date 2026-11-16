@@ -113,6 +113,7 @@ fn check_sampling(
         "preparation must not execute actual callbacks"
     );
     let work_before = sampling.query_work_statistics();
+    let storage_before = sampling.reference_storage_statistics().unwrap();
     assert!(prepared.all_families_retained(), "{label}");
     assert_eq!(prepared.counts.failed, 0, "{label}");
     assert_eq!(prepared.by_kind["acceptance"].planned, 1, "{label}");
@@ -214,6 +215,19 @@ fn check_sampling(
         "{label} must exercise non-unit history correction on a nonzero contribution"
     );
     let work_after = sampling.query_work_statistics();
+    let storage_after = sampling.reference_storage_statistics().unwrap();
+    assert_eq!(
+        storage_after, storage_before,
+        "{label} retains fixed Gaussian/program positions, live/expired weak slots and capacity"
+    );
+    let scalar_entries = probability.unwrap().cached_queries + density.unwrap().cached_queries;
+    assert!(probability.unwrap().cached_queries <= 64);
+    assert!(density.unwrap().cached_queries <= 16);
+    assert!(storage_after.source.unwrap().live_geometries <= scalar_entries);
+    assert!(storage_after.source.unwrap().geometry_weak_slots <= scalar_entries + 1);
+    println!(
+        "{label} actual retained programs={storage_after:?}; scalar_queries={scalar_entries}; support={support:?}"
+    );
     let factories = |s: rmagna::unitary::QueryWorkStatistics| {
         [
             s.affine_closures_prepared,

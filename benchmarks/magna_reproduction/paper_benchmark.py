@@ -271,7 +271,8 @@ def check_capture(manifest, results, pinned=None, *, require_query_work=False):
             stage = cell["stages"][stage_name]
             if stage_success(stage):
                 paper_query_work.validate(stage["payload"], required=require_query_work,
-                                          expected_source_sha256=expected_source)
+                                          expected_source_sha256=expected_source,
+                                          require_inventory=require_query_work)
         outcome = cell_result(cell, manifest)
         require(cell["outcome"] == row["outcome"] == outcome, "cell outcome changed")
         for key in ("reference_prescribed", "reference_noisy"):

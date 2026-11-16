@@ -50,8 +50,7 @@ fn configured(
     }
     options
 }
-#[test]
-fn original_dynamic_file_samples_use_automatic_eviction_without_memoizing_callbacks_or_changing_rng()
+pub fn original_dynamic_file_samples_use_automatic_eviction_without_memoizing_callbacks_or_changing_rng()
  {
     let files = Files::new();
     let mut draws = 0;

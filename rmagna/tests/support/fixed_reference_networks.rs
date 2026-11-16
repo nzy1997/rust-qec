@@ -99,8 +99,7 @@ fn source(shared: bool, a: &ScalarArithmetic) -> OriginalInstrument {
     )
     .unwrap()
 }
-#[test]
-fn full_shared_effect_event_and_fault_fixture_matches_every_independent_fixed_record_sum() {
+pub fn full_shared_effect_event_and_fault_fixture_matches_every_independent_fixed_record_sum() {
     let a = ScalarArithmetic::default();
     let mut cells = 0;
     let mut zeros = 0;
@@ -242,8 +241,7 @@ fn full_shared_effect_event_and_fault_fixture_matches_every_independent_fixed_re
         "768 exact shared-query cells/96 isolated source plans: complete original T,S,CCZ,a,H,T,b,DISCARD fixture, two fault/report frames, every Pauli/RHS/retained-b cell including zero pairings; 48 plans share three actual geometries and perform no hot construction"
     );
 }
-#[test]
-fn original_ccz_destructive_trace_reuses_all_fault_rhs_effects_and_threaded_batches() {
+pub fn original_ccz_destructive_trace_reuses_all_fault_rhs_effects_and_threaded_batches() {
     let a = ScalarArithmetic::default();
     let mut cells = 0;
     for compiler in [

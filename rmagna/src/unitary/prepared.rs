@@ -26,6 +26,20 @@ pub(super) struct SharedScalarGeometry {
     entries: Mutex<Vec<Weak<ScalarGeometry>>>,
 }
 impl SharedScalarGeometry {
+    pub(super) fn storage_statistics(&self) -> Result<(usize, usize, usize), UnitaryError> {
+        let entries = self
+            .entries
+            .lock()
+            .map_err(|_| UnitaryError::SymbolicGeometryCacheUnavailable)?;
+        Ok((
+            entries.len(),
+            entries.capacity(),
+            entries
+                .iter()
+                .filter(|entry| entry.strong_count() != 0)
+                .count(),
+        ))
+    }
     pub(super) fn live_count(&self) -> Option<usize> {
         self.entries.lock().ok().map(|entries| {
             entries

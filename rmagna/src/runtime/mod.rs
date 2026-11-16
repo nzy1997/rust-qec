@@ -29,7 +29,7 @@ use crate::unitary::CompiledUnitary;
 use num_rational::BigRational;
 use num_traits::One;
 pub use registry::{Controller, ControllerRegistry};
-use std::{collections::BTreeMap, fmt};
+use std::{collections::BTreeMap, fmt, sync::Arc};
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum RuntimeError {
     PreparationUnavailable {
@@ -258,6 +258,9 @@ pub struct ResolvedHistory {
     faults: Vec<FaultSelection>,
     history_mass: ExactScalar,
     history_mass_reused: bool,
+    // At most one draw-local numeric view, produced by the final mass query.
+    // It never enters a persistent program or query cache.
+    terminal_assignment: Option<Arc<CompiledUnitary>>,
     history_proposal_mass: Option<ExactScalar>,
     noise_probability: BigRational,
     noise_likelihood_ratio: BigRational,
@@ -271,6 +274,11 @@ pub struct ResolvedHistory {
     history_queries: usize,
 }
 impl ResolvedHistory {
+    pub(crate) fn terminal_assignment(&self) -> Option<crate::instrument::AssignedInstrument<'_>> {
+        self.terminal_assignment.as_ref().map(|state| {
+            crate::instrument::AssignedInstrument::new(&self.instrument, state.clone())
+        })
+    }
     pub fn instrument(&self) -> &CompiledInstrument {
         &self.instrument
     }
@@ -326,9 +334,12 @@ impl ResolvedHistory {
         max_terms: usize,
         arithmetic: &ScalarArithmetic,
     ) -> Result<CausalDraw, RuntimeError> {
-        let masses =
-            self.instrument
-                .masses(outputs, target, &self.faults, max_terms, arithmetic)?;
+        let assigned = if let Some(assigned) = self.terminal_assignment() {
+            assigned
+        } else {
+            self.instrument.assigned(&self.faults, arithmetic)?
+        };
+        let masses = assigned.masses(outputs, target, max_terms, arithmetic)?;
         Ok(CausalDraw {
             masses,
             history_mass: self.history_mass,
@@ -670,6 +681,21 @@ impl CausalProgram {
         self.reference
             .as_ref()
             .map(CompiledInstrument::query_work_statistics)
+    }
+    /// Numeric assignments on the retained reference; excludes cold transient programs.
+    pub fn insertion_assignments(&self) -> Option<u64> {
+        self.reference
+            .as_ref()
+            .map(CompiledInstrument::insertion_assignments)
+    }
+    pub fn reference_storage_statistics(
+        &self,
+    ) -> Result<Option<crate::unitary::ReferenceStorageStatistics>, RuntimeError> {
+        Ok(self
+            .reference
+            .as_ref()
+            .map(CompiledInstrument::reference_storage_statistics)
+            .transpose()?)
     }
     pub fn reference_compilations(&self) -> usize {
         1
@@ -1031,39 +1057,40 @@ impl CausalProgram {
             .conditioned(&state.conditions)?;
         let faults = state.faults(&instrument)?;
         let history_mass_reused = state.confirmed_physical_mass.is_some();
-        let history_mass = if let Some(mass) = state.confirmed_physical_mass.take() {
-            // Future resolved operations are trace preserving for the already
-            // observed records; postselection is applied by the terminal task.
-            mass
-        } else {
-            let parities = state
-                .conditions
-                .iter()
-                .map(|(p, _)| p.clone())
-                .collect::<Vec<_>>();
-            let values = BitVector::from_indices(
-                parities.len(),
-                state
+        let (history_mass, terminal_assignment) =
+            if let Some(mass) = state.confirmed_physical_mass.take() {
+                // Future resolved operations are trace preserving for the already
+                // observed records; postselection is applied by the terminal task.
+                (mass, None)
+            } else {
+                let parities = state
                     .conditions
                     .iter()
-                    .enumerate()
-                    .filter_map(|(j, (_, v))| v.then_some(j)),
-            )
-            .map_err(InstrumentError::from)?;
-            state.mode.query()?;
-            observe(meter, OperationKind::Query, || {
-                instrument
-                    .reported_probability(
-                        &parities,
-                        &values,
-                        &faults,
-                        self.options.sampling.max_terms,
-                        arithmetic,
-                    )
-                    .map_err(RuntimeError::from)
-            })?
-            .value
-        };
+                    .map(|(p, _)| p.clone())
+                    .collect::<Vec<_>>();
+                let values = BitVector::from_indices(
+                    parities.len(),
+                    state
+                        .conditions
+                        .iter()
+                        .enumerate()
+                        .filter_map(|(j, (_, v))| v.then_some(j)),
+                )
+                .map_err(InstrumentError::from)?;
+                state.mode.query()?;
+                observe(meter, OperationKind::Query, || {
+                    let assigned = instrument.assigned(&faults, arithmetic)?;
+                    let mass = assigned
+                        .reported_probability(
+                            &parities,
+                            &values,
+                            self.options.sampling.max_terms,
+                            arithmetic,
+                        )?
+                        .value;
+                    Ok::<_, RuntimeError>((mass, Some(assigned.into_state())))
+                })?
+            };
         let noise_probability =
             if !draw.defer_guarded && instrument.noise_sites().len() == self.model.num_sites() {
                 // Every potential category remains active, so the already validated
@@ -1084,6 +1111,7 @@ impl CausalProgram {
             decisions: state.decisions,
             history_mass,
             history_mass_reused,
+            terminal_assignment,
             history_proposal_mass: state.proposal_mass,
             noise_probability,
             noise_likelihood_ratio: draw.likelihood_ratio,

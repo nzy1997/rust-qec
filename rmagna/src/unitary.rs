@@ -1,6 +1,10 @@
 //! Unitary third-hierarchy circuits lowered to Clifford boundaries and phases.
 
 mod cache_key;
+mod continuation;
+pub use continuation::{
+    ContinuationOptions, ContinuationStatistics, ContinuedUnitary, PreparedContinuation,
+};
 mod query_cache;
 pub use query_cache::{
     ScalarQuery, ScalarQueryCache, ScalarQueryCacheOptions, ScalarQueryCacheStatistics,
@@ -28,7 +32,7 @@ pub use prepared::{
     DensityLayout, PreparedDensityOverlap, PreparedPauliMoment, PreparedProbability,
 };
 pub use support::{PreparedProbabilitySupport, ProbabilitySupportExpansion};
-pub use work::QueryWorkStatistics;
+pub use work::{QueryWorkStatistics, ReferenceStorageStatistics};
 
 use crate::clifford::{CliffordCircuit, CliffordError, CliffordGate};
 use crate::gf2::{AffineSupport, BitVector, Gf2Error};
@@ -50,6 +54,11 @@ pub enum UnitaryError {
         required: u128,
     },
     SymbolicGeometryCacheUnavailable,
+    ContinuationResourceLimit {
+        option: &'static str,
+        limit: usize,
+        required: u128,
+    },
     DimensionMismatch,
     DimensionOverflow,
     ZeroStabilizerInput,
@@ -103,6 +112,16 @@ impl fmt::Display for UnitaryError {
                 limit,
                 required,
             } => write!(f, "{option}={limit} is insufficient; need {required}"),
+            Self::ContinuationResourceLimit {
+                option,
+                limit,
+                required,
+            } => {
+                write!(
+                    f,
+                    "continuation {option}={limit} is insufficient; need {required}"
+                )
+            }
             Self::SymbolicGeometryCacheUnavailable => write!(
                 f,
                 "shared scalar geometry cache is unavailable after a preparation panic"
@@ -426,6 +445,7 @@ impl UnitaryCircuit {
             physical_width: self.width,
             boundary,
             phase,
+            assignment: None,
             program,
             compilation,
         })
@@ -471,8 +491,13 @@ pub struct CompiledUnitary {
     physical_width: usize,
     boundary: Arc<AffineKet>,
     phase: Arc<ParityPhase>,
+    assignment: Option<Arc<InsertionAssignment>>,
     program: Arc<InsertionProgram>,
     compilation: Arc<CompilationDiagnostics>,
+}
+struct InsertionAssignment {
+    frame: crate::compact::CompactPauliWord,
+    phase: Arc<ParityPhase>,
 }
 struct InsertionProgram {
     scalar_geometry: prepared::SharedScalarGeometry,
@@ -513,6 +538,45 @@ impl<'a> DensityBoundary<'a> {
 }
 
 impl CompiledUnitary {
+    /// Inventory the original shared program, excluding draw-local numeric
+    /// boundaries and independently retained plans. A poisoned mutex is an
+    /// error, never a zero-retention observation.
+    pub fn reference_storage_statistics(&self) -> Result<ReferenceStorageStatistics, UnitaryError> {
+        let (geometry_weak_slots, geometry_slot_capacity, live_geometries) =
+            self.program.scalar_geometry.storage_statistics()?;
+        Ok(ReferenceStorageStatistics {
+            physical_width: self.width(),
+            raw_boundary_width: self.program.reference.width(),
+            query_boundary_width: self.program.query_reference.width(),
+            unique_reference_boundaries: 1 + usize::from(!Arc::ptr_eq(
+                &self.program.reference,
+                &self.program.query_reference,
+            )),
+            raw_phase_variables: self.program.reference_phase.num_variables(),
+            original_positions: self.program.positions.len() - 1,
+            expanded_clifford_gates: self.program.circuit.gates().len(),
+            geometry_weak_slots,
+            geometry_slot_capacity,
+            live_geometries,
+        })
+    }
+    /// Successful replacement insertion assignments on this shared program,
+    /// including identity assignments. Saturates at u64::MAX. This measures
+    /// numeric frame work separately from scalar-query factory observations.
+    pub fn insertion_assignments(&self) -> u64 {
+        self.program
+            .work
+            .assignments
+            .load(std::sync::atomic::Ordering::Relaxed)
+    }
+    /// The unreduced final insertion frame, relative to this immutable program.
+    /// `None` denotes its unassigned reference. Raw magic coordinates can exceed
+    /// the reduced query boundary; they are not a serialized Native ABI.
+    pub fn assignment_frame(&self) -> Option<&crate::compact::CompactPauliWord> {
+        self.assignment
+            .as_deref()
+            .map(|assignment| &assignment.frame)
+    }
     /// Cumulative events from actual closure/map/resource factories. Program
     /// views share this owner; no physics, RNG or callback is run to inspect it.
     pub fn query_work_statistics(&self) -> QueryWorkStatistics {
@@ -676,10 +740,12 @@ impl CompiledUnitary {
             // Preserve the identity-frame coefficient budget check while
             // sharing the already reduced immutable no-fault query boundary.
             arithmetic.multiply(self.program.reference.coefficient(), &ExactScalar::one())?;
+            self.program.work.record(&self.program.work.assignments);
             return Ok(Self {
                 physical_width: self.physical_width,
                 boundary: Arc::clone(&self.program.query_reference),
                 phase: Arc::clone(&self.program.query_reference_phase),
+                assignment: None,
                 compilation: Arc::clone(&self.compilation),
                 program: Arc::clone(&self.program),
             });
@@ -739,15 +805,21 @@ impl CompiledUnitary {
         } else {
             Arc::clone(&self.program.reference_phase)
         };
+        let assignment = Some(Arc::new(InsertionAssignment {
+            frame: crate::compact::CompactPauliWord::from_dense(frame),
+            phase: Arc::clone(&phase),
+        }));
         let (boundary, phase) = if let Some(reduction) = &self.program.observation_reduction {
             reduction.apply(&boundary, &phase)?
         } else {
             (boundary, phase)
         };
+        self.program.work.record(&self.program.work.assignments);
         Ok(Self {
             physical_width: self.physical_width,
             boundary,
             phase,
+            assignment,
             compilation: Arc::clone(&self.compilation),
             program: Arc::clone(&self.program),
         })

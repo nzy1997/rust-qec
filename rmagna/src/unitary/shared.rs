@@ -25,6 +25,13 @@ pub(super) struct PhaseUpdates {
     coordinates: usize,
 }
 impl PhaseUpdates {
+    pub(super) fn phase_axes(&self) -> impl Iterator<Item = &BitVector> {
+        self.outside.iter().map(|(axis, _)| axis).chain(
+            self.selected
+                .iter()
+                .map(|observation| &observation.coordinates),
+        )
+    }
     pub(super) fn phase(
         &self,
         insertions: &BTreeMap<usize, Vec<&PauliWord>>,
@@ -491,6 +498,7 @@ pub(super) fn compile(
         physical_width: source.width,
         boundary: query_reference,
         phase: query_phase,
+        assignment: None,
         program,
         compilation,
     })
