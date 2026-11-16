@@ -345,3 +345,159 @@ fn cached_physical_prefix_mass_is_independent_of_future_selection_and_guarded_no
         "{cases} future-selection/guarded-noise paths:cachedunconditionedP equals literalTmass and freshfinalinstrumentquery"
     );
 }
+
+#[test]
+fn prepared_feedback_layers_reuse_actual_factories_and_match_independent_basis_targets() {
+    use rmagna::{
+        costs::{ExecutionLimits, ExecutionMeter},
+        instrument::QueryPreparation,
+        noise::{NoiseSampling, SplitMix64},
+        runtime::{ControllerRegistry, HistorySampler},
+        task::{EvaluationOptions, TaskEvaluator, TaskOptions, parse_task},
+        unitary::CompilerStrategy,
+    };
+    use std::sync::{
+        Arc,
+        atomic::{AtomicUsize, Ordering},
+    };
+    struct Files(std::path::PathBuf);
+    impl Drop for Files {
+        fn drop(&mut self) {
+            let _ = std::fs::remove_dir_all(&self.0);
+        }
+    }
+    let files = Files(std::env::temp_dir().join(format!(
+        "rmagna-fixed-reference-layers-{}",
+        std::process::id()
+    )));
+    std::fs::create_dir(&files.0).unwrap();
+    std::fs::write(files.0.join("ideal.magna"), "I 0").unwrap();
+    std::fs::write(files.0.join("magic.magna"), "H 0\nT 0").unwrap();
+    let a = ScalarArithmetic::default();
+    let mut cases = 0;
+    for layers in [1, 3, 7] {
+        for sampler in [HistorySampler::ExactMarginal, HistorySampler::AffineSupport] {
+            for mode in [
+                QueryPreparation::Trace,
+                QueryPreparation::FixedFibers(Default::default()),
+                QueryPreparation::FixedCatalogue(Default::default()),
+            ] {
+                for compiler in [
+                    CompilerStrategy::ParityCopies,
+                    CompilerStrategy::SharedCommutingLayer,
+                ] {
+                    for magic in [false, true] {
+                        let calls = Arc::new(AtomicUsize::new(0));
+                        let seen = Arc::clone(&calls);
+                        let mut registry = ControllerRegistry::default();
+                        registry
+                            .register("and", "1", move |v: &[bool]| {
+                                seen.fetch_add(1, Ordering::Relaxed);
+                                Ok(vec![v[0] & v[1]])
+                            })
+                            .unwrap();
+                        let mut source = String::new();
+                        for j in 0..layers {
+                            let (u, v) = (2 * j + 1, 2 * j + 2);
+                            source += &format!(
+                                "H {u} {v}\nM {u} {v}\nDETECTOR rec[-2]\nDETECTOR rec[-1]\nCONTROL[and] det[-2] det[-1] -> ctrl[{j}]\nCX ctrl[{j}] 0\n"
+                            );
+                        }
+                        let parse = ParseOptions {
+                            controllers: registry.names(),
+                            ..Default::default()
+                        };
+                        let circuit = parse_circuit(&source, &parse).unwrap();
+                        let task = format!(
+                            "{{\"outputs\":[0],\"ideal_state\":\"{}\"}}",
+                            if magic { "magic.magna" } else { "ideal.magna" }
+                        );
+                        let modules = parse_task(&task, &files.0, &TaskOptions::default())
+                            .unwrap()
+                            .load_modules(&circuit, &parse)
+                            .unwrap();
+                        let mut options = EvaluationOptions::default();
+                        options.runtime.history_sampler = sampler;
+                        options.runtime.compile.compiler_strategy = compiler;
+                        options.runtime.compile.probability_preparation = mode;
+                        options.runtime.compile.density_preparation = mode;
+                        options.runtime.compile.moment_preparation = mode;
+                        let prep_meter = ExecutionMeter::new(ExecutionLimits::default());
+                        let e = TaskEvaluator::new_with_costs(
+                            &circuit,
+                            &modules,
+                            &registry,
+                            options,
+                            &NoiseSampling::Physical,
+                            &prep_meter,
+                        )
+                        .unwrap();
+                        let prepared = e.prepare_sampling_queries(Default::default(), &prep_meter);
+                        assert_eq!(prepared.result, Ok(()));
+                        assert_eq!(calls.load(Ordering::Relaxed), 0);
+                        let before = e.query_work_statistics();
+                        let before_source = before.source.unwrap();
+                        let meter = ExecutionMeter::default();
+                        let mut rng = SplitMix64::new(21);
+                        for _ in 0..8 {
+                            let result = e.sample_with_costs(&mut rng, &meter).unwrap();
+                            // Independent physical oracle: each layer has two
+                            // fair independent records. The final output is XOR
+                            // of their ANDs. A magic target overlaps either
+                            // computational basis output with probability 1/2.
+                            let mass = a.omega(0, -4 * layers as i64).unwrap();
+                            assert_eq!(result.history_mass, mass);
+                            assert_eq!(result.raw_acceptance, mass);
+                            assert_eq!(result.controller_calls.len(), layers);
+                            let mut parity = false;
+                            for call in &result.controller_calls {
+                                assert_eq!(call.outputs, vec![call.inputs[0] & call.inputs[1]]);
+                                parity ^= call.outputs[0];
+                            }
+                            let error = if magic {
+                                a.multiply(&mass, &a.omega(0, -2).unwrap()).unwrap()
+                            } else if parity {
+                                mass.clone()
+                            } else {
+                                ExactScalar::zero()
+                            };
+                            assert_eq!(result.raw_error, error);
+                            assert_eq!(result.network_compilations, 0);
+                        }
+                        let after = e.query_work_statistics();
+                        let after_source = after.source.unwrap();
+                        assert_eq!(preparations(before_source), preparations(after_source));
+                        assert_eq!(before.target, after.target);
+                        assert_eq!(calls.load(Ordering::Relaxed), layers * 8);
+                        assert_eq!(meter.snapshot().compilation.attempted, 0);
+                        let actual_queries = if sampler == HistorySampler::ExactMarginal {
+                            8 * (3 * layers + 2)
+                        } else {
+                            24
+                        };
+                        assert_eq!(meter.snapshot().query.attempted, actual_queries as u64);
+                        assert_eq!(
+                            after_source.closure_evaluations - before_source.closure_evaluations,
+                            actual_queries as u64
+                        );
+                        let cold = after_source.cold_evaluations - before_source.cold_evaluations;
+                        assert_eq!(
+                            cold,
+                            if matches!(mode, QueryPreparation::Trace) {
+                                actual_queries as u64
+                            } else {
+                                0
+                            }
+                        );
+                        assert_eq!(e.prepared_density_reuses(), Some(8));
+                        cases += 1;
+                    }
+                }
+            }
+        }
+    }
+    assert_eq!(cases, 72);
+    println!(
+        "72prepared feedback cases/576draws:1,3,7layers x2samplers x3policies x2compilers x2targets;0hotfactories;actualquerycounts and independent joint/basis target masses agree"
+    );
+}
