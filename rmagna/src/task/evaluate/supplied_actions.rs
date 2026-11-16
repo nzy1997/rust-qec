@@ -45,6 +45,20 @@ pub struct SuppliedActionEvaluator {
     likelihood: BigRational,
 }
 impl SuppliedActionEvaluator {
+    /// Observe the same immutable source/target factory owners used by sample.
+    /// The supplied assignment is retained; inspection runs no callbacks or RNG.
+    pub fn query_work_statistics(&self) -> TaskQueryWorkStatistics {
+        self.evaluator.query_work_statistics()
+    }
+    /// Prepare sampling families for this fixed assignment without drawing a
+    /// history. A receipt distinguishes construction from actual retention.
+    pub fn prepare_sampling_queries(
+        &self,
+        options: SamplingPreparationOptions,
+        meter: &ExecutionMeter,
+    ) -> SamplingPreparationReport {
+        self.evaluator.prepare_sampling_queries(options, meter)
+    }
     /// Evaluate the assignment on a sampled history. Physical noise probability
     /// describes the exact active choices in the original categorical law. An
     /// active Pauli sequence outside that law has zero physical mass, even

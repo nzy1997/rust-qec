@@ -2,7 +2,9 @@ use num_traits::Signed;
 use rmagna::file_api::{
     FileEnumerationOptions, FileLoadOptions, FilePreparationOptions, FileTaskOptions,
 };
-use rmagna::instrument::{InsertionPreparation, ProbabilityPreparation, QueryPreparation};
+use rmagna::instrument::{
+    InsertionPreparation, ProbabilityPreparation, QueryCachePolicy, QueryPreparation,
+};
 use rmagna::noise::NoiseSampling;
 use rmagna::probability::ProbabilityParser;
 use rmagna::runtime::process::ProcessOptions;
@@ -49,6 +51,7 @@ Run configuration:
   --density-preparation MODE           Same choices; default fixed, on demand
   --moment-preparation MODE            Same choices; default fixed, on demand
   --fiber-search-rank N               Fixed/catalogue fallback search rank (default 16)
+  --query-cache-policy quota|lru       Per-family overflow behavior (default quota)
   --max-prepared-probabilities N       Retained query cap (default 64)
   --max-prepared-densities N           Retained query cap (default 16)
   --max-prepared-moments N             Retained query cap (default 64)
@@ -538,6 +541,7 @@ fn parse_tokens(raw: Vec<String>) -> Result<(Mode, PathBuf, Flags), String> {
                 | "--max-path-bits"
                 | "--max-gates"
                 | "--max-noise-sites"
+                | "--query-cache-policy"
                 | "--max-prepared-probabilities"
                 | "--max-prepared-densities"
                 | "--max-prepared-moments"
@@ -738,6 +742,13 @@ fn configure_runtime(flags: &mut Flags, file: &mut FileTaskOptions) -> Result<()
     compile.max_gates = flags.number("--max-gates", compile.max_gates)?;
     compile.max_path_bits = flags.number("--max-path-bits", compile.max_path_bits)?;
     compile.max_noise_sites = flags.number("--max-noise-sites", compile.max_noise_sites)?;
+    compile.query_cache_policy = match flags
+        .choice("--query-cache-policy", "quota", &["quota", "lru"])?
+        .as_str()
+    {
+        "lru" => QueryCachePolicy::Lru,
+        _ => QueryCachePolicy::Quota,
+    };
     compile.max_prepared_probabilities = flags.number(
         "--max-prepared-probabilities",
         compile.max_prepared_probabilities,

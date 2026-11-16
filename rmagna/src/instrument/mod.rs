@@ -11,6 +11,8 @@ mod preparation;
 pub use insertions::{InsertionPreparation, PreparedInsertionStatistics};
 pub use preparation::{InstrumentQueryLayout, QueryPreparationOutcome};
 mod probabilities;
+mod query_cache;
+pub use query_cache::QueryCachePolicy;
 mod scalar_cache;
 pub use scalar_cache::InstrumentScalarQuery;
 mod support;
@@ -172,6 +174,9 @@ impl From<UnitaryError> for InstrumentError {
 
 #[derive(Clone, Copy, Debug)]
 pub struct CompileOptions {
+    /// Automatic scalar-family retention; defaults to strict quotas. LRU limits
+    /// retained entries, excluding plans in flight and separately retained Arcs.
+    pub query_cache_policy: QueryCachePolicy,
     pub insertion_preparation: InsertionPreparation,
     pub compiler_strategy: crate::unitary::CompilerStrategy,
     pub probability_preparation: ProbabilityPreparation,
@@ -190,6 +195,7 @@ pub struct CompileOptions {
 impl Default for CompileOptions {
     fn default() -> Self {
         Self {
+            query_cache_policy: QueryCachePolicy::Quota,
             insertion_preparation: InsertionPreparation::Direct,
             compiler_strategy: crate::unitary::CompilerStrategy::ParityCopies,
             probability_preparation: ProbabilityPreparation::Cold,

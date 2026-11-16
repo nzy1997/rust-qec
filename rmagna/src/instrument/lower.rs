@@ -419,14 +419,17 @@ pub(super) fn compile(
         probability_queries: Arc::new(probabilities::ProbabilityQueries::new(
             options.probability_preparation,
             options.max_prepared_probabilities,
+            options.query_cache_policy,
         )?),
         density_queries: Arc::new(densities::DensityQueries::new(
             options.density_preparation,
             options.max_prepared_densities,
+            options.query_cache_policy,
         )?),
         moment_queries: Arc::new(moments::MomentQueries::new(
             options.moment_preparation,
             options.max_prepared_moments,
+            options.query_cache_policy,
         )?),
         live_wires: Arc::new(state.live),
         record_wires: Arc::new(state.records),

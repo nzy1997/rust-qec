@@ -1174,7 +1174,7 @@
           "package": "rmagna",
           "target": "original_file_batches_and_reuse",
           "test": "original_aggregate_matches_single_draws",
-          "source_sha256": "290881b274cad1eb230c0b31142c431b20fe2720bbf4a52e7afee539a1c64a78"
+          "source_sha256": "9987a55434e10b0c512a5e2854ec206fb0bcea2aaf086d8e9a11afdc3c185b8a"
         }
       ]
     },
@@ -1187,7 +1187,7 @@
           "package": "rmagna",
           "target": "original_file_batches_and_reuse",
           "test": "original_failure_retains_only_completed_prefix",
-          "source_sha256": "290881b274cad1eb230c0b31142c431b20fe2720bbf4a52e7afee539a1c64a78"
+          "source_sha256": "9987a55434e10b0c512a5e2854ec206fb0bcea2aaf086d8e9a11afdc3c185b8a"
         }
       ]
     },
@@ -1369,7 +1369,7 @@
           "package": "rmagna",
           "target": "original_file_batches_and_reuse",
           "test": "original_batch_failure_keeps_completed_prefix_and_query_budget_contract",
-          "source_sha256": "290881b274cad1eb230c0b31142c431b20fe2720bbf4a52e7afee539a1c64a78"
+          "source_sha256": "9987a55434e10b0c512a5e2854ec206fb0bcea2aaf086d8e9a11afdc3c185b8a"
         }
       ]
     },
@@ -1392,7 +1392,7 @@
           "package": "rmagna",
           "target": "original_file_batches_and_reuse",
           "test": "original_fixed_preparation_is_reused_for_new_original_faults",
-          "source_sha256": "290881b274cad1eb230c0b31142c431b20fe2720bbf4a52e7afee539a1c64a78"
+          "source_sha256": "9987a55434e10b0c512a5e2854ec206fb0bcea2aaf086d8e9a11afdc3c185b8a"
         }
       ]
     },

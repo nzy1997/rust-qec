@@ -303,8 +303,11 @@ pub(crate) fn execution_configuration(evaluation: EvaluationOptions, run: TaskRu
             "statistics": {"max_dimensions": run.statistics.max_dimensions, "coefficient_bits": run.statistics.arithmetic.max_coefficient_bits()},
         },
     });
-    // Preserve existing default fingerprints; an explicit new completion cap
-    // is still part of the declared execution configuration.
+    // Preserve existing default fingerprints while binding opt-in runtime policy
+    // and additional admission limits to the declared execution configuration.
+    if compile.query_cache_policy != crate::instrument::QueryCachePolicy::Quota {
+        options["compile"]["query_cache_policy"] = json!(compile.query_cache_policy.name());
+    }
     if evaluation.controller_execution == super::ControllerExecution::RequiredForTask {
         options["controller_execution"] = json!("required_for_task");
     }

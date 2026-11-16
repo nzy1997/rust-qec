@@ -1,9 +1,9 @@
 //! Bounded immutable probability plans shared by instrument branches.
+use super::query_cache::{HashPlans, admit_new};
 use super::*;
 use crate::fibers::FiberOptions;
 use crate::unitary::PreparedProbability;
 use serde_json::json;
-use std::collections::HashMap;
 use std::sync::Mutex;
 
 #[derive(Clone, Copy, Debug, Default)]
@@ -108,6 +108,8 @@ impl QueryPreparation {
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct PreparedQueryStatistics {
     pub cached_queries: usize,
+    /// Successful automatic layout evictions; not failed preparation attempts.
+    pub cache_evictions: usize,
     pub fixed_resources: usize,
     /// Actual selected catalogue resources; missing keys count as fibers.
     pub catalogue_resources: usize,
@@ -125,6 +127,7 @@ impl PreparedQueryStatistics {
     ) -> Self {
         let mut statistics = Self {
             cached_queries,
+            cache_evictions: 0,
             fixed_resources: 0,
             catalogue_resources: 0,
             native_routes: Default::default(),
@@ -167,10 +170,15 @@ pub type PreparedProbabilityStatistics = PreparedQueryStatistics;
 pub(super) struct ProbabilityQueries {
     mode: ProbabilityPreparation,
     limit: usize,
-    plans: Mutex<HashMap<Vec<BitVector>, Arc<PreparedProbability>>>,
+    policy: QueryCachePolicy,
+    plans: Mutex<HashPlans<Vec<BitVector>, Arc<PreparedProbability>>>,
 }
 impl ProbabilityQueries {
-    pub(super) fn new(mode: ProbabilityPreparation, limit: usize) -> Result<Self, InstrumentError> {
+    pub(super) fn new(
+        mode: ProbabilityPreparation,
+        limit: usize,
+        policy: QueryCachePolicy,
+    ) -> Result<Self, InstrumentError> {
         if !matches!(mode, ProbabilityPreparation::Cold) && limit == 0 {
             return Err(InstrumentError::ResourceLimit {
                 option: "max_prepared_probabilities",
@@ -181,7 +189,8 @@ impl ProbabilityQueries {
         Ok(Self {
             mode,
             limit,
-            plans: Mutex::new(HashMap::new()),
+            policy,
+            plans: Mutex::new(HashPlans::default()),
         })
     }
     pub(super) fn statistics(&self) -> Result<PreparedProbabilityStatistics, InstrumentError> {
@@ -189,12 +198,14 @@ impl ProbabilityQueries {
             .plans
             .lock()
             .map_err(|_| InstrumentError::PreparedQueryCacheUnavailable)?;
-        Ok(PreparedQueryStatistics::from_resources(
+        let mut statistics = PreparedQueryStatistics::from_resources(
             plans.len(),
             plans
                 .values()
                 .filter_map(|plan| plan.fixed_phase_resource()),
-        ))
+        );
+        statistics.cache_evictions = plans.evictions;
+        Ok(statistics)
     }
     pub(super) fn evaluate(
         &self,
@@ -204,6 +215,9 @@ impl ProbabilityQueries {
         max_terms: usize,
         arithmetic: &ScalarArithmetic,
     ) -> Result<NetworkValue, InstrumentError> {
+        if rows.len() != outcomes.width() || rows.iter().any(|row| row.width() != state.width()) {
+            return Err(UnitaryError::DimensionMismatch.into());
+        }
         if matches!(self.mode, ProbabilityPreparation::Cold) {
             return Ok(state.probability_z(rows, outcomes, max_terms, arithmetic)?);
         }
@@ -246,16 +260,15 @@ impl ProbabilityQueries {
                 .plans
                 .lock()
                 .map_err(|_| InstrumentError::PreparedQueryCacheUnavailable)?;
-            if let Some(plan) = plans.get(rows) {
+            if let Some(plan) = plans.get(rows, self.policy) {
                 (Arc::clone(plan), QueryPreparationOutcome::Reused)
             } else {
-                if plans.len() >= self.limit {
-                    return Err(InstrumentError::ResourceLimit {
-                        option: "max_prepared_probabilities",
-                        limit: self.limit,
-                        required: plans.len().saturating_add(1),
-                    });
-                }
+                admit_new(
+                    plans.len(),
+                    self.limit,
+                    self.policy,
+                    "max_prepared_probabilities",
+                )?;
                 let plan = match self.mode {
                     ProbabilityPreparation::Native(options) => state
                         .prepare_probability(rows, arithmetic)?
@@ -279,7 +292,7 @@ impl ProbabilityQueries {
                     ProbabilityPreparation::Cold => unreachable!("cold queries returned above"),
                 };
                 let plan = Arc::new(plan);
-                plans.insert(rows.to_vec(), Arc::clone(&plan));
+                plans.insert(rows.to_vec(), Arc::clone(&plan), self.limit, self.policy);
                 (plan, QueryPreparationOutcome::Created)
             }
         };
@@ -334,6 +347,7 @@ mod tests {
             PreparedQueryStatistics::from_resources(4, [&scalar, &ccz, &wide].into_iter()),
             PreparedQueryStatistics {
                 cached_queries: 4,
+                cache_evictions: 0,
                 fixed_resources: 3,
                 catalogue_resources: 2,
                 native_routes: Default::default(),
@@ -410,6 +424,7 @@ mod tests {
             PreparedQueryStatistics::from_resources(5, [&scalar, &ccz, &wide, &four_t].into_iter()),
             PreparedQueryStatistics {
                 cached_queries: 5,
+                cache_evictions: 0,
                 fixed_resources: 4,
                 catalogue_resources: 3,
                 native_routes: Default::default(),

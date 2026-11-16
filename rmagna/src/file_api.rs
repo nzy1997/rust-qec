@@ -587,13 +587,17 @@ fn compilation_snapshot(
 ) -> Result<Value, TaskError> {
     let d = evaluator.compilation();
     let query_statistics = |s: crate::instrument::PreparedQueryStatistics| {
-        json!({
+        let mut value = json!({
             "cached_queries":s.cached_queries,"fixed_resources":s.fixed_resources,
             "catalogue_resources":s.catalogue_resources,"maximum_quotient_rank":s.maximum_quotient_rank,
             "native_routes":native_routes_json(s.native_routes),
             "native_transports":native_transports_json(s.native_transports),
             "maximum_terms":s.maximum_terms,"maximum_phase_variables":s.maximum_phase_variables,
-        })
+        });
+        if s.cache_evictions != 0 {
+            value["cache_evictions"] = json!(s.cache_evictions);
+        }
+        value
     };
     let probability = evaluator
         .prepared_probability_statistics()?

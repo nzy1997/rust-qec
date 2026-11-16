@@ -408,14 +408,18 @@ fn stage_json(stage: &SamplingPreparationReport) -> Value {
         .iter()
         .map(|(k, v)| (k.to_string(), counts_json(*v)))
         .collect::<serde_json::Map<_, _>>();
-    json!({"scope":stage.scope,"execution_route":stage.execution_route,
+    let mut value = json!({"scope":stage.scope,"execution_route":stage.execution_route,
         "status":if stage.result.is_ok(){"complete"}else{"failed"},
         "all_families_retained":stage.all_families_retained(),
         "phase_resource_policy":"configured_per_family; trace policies defer phase construction",
         "counts":counts_json(stage.counts),"by_kind":kinds,
         "history_rows":stage.history_rows,"layout_rows":stage.layout_rows,
         "elapsed_seconds":stage.elapsed_seconds,
-        "failure":stage.result.as_ref().err().map(|e|json!({"field":e.field,"message":e.message}))})
+        "failure":stage.result.as_ref().err().map(|e|json!({"field":e.field,"message":e.message}))});
+    if stage.cache_evictions != 0 {
+        value["cache_evictions"] = json!(stage.cache_evictions);
+    }
+    value
 }
 fn bind_stage(metadata: &mut Value, stage: Option<&SamplingPreparationReport>, included: bool) {
     let Some(stage) = stage else { return };
