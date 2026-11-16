@@ -4,6 +4,7 @@ pub mod cancellation;
 pub mod catalogue;
 pub mod circuit;
 pub mod clifford;
+pub mod compact;
 pub mod costs;
 pub mod enumeration;
 pub mod field;

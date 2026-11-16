@@ -107,9 +107,10 @@ pub use assignment_plan::{
     OriginalAssignmentCertificate, OriginalAssignmentExecutionPolicy, OriginalAssignmentInput,
     OriginalAssignmentPlan, OriginalCachedAssignment, OriginalCompactAssignment,
     OriginalCompactNoiseChannel, OriginalCompactNoiseLayout, OriginalIndependentRecordProposal,
-    OriginalNoiseAssignmentStream, OriginalNoiseCodeSelection, OriginalProbabilityCache,
-    OriginalProbabilityCacheStatistics, OriginalProposalDraw, OriginalProposalDrawError,
-    OriginalProposalOptions, OriginalSharedFaults, OriginalTraceCache,
+    OriginalNoiseAssignmentStream, OriginalNoiseCodeSelection, OriginalPackedAssignmentBatch,
+    OriginalPackedAssignmentPlan, OriginalPackedBatchOptions, OriginalPackedBatchStatistics,
+    OriginalProbabilityCache, OriginalProbabilityCacheStatistics, OriginalProposalDraw,
+    OriginalProposalDrawError, OriginalProposalOptions, OriginalSharedFaults, OriginalTraceCache,
     OriginalTraceCacheStatistics,
 };
 
@@ -586,14 +587,12 @@ impl OriginalInstrument {
         admit("max_metadata_bytes", l.max_metadata_bytes, bytes)?;
         Ok(())
     }
-    pub fn compile(
+    // Shared validation for literal compilation and explicit static batches.
+    // Callers admit assignment metadata before allocating this named map.
+    pub(super) fn assignment_true_values<'a>(
         &self,
-        assignment: &OriginalAssignment,
-        strategy: CompilerStrategy,
-        arithmetic: &ScalarArithmetic,
-    ) -> Result<OriginalBranch, OriginalError> {
-        let l = self.limits;
-        self.admit_assignment_metadata(assignment)?;
+        assignment: &'a OriginalAssignment,
+    ) -> Result<BTreeMap<&'a str, bool>, OriginalError> {
         let known = self
             .records
             .iter()
@@ -613,6 +612,17 @@ impl OriginalInstrument {
                 return Err(invalid("missing true record", r));
             }
         }
+        Ok(values)
+    }
+    pub fn compile(
+        &self,
+        assignment: &OriginalAssignment,
+        strategy: CompilerStrategy,
+        arithmetic: &ScalarArithmetic,
+    ) -> Result<OriginalBranch, OriginalError> {
+        let l = self.limits;
+        self.admit_assignment_metadata(assignment)?;
+        let values = self.assignment_true_values(assignment)?;
         let mut reports = values.clone();
         for r in &assignment.report_flips {
             let value = reports

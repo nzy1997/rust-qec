@@ -1,0 +1,19 @@
+SPDX-License-Identifier: MPL-2.0
+
+Source: https://github.com/itpyi/magna
+Pinned commit: 56847478c840395735146ef1e1ccdc3d8aedc10f
+Full license: original_many_record_input.LICENSE in this directory.
+
+Attributed original scenarios:
+- tests/core/test_native_compact_suffix.py:
+  NativeCompactSuffixTests.test_lossless_storage_and_ordered_faults_without_cpython
+- tests/native/compact_suffix.cpp, including all storage, range, randomized and
+  arbitrary manual suffix/frame cases and its independent set-valued oracle.
+- tests/core/test_native_global_fastpath.py:
+  NativeGlobalFastpathTests.test_shared_immutable_faults_keep_distinct_records_and_batch_scope
+
+Rust adaptations retain explicit declared dimensions and omega rather than i
+phase exponents. Additional compiler, buffer, high-word, true/report, lifetime,
+strict-input and error-prefix guards test the independent public Rust APIs.
+The manual suffix fixture adapter is not a substitute Clifford compiler.
+No CPython or Native ABI is required by the Rust test target.

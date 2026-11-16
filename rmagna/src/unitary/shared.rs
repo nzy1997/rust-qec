@@ -1,5 +1,6 @@
 //! Independent commuting-observation compilation at original gate boundaries.
 use super::*;
+use crate::compact::CompactBitVector;
 use crate::gf2::{LinearFactorization, transpose_columns};
 
 struct Slot {
@@ -89,8 +90,8 @@ impl PhaseUpdates {
 /// phases stay in the separate exact Clifford frame, not these binary masks.
 pub(super) struct InsertionEffects<'a> {
     updates: &'a PhaseUpdates,
-    x: Vec<BitVector>,
-    z: Vec<BitVector>,
+    x: Vec<CompactBitVector>,
+    z: Vec<CompactBitVector>,
     cursor: usize,
     next_selected: usize,
 }
@@ -100,8 +101,8 @@ impl<'a> InsertionEffects<'a> {
         let rows = if observations == 0 { 0 } else { width };
         Ok(Self {
             updates,
-            x: vec![BitVector::zeros(observations)?; rows],
-            z: vec![BitVector::zeros(observations)?; rows],
+            x: vec![CompactBitVector::zeros(observations); rows],
+            z: vec![CompactBitVector::zeros(observations); rows],
             cursor: updates.cliffords.len(),
             next_selected: observations,
         })
@@ -142,9 +143,9 @@ impl<'a> InsertionEffects<'a> {
         word: &PauliWord,
     ) -> Result<BitVector, UnitaryError> {
         let observations = self.updates.selected.len();
-        let mut effects = BitVector::zeros(observations)?;
+        let mut effects = CompactBitVector::zeros(observations);
         if observations == 0 || position <= self.updates.cut_gate {
-            return Ok(effects);
+            return Ok(effects.materialize()?);
         }
         if position > self.cursor || word.width() != self.updates.width {
             return Err(UnitaryError::DimensionMismatch);
@@ -172,7 +173,7 @@ impl<'a> InsertionEffects<'a> {
         for q in word.z().ones() {
             effects.xor_assign(&self.z[q])?;
         }
-        Ok(effects)
+        Ok(effects.materialize()?)
     }
 }
 

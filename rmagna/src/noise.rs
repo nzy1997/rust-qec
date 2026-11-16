@@ -2,6 +2,16 @@
 mod conditional;
 mod modulo_range;
 pub use modulo_range::{ModuloRangeError, ModuloWordRangeSource};
+mod prepared;
+mod prepared_weights;
+pub use prepared::{
+    PreparedNoiseDraw, PreparedNoiseError, PreparedNoiseOptions, PreparedNoiseSchedule,
+    PreparedNoiseStatistics,
+};
+pub use prepared_weights::{
+    NoiseWeightError, NoiseWeightLimits, NoiseWeightStatistics, PreparedNoiseWeights,
+    RawNoiseFactor,
+};
 mod sparse;
 pub use sparse::{
     SparseNoiseAction, SparseNoiseDraw, SparseNoiseError, SparseNoiseOptions, SparseNoiseSampler,

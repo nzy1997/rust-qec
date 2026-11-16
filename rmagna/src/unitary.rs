@@ -17,7 +17,9 @@ pub(crate) use input::{validate_stabilizer_input, with_zero_ancillas};
 mod insertions;
 mod observations;
 mod phase_map;
-pub use insertions::{InsertionPreparationOptions, PreparedInsertions};
+pub use insertions::{
+    InsertionPreparationOptions, PreparedInsertionStorageStatistics, PreparedInsertions,
+};
 mod prepared;
 mod shared;
 mod support;

@@ -15,6 +15,13 @@ pub use noise_layout::{
     OriginalNoiseCodeSelection,
 };
 
+#[path = "original_packed_batch.rs"]
+mod packed_batch;
+pub use packed_batch::{
+    OriginalPackedAssignmentBatch, OriginalPackedAssignmentPlan, OriginalPackedBatchOptions,
+    OriginalPackedBatchStatistics,
+};
+
 /// Immutable, owned physical faults and XOR-normalized report names. Sharing is
 /// explicit through Arc; mutable ordinary assignments are snapshotted per yield.
 #[derive(Clone)]

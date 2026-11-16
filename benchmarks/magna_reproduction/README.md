@@ -33,7 +33,7 @@ python3 benchmarks/magna_reproduction/remaining_contracts.py check \
 python3 -I -m unittest discover -s benchmarks/magna_reproduction -p test_remaining_contracts.py
 ```
 
-The first command prints `PASS`, 89 requirements, the reconciled ledger counts,
+The first command prints `PASS`, the current outstanding requirement counts, the reconciled ledger counts,
 31 tasks, 435 paper files and 18 issue nodes. Without `--upstream`, it checks the
 catalog and local owners but explicitly reports `upstream_verified=false`.
 Changed source pins, missing methods, unsupported status promotions and cyclic
@@ -3859,3 +3859,61 @@ The remaining delivery must qualify the complete constrained-domain, redundant
 label, parity/selection and protocol-to-target continuation/storage contracts.
 New cache/probe and factory observations do not by themselves establish all 25
 assigned source methods or constant Native internal parent counts.
+
+### Prepared exact noise and raw grouped weights (R10)
+
+`cargo test --locked -p rmagna --test prepared_noise_batches -- --show-output`
+executes the five complete source-bound R10 scenarios. The original Native
+methods were also run unchanged using the existing pinned helper. Rust retains
+all 139 interleaved action sites, 23/41 seed partition, 513-site fallback, group
+sizes 1/2/17/308/512/513, 128-seed arbitrary 100-digit category fixture and its
+47/81 partition, and 316-site/15-seed weighted/plain choices. Original ordered
+multi-Pauli action descriptors and unreduced raw integer products are public
+payloads; unit ratios including 3/3 are skipped before products, while cross-site
+cancellation and zero-product denominators remain visible.
+
+The new explicit seeded schedule groups occurrence totals and interns complete
+ordered conditional distributions. It uses the existing finite bit-plane kernel
+with an exact residual at `U == floor(p*2^64)`, so physical rational laws are not
+silently approximated. Forced near-zero/near-one/equality cases, lane63 and an
+independent joint-law check exercise the actual driver. `draw_scalar_seeded` is a
+single-factor law/entropy ablation. Seed partitions and weighted/plain replay
+agree within Rust; Native/Python and packed/scalar seed streams are distinct.
+This is a library noise service, not automatic guarded FileTask batching or a
+paper throughput campaign. Numerical models, count tables and output payloads
+have separately declared bounds; their metadata is not process RSS.
+
+The five mappings use unconditional tests in `prepared_noise_batches.rs` and a
+source-bound compiler/list/run receipt. Exact sparse/action/raw-product assertions
+reject reordered Pauli factors and perturbed weights. Removing the exact residual
+must reject the forced cutoff case. Finite proposal and estimator contracts from
+R06/B02 remain separate; a declared raw factor is not automatically an unbiased
+importance likelihood.
+
+### R11 compact transport and batch-local immutable packing
+
+`cargo test --locked -p rmagna --test compact_fault_storage -- --show-output`
+executes the complete pinned `compact_suffix.cpp` storage/range/manual-frame
+scenarios against public adaptive Rust masks and phased frames, with the original
+MT inputs and an independent set-valued Pauli oracle. Actual prepared suffixes,
+retained entries and shared sign effects use the same compact representation.
+An explicit high-width compiler diagnostic reports allocated mask/table scopes;
+these are neither RSS nor an entire preparation peak. Admission remains a
+conservative worst-case bound and can reject sparse instances.
+
+The complete immutable-fault method uses its original +X/T/MX source, Z faults,
+both record values, fresh batch boundaries and literal scalar comparisons.
+`prepare_packed_probabilities` performs real static fault transport/law preparation
+once for consecutive immutable group references in each batch. Mutable inputs
+repack, foreign source tokens reject before shared-empty reuse, and controls
+reject before callbacks. Existing literal/default task execution is unchanged.
+Ordinary and compact inputs are true words; the noise-layout reported-word adapter
+still applies report flips. Distinct inversions and strict JSON values are checked.
+
+Actual production mutations truncate a high sparse word index, reuse the first
+packed law across batches, and truncate the restored R10 15-way conditional.
+The first two violate structural witnesses even when simple scalar values agree;
+the last is caught by forced alternative14 selection. Together R10/R11 qualify
+seven original methods (315 verified / 7 partial / 30 unmapped); full parity and
+the R09 continuation/resource work remain open. Retained compiler/list/run
+receipts bind every new witness to the final source and executed binary.
