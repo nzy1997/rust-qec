@@ -6921,3 +6921,32 @@ controller inputs/outputs, entropy, caller RNG states and errors agree while
 the observed preparation counts change from two to 30 and evictions from zero
 to 29. An independent resolved-view case returns opposite unconditioned Z
 moments from shared preparation and one-half mass for both reported outcomes.
+
+`OriginalTraceView::probe_affine_records` offers a conservative resource-free
+certificate of a uniform affine reported-record law. It reuses the retained
+probability geometry construction, checks the actual view's phase directly and
+returns `None` when uncertified. It never selects a catalogue or constructs a
+phase resource. Retained-row/metadata/packed-geometry admission precedes
+construction; an explicit signature-work bound precedes Clifford conversion.
+Resource policy and term limits apply to the separate ordinary query, not this
+probe. Actual faults and reported inversions/flips remain part of the certificate.
+`OriginalStaticTrace::query_work_statistics` observes this owner's scalar and
+labelled query factories, excluding inherited-side expansion operations.
+
+The full upstream incremental-history circuit is checked against 16 stream
+hashes captured from Rust commit `fbe56895852a92afb547e15e6ef3a016c4b67917`,
+before these R09 changes. Its 1,024 draws cover both compilers, both history
+samplers, magic/no-magic inputs, fixed/cold execution and unbounded/metered runs.
+Each hash includes every physical evaluation field, actual ordered callbacks and
+random words, and the next caller word. Compilation/query counts and resource
+representation sizes are separate observations. Cold-prefix affine bases have
+a distinct seeded convention; the fixture records that difference explicitly.
+No Python RNG digest or private Native LRU option is presented as a Rust ABI.
+
+Full original shared-query and CCZ/destructive-readout fixtures additionally
+check 896 exact cells against independent literal fixed-record branch sums,
+96 isolated fresh plans and 24 actual threaded batches. Retained classical
+labels are checked cell by cell through explicit scalar event rows. Forty-eight
+shared-query plans retain three actual projection/contraction geometries with
+45 observed reuses, while each effect retains its own phase resource. Conflicting
+repeated events return zero, and invalid warm requests fail before preparation.

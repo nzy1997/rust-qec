@@ -2162,3 +2162,174 @@ fn instrument_lru_eviction_keeps_all_sixty_actual_callbacks_guarded_noise_masses
         "30draws each atLRU4/LRU1:60actualcallbacks;2vs30realpreparations/0vs29evictions;entirephysicalmass/noise/entropy/RNG/controller/error transcriptidentical;literal conditional output oracle agrees"
     );
 }
+
+#[test]
+fn affine_probe_refuses_biased_t_readout_without_building_a_phase_resource() {
+    use rmagna::{
+        clifford::CliffordCircuit,
+        instrument::*,
+        phase::{NativePhaseOptions, PhaseError},
+        unitary::{CompilerStrategy, UnitaryError},
+    };
+    let a = ScalarArithmetic::default();
+    let mut cases = 0;
+    for compiler in [
+        CompilerStrategy::ParityCopies,
+        CompilerStrategy::SharedCommutingLayer,
+    ] {
+        for kind in ["uniform", "biased", "deterministic"] {
+            let mut ops = vec![];
+            if kind != "deterministic" {
+                ops.push(original_op("h", OriginalGate::H(0)));
+            }
+            if kind == "biased" {
+                ops.extend([
+                    original_op(
+                        "t",
+                        OriginalGate::Phase {
+                            wires: vec![0],
+                            turns: 1,
+                        },
+                    ),
+                    original_op("h2", OriginalGate::H(0)),
+                ]);
+            }
+            ops.extend([
+                original_op("anchor", OriginalGate::Identity(vec![0])),
+                original_op("m", original_z("r", 0)),
+            ]);
+            let instrument = OriginalInstrument::new(
+                vec![0],
+                vec![0],
+                CliffordCircuit::computational(bits(1, 0)).unwrap(),
+                ops,
+                vec![],
+                OriginalLimits::default(),
+                &a,
+            )
+            .unwrap();
+            let trace = instrument.compile_trace(compiler, &a).unwrap();
+            let mut native = NativePhaseOptions::default();
+            native.selection.max_quotient_rank = 0;
+            let options = OriginalNetworkOptions {
+                resource: OriginalNetworkResource::Native(native),
+                max_terms: 256,
+                ..Default::default()
+            };
+            for fault in [false, true] {
+                for report in [false, true] {
+                    for inverted in [false, true] {
+                        let view = trace
+                            .with_assignment(
+                                &OriginalTraceAssignment {
+                                    faults: if fault {
+                                        vec![OriginalFault {
+                                            after: "anchor".into(),
+                                            wire: 0,
+                                            pauli: OriginalPauli::X,
+                                        }]
+                                    } else {
+                                        vec![]
+                                    },
+                                    report_flips: if report { vec!["r".into()] } else { vec![] },
+                                },
+                                &a,
+                            )
+                            .unwrap();
+                        let keep = [OriginalRecordParity {
+                            records: vec!["r".into()],
+                            inverted,
+                        }];
+                        let before = trace.query_work_statistics();
+                        let result = view
+                            .probe_affine_records(&keep, &options, 64 << 20, &a)
+                            .unwrap();
+                        let after = trace.query_work_statistics();
+                        assert_eq!(
+                            after.phase_resources_prepared,
+                            before.phase_resources_prepared
+                        );
+                        assert_eq!(
+                            after.support_phase_resources_prepared,
+                            before.support_phase_resources_prepared
+                        );
+                        assert_eq!(
+                            after.support_parents_prepared,
+                            before.support_parents_prepared
+                        );
+                        assert_eq!(
+                            after.support_projections_prepared,
+                            before.support_projections_prepared + 1
+                        );
+                        assert_eq!(after.live_affine_geometries, Some(0));
+                        if kind == "biased" {
+                            assert!(result.is_none());
+                            assert!(
+                                view.prepare_record_probabilities(&keep, &options, &a)
+                                    .is_err()
+                            );
+                        } else {
+                            let result = result.expect("direct Clifford probability certificate");
+                            assert_eq!(result.total_mass(), &ExactScalar::one());
+                            if kind == "uniform" {
+                                assert_eq!(result.support().dimension(), 1);
+                                assert_eq!(result.mass_per_label(), &a.omega(0, -2).unwrap());
+                            } else {
+                                assert_eq!(result.support().dimension(), 0);
+                                assert_eq!(
+                                    result.support().offset(),
+                                    &bits(1, usize::from(fault ^ report ^ inverted))
+                                );
+                                assert_eq!(result.mass_per_label(), &ExactScalar::one());
+                            }
+                        }
+                        let before = trace.query_work_statistics();
+                        let mut bounded = options;
+                        bounded.limits.max_geometry_words = 0;
+                        assert!(matches!(
+                            view.probe_affine_records(&keep, &bounded, 64 << 20, &a),
+                            Err(OriginalError::ResourceLimit {
+                                option: "max_network_geometry_words",
+                                ..
+                            })
+                        ));
+                        let unknown = [OriginalRecordParity {
+                            records: vec!["unknown".into()],
+                            inverted: false,
+                        }];
+                        assert!(
+                            view.probe_affine_records(&unknown, &options, 64 << 20, &a)
+                                .is_err()
+                        );
+                        assert_eq!(
+                            preparations(trace.query_work_statistics()),
+                            preparations(before)
+                        );
+                        if kind == "biased" {
+                            assert!(matches!(
+                                view.probe_affine_records(&keep, &options, 0, &a),
+                                Err(OriginalError::Unitary(UnitaryError::Phase(
+                                    PhaseError::ResourceLimit {
+                                        option: "affine_probe.max_signature_work",
+                                        ..
+                                    }
+                                )))
+                            ));
+                        }
+                        cases += 1;
+                    }
+                }
+            }
+        }
+    }
+    assert_eq!(cases, 48);
+    println!(
+        "48 affine probes: exact source HTH readout refuses certification and ordinary rank-zero resource query; Clifford laws preserve actual faults/report offsets; zero resource constructions and explicit geometry/signature admission"
+    );
+}
+
+#[path = "support/fixed_reference_replay.rs"]
+mod replay;
+
+#[path = "support/fixed_reference_networks.rs"]
+mod networks;

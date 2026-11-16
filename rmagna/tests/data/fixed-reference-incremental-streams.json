@@ -1,0 +1,27 @@
+{
+  "capture_source_sha256": "6748641df02c1d549547cbd646046c3abfe9c38971111d590547187c1d5341f0",
+  "cells": {
+    "ParityCopies/false/AffineSupport/ColdPrefix": "203ea7821d51b94cb109c3d661808f5eb4f6ff074334bf8721e7b2bce82ebaf6",
+    "ParityCopies/false/AffineSupport/FixedTemplate": "286c42a88a4465b34e2d62e1b1a70fd16a1b94355072c589313be87cef191f4a",
+    "ParityCopies/false/ExactMarginal/ColdPrefix": "b6b8ca39f6bf2f5ff4073326fb6052e737e1195b881fb059d128da6746616b6a",
+    "ParityCopies/false/ExactMarginal/FixedTemplate": "b6b8ca39f6bf2f5ff4073326fb6052e737e1195b881fb059d128da6746616b6a",
+    "ParityCopies/true/AffineSupport/ColdPrefix": "0fe4b2164d743659a0d01e3da6ab36218855829d3335f4120a8d56397580e5c5",
+    "ParityCopies/true/AffineSupport/FixedTemplate": "e3a925b7a17fe7bb4fda704952b861f7972ceede56715e12e944bbe50c08f354",
+    "ParityCopies/true/ExactMarginal/ColdPrefix": "c1600eebb0c0d57eb37f9221ea4773b0a457f2cb235ae8a18c4cd4127b455bc5",
+    "ParityCopies/true/ExactMarginal/FixedTemplate": "c1600eebb0c0d57eb37f9221ea4773b0a457f2cb235ae8a18c4cd4127b455bc5",
+    "SharedCommutingLayer/false/AffineSupport/ColdPrefix": "203ea7821d51b94cb109c3d661808f5eb4f6ff074334bf8721e7b2bce82ebaf6",
+    "SharedCommutingLayer/false/AffineSupport/FixedTemplate": "286c42a88a4465b34e2d62e1b1a70fd16a1b94355072c589313be87cef191f4a",
+    "SharedCommutingLayer/false/ExactMarginal/ColdPrefix": "b6b8ca39f6bf2f5ff4073326fb6052e737e1195b881fb059d128da6746616b6a",
+    "SharedCommutingLayer/false/ExactMarginal/FixedTemplate": "b6b8ca39f6bf2f5ff4073326fb6052e737e1195b881fb059d128da6746616b6a",
+    "SharedCommutingLayer/true/AffineSupport/ColdPrefix": "0fe4b2164d743659a0d01e3da6ab36218855829d3335f4120a8d56397580e5c5",
+    "SharedCommutingLayer/true/AffineSupport/FixedTemplate": "e3a925b7a17fe7bb4fda704952b861f7972ceede56715e12e944bbe50c08f354",
+    "SharedCommutingLayer/true/ExactMarginal/ColdPrefix": "c1600eebb0c0d57eb37f9221ea4773b0a457f2cb235ae8a18c4cd4127b455bc5",
+    "SharedCommutingLayer/true/ExactMarginal/FixedTemplate": "c1600eebb0c0d57eb37f9221ea4773b0a457f2cb235ae8a18c4cd4127b455bc5"
+  },
+  "first_seed": 26090400,
+  "rng": "SplitMix64",
+  "rust_baseline_commit": "fbe56895852a92afb547e15e6ef3a016c4b67917",
+  "schema": "rmagna.incremental-stream.v1",
+  "scope": "All TaskEvaluation physics fields, ordered actual callbacks and random words, and next caller word. Compilation/query counts and resource representation sizes are excluded. ColdPrefix affine bases have a distinct seeded convention. Native Python digests are not reused.",
+  "seeds_per_cell": 32
+}

@@ -41,6 +41,41 @@ pub struct UniformOriginalRecords {
 }
 
 impl OriginalTraceView<'_> {
+    /// Try to certify a uniform affine law directly from the actual Clifford
+    /// probability tensor, without selecting or expanding a phase resource.
+    /// `None` means uncertified, including coherent sums or nonpositive masses;
+    /// it does not prove that the distribution is nonuniform. The ordinary
+    /// retained-row and packed-geometry limits apply before construction.
+    /// Resource policy, catalogue and term caps are intentionally unused;
+    /// `max_signature_work` independently bounds the Clifford signature scan.
+    pub fn probe_affine_records(
+        &self,
+        keep: &[OriginalRecordParity],
+        options: &OriginalNetworkOptions<'_>,
+        max_signature_work: usize,
+        a: &ScalarArithmetic,
+    ) -> Result<Option<UniformOriginalRecords>, OriginalError> {
+        let (layout, rows) = labelled_layout(
+            self.source,
+            keep,
+            options,
+            "max_record_rows",
+            self.source.limits.completed.max_record_rows,
+        )?;
+        let shift = layout.outcomes(self, &BitVector::zeros(keep.len())?)?;
+        let Some(terms) =
+            self.unitary
+                .probe_probability_support_affine(&rows, max_signature_work, a)?
+        else {
+            return Ok(None);
+        };
+        let zero = BitVector::zeros(shift.width())?;
+        let terms = terms
+            .into_iter()
+            .map(|term| term.pauli(&shift, &zero).map_err(OriginalError::from))
+            .collect::<Result<Vec<_>, _>>()?;
+        OriginalRecordProbabilities { terms }.uniform_affine(a)
+    }
     /// Prepare ordered reported parities without expanding the coherent side.
     /// Report inversions and physical faults belong to this immutable view.
     /// Retained rows obey `OriginalLimits::completed.max_record_rows`; event-row
