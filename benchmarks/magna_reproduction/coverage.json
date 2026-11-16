@@ -1012,67 +1012,67 @@
     {
       "id": "test_file_api.FileApiTests.test_signal_handlers_run_during_one_long_native_batch",
       "status": "verified",
-      "contract": "Complete unchanged original SIGALRM/Stop method executes its ten-million-draw request,0.2-second alarm and original time assertion, with exact timer/handler setter protocol and restored process state. Independent Rust equivalent is explicitly a sticky token plus opt-in same-thread cooperative safe-point scope, not Python signal/exception ABI or an invented wall-time bound. Real4096-term contraction rendezvous cancels at term4; cold/prepared Gaussian elimination cancels at step3. Nested scopes, other-thread isolation and unwind restoration preserve context. Cancelled in-flight rows are interrupted rather than completed/failed/unattempted; committed records/partial exact statistics and actual work counters remain. Actual callback/caller RNG replay proves no entropy after observed refusal and no rewind; ordinary decoder error wins when only cancellation was requested. Blocked process response, contended session lock and registered-process batch cases terminate/reap the actual managed child before reporting cancellation, poison shared bindings and do not retry. Existing between-draw semantics remain. Arbitrary blocked in-process callbacks, individual OS/big-integer calls, descendant management, Python ABI and real-time preemption remain outside this typed contract.",
+      "contract": "Complete unchanged original SIGALRM/Stop method executes its ten-million-draw request,0.2-second alarm and original time assertion, with exact timer/handler setter protocol and restored process state. Independent Rust equivalent is explicitly a sticky token plus opt-in same-thread cooperative safe-point scope, not Python signal/exception ABI or an invented wall-time bound. Real4096-term contraction rendezvous cancels at term4; cold/prepared Gaussian elimination cancels at step3. Nested scopes, other-thread isolation and unwind restoration preserve context. Cancelled in-flight rows are interrupted rather than completed/failed/unattempted; committed records/partial exact statistics and actual work counters remain. Actual callback/caller RNG replay proves no entropy after observed refusal and no rewind; ordinary decoder error wins when only cancellation was requested. Blocked process response, contended session lock and registered-process batch cases terminate/reap the actual managed child before reporting cancellation, poison shared bindings and do not retry. Existing between-draw semantics remain. Arbitrary blocked in-process callbacks, individual OS/big-integer calls, descendant management, Python ABI and real-time preemption remain outside this typed contract. Validated response commits and managed termination are ordered by the same lifecycle mutex: termination-first refuses an already queued valid reply, while commit-first preserves the owned output; other callers do not falsely report their own token interrupted.",
       "rust_tests": [
         {
           "package": "rmagna",
           "target": "long_operation_cancellation",
           "test": "one_inflight_phase_contraction_stops_at_a_deterministic_rendezvous",
-          "source_sha256": "e832dd5082b62a9d84f7d7d29ef910730c2abc1c7225235e213084496955c93b"
+          "source_sha256": "d8482a9bdc830db3bcc1841a8ee3e2c4c7b28b06e99cffa1cec1c6c62c5cc9fa"
         },
         {
           "package": "rmagna",
           "target": "long_operation_cancellation",
           "test": "cold_and_prepared_quadratic_work_refuse_inside_elimination",
-          "source_sha256": "e832dd5082b62a9d84f7d7d29ef910730c2abc1c7225235e213084496955c93b"
+          "source_sha256": "d8482a9bdc830db3bcc1841a8ee3e2c4c7b28b06e99cffa1cec1c6c62c5cc9fa"
         },
         {
           "package": "rmagna",
           "target": "long_operation_cancellation",
           "test": "nested_scopes_unwinding_and_other_threads_restore_their_own_contexts",
-          "source_sha256": "e832dd5082b62a9d84f7d7d29ef910730c2abc1c7225235e213084496955c93b"
+          "source_sha256": "d8482a9bdc830db3bcc1841a8ee3e2c4c7b28b06e99cffa1cec1c6c62c5cc9fa"
         },
         {
           "package": "rmagna",
           "target": "long_operation_cancellation",
           "test": "a_cancelled_inflight_row_is_distinct_from_committed_failed_and_unattempted_rows",
-          "source_sha256": "e832dd5082b62a9d84f7d7d29ef910730c2abc1c7225235e213084496955c93b"
+          "source_sha256": "d8482a9bdc830db3bcc1841a8ee3e2c4c7b28b06e99cffa1cec1c6c62c5cc9fa"
         },
         {
           "package": "rmagna",
           "target": "long_operation_cancellation",
           "test": "blocked_process_response_is_cancelled_only_after_the_managed_child_is_reaped",
-          "source_sha256": "e832dd5082b62a9d84f7d7d29ef910730c2abc1c7225235e213084496955c93b"
+          "source_sha256": "d8482a9bdc830db3bcc1841a8ee3e2c4c7b28b06e99cffa1cec1c6c62c5cc9fa"
         },
         {
           "package": "rmagna",
           "target": "long_operation_cancellation",
           "test": "cancellation_while_waiting_for_the_session_lock_terminates_the_shared_worker",
-          "source_sha256": "e832dd5082b62a9d84f7d7d29ef910730c2abc1c7225235e213084496955c93b"
+          "source_sha256": "d8482a9bdc830db3bcc1841a8ee3e2c4c7b28b06e99cffa1cec1c6c62c5cc9fa"
         },
         {
           "package": "rmagna",
           "target": "long_operation_cancellation",
           "test": "registered_process_cancellation_preserves_typed_batch_interruption_after_string_errors",
-          "source_sha256": "e832dd5082b62a9d84f7d7d29ef910730c2abc1c7225235e213084496955c93b"
+          "source_sha256": "d8482a9bdc830db3bcc1841a8ee3e2c4c7b28b06e99cffa1cec1c6c62c5cc9fa"
         },
         {
           "package": "rmagna",
           "target": "long_operation_cancellation",
           "test": "a_safe_point_after_the_actual_callback_consumes_no_more_caller_owned_entropy",
-          "source_sha256": "e832dd5082b62a9d84f7d7d29ef910730c2abc1c7225235e213084496955c93b"
+          "source_sha256": "d8482a9bdc830db3bcc1841a8ee3e2c4c7b28b06e99cffa1cec1c6c62c5cc9fa"
         },
         {
           "package": "rmagna",
           "target": "long_operation_cancellation",
           "test": "a_decoder_error_after_requesting_cancellation_remains_a_failed_draw",
-          "source_sha256": "e832dd5082b62a9d84f7d7d29ef910730c2abc1c7225235e213084496955c93b"
+          "source_sha256": "d8482a9bdc830db3bcc1841a8ee3e2c4c7b28b06e99cffa1cec1c6c62c5cc9fa"
         },
         {
           "package": "rmagna",
           "target": "long_operation_cancellation",
           "test": "complete_original_signal_reference_keeps_the_separate_python_exception_contract_explicit",
-          "source_sha256": "e832dd5082b62a9d84f7d7d29ef910730c2abc1c7225235e213084496955c93b"
+          "source_sha256": "d8482a9bdc830db3bcc1841a8ee3e2c4c7b28b06e99cffa1cec1c6c62c5cc9fa"
         },
         {
           "package": "rmagna",
@@ -1085,6 +1085,18 @@
           "target": "file_runtime_control",
           "test": "asynchronous_cancellation_commits_one_draw_without_sparse_progress_or_extra_callback",
           "source_sha256": "c72040323268ac19d829f2cdee1def4ade74f83554ffe18ebf3c077ebccd0fb5"
+        },
+        {
+          "package": "rmagna",
+          "target": "long_operation_cancellation",
+          "test": "a_valid_queued_reply_is_rejected_when_shared_termination_commits_first",
+          "source_sha256": "d8482a9bdc830db3bcc1841a8ee3e2c4c7b28b06e99cffa1cec1c6c62c5cc9fa"
+        },
+        {
+          "package": "rmagna",
+          "target": "long_operation_cancellation",
+          "test": "an_owned_committed_reply_remains_valid_after_later_shared_termination",
+          "source_sha256": "d8482a9bdc830db3bcc1841a8ee3e2c4c7b28b06e99cffa1cec1c6c62c5cc9fa"
         }
       ]
     },

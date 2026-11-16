@@ -52,6 +52,22 @@ struct Worker {
     timeout: Duration,
 }
 impl Worker {
+    // This lock is the lifecycle linearization point shared with terminate.
+    // No response can commit after a completed termination, even if the I/O
+    // thread queued its valid bytes before the managed child was killed.
+    fn commit_response(&self, started: Instant) -> Result<(), ProcessError> {
+        let _lifecycle = self
+            .child
+            .lock()
+            .map_err(|_| error("worker process mutex poisoned"))?;
+        if self.stopped.load(Ordering::Acquire) {
+            return Err(error("worker stopped before response commit"));
+        }
+        if started.elapsed() >= self.timeout {
+            return Err(error("response validation exceeded the exchange timeout"));
+        }
+        Ok(())
+    }
     fn terminate(&self) -> Result<(), ProcessError> {
         let mut child = self
             .child
@@ -209,10 +225,11 @@ impl Session {
         if outputs.len() > self.options.max_bits {
             return Err(self.fail("output bit budget exceeded"));
         }
-        if started.elapsed() > self.options.timeout {
-            return Err(self.fail("response validation exceeded the exchange timeout"));
+        let outputs = outputs.into_iter().map(|bit| bit.0).collect();
+        if let Err(e) = self.worker.commit_response(started) {
+            return Err(self.fail(e.0));
         }
-        Ok(outputs.into_iter().map(|bit| bit.0).collect())
+        Ok(outputs)
     }
 }
 impl Drop for Session {
@@ -340,13 +357,16 @@ impl ControllerProcess {
     /// Inspect/reap the actual managed child without acquiring the exchange
     /// lock. A returned exit status also prevents any later request/retry.
     pub fn try_wait(&self) -> Result<Option<std::process::ExitStatus>, ProcessError> {
-        let status = self
+        let mut child = self
             .worker
             .child
             .lock()
-            .map_err(|_| error("worker process mutex poisoned"))?
+            .map_err(|_| error("worker process mutex poisoned"))?;
+        let status = child
             .try_wait()
             .map_err(|e| error(format!("cannot inspect worker: {e}")))?;
+        // Keep the lifecycle lock through the stop transition, just as
+        // terminate does, so a response cannot commit between these events.
         if status.is_some() {
             self.worker.stopped.store(true, Ordering::Release);
         }

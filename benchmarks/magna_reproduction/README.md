@@ -3786,7 +3786,10 @@ validation. This is a safe-point policy, not a real-time latency claim. A
 termination handle independent of the session lock kills and reaps the direct
 managed child before recording successful cancellation. Cleanup errors remain
 errors. Termination poisons the whole shared worker and all bindings, including
-another caller's in-flight exchange; no request is retried. Descendant process
+another caller's uncommitted in-flight exchange; no request is retried.
+Validated response commits and termination share the child lifecycle mutex.
+When termination wins that ordering, even an already queued valid reply fails;
+when the response commits first, its owned result remains valid. Descendant process
 management is outside this direct-child contract. `ControllerProcess::try_wait`
 inspects the actual managed child without taking the exchange lock.
 

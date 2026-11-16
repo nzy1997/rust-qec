@@ -630,3 +630,107 @@ fn complete_original_signal_reference_keeps_the_separate_python_exception_contra
         "unchanged original10million-draw request/0.2secondSIGALRM/Stop passed in Native;handler/timer restored;Rust exposes separate cooperative scope"
     );
 }
+
+fn replying_process(files: &Files) -> rmagna::runtime::process::ControllerProcess {
+    use rmagna::runtime::process::{ControllerProcess, ProcessOptions};
+    let mut command = std::process::Command::new("python3");
+    command.args(["-I","-B","-u","-c",concat!(
+        "import os,sys,json,time,pathlib\n",
+        "print(json.dumps({'protocol':'rmagna.controller.v1','bindings':{'toy':'1'},'manifest':{'pid':os.getpid()}}),flush=True)\n",
+        "request=json.loads(sys.stdin.readline())\n",
+        "print(json.dumps({'id':request['id'],'outputs':[True]}),flush=True)\n",
+        "pathlib.Path('reply-ready').write_text('complete response flushed')\n",
+        "while True: time.sleep(1)\n")]).current_dir(&files.0);
+    ControllerProcess::spawn(
+        command,
+        ProcessOptions {
+            timeout: Duration::from_secs(5),
+            ..Default::default()
+        },
+    )
+    .unwrap()
+}
+
+#[test]
+fn a_valid_queued_reply_is_rejected_when_shared_termination_commits_first() {
+    let files = Files::new();
+    let worker = replying_process(&files);
+    let pid = worker.manifest()["pid"].as_u64().unwrap();
+    let (entered, ready) = mpsc::channel();
+    let (release, waiting) = mpsc::channel();
+    let waiting = Mutex::new(waiting);
+    let observer: CheckpointObserver = Arc::new(move |point| {
+        if point.kind == SafePoint::DecoderWait && point.sequence == 2 {
+            entered.send(()).unwrap();
+            waiting
+                .lock()
+                .unwrap()
+                .recv_timeout(Duration::from_secs(10))
+                .unwrap();
+        }
+    });
+    let owner = worker.clone();
+    let (done, result) = mpsc::channel();
+    let thread = std::thread::spawn(move || {
+        done.send(
+            CancellationToken::new()
+                .with_cooperative_scope(Some(observer), || owner.evaluate("toy", &[])),
+        )
+        .unwrap();
+    });
+    ready.recv_timeout(Duration::from_secs(10)).unwrap();
+    let started = std::time::Instant::now();
+    while !files.0.join("reply-ready").exists() {
+        assert!(
+            started.elapsed() < Duration::from_secs(10),
+            "child did not flush its valid reply"
+        );
+        std::thread::sleep(Duration::from_millis(1));
+    }
+    // The complete response is already in the pipe/queue. The owner cannot
+    // commit it while paused, so termination must win without a timing race.
+    let cancel = CancellationToken::new();
+    cancel.cancel();
+    let cancelled = cancel.with_cooperative_scope(None, || worker.evaluate("toy", &[]));
+    assert!(cancelled.interrupted);
+    assert!(cancelled.value.is_err());
+    assert_reaped(&worker, pid);
+    release.send(()).unwrap();
+    let original = result.recv_timeout(Duration::from_secs(10)).unwrap();
+    thread.join().unwrap();
+    assert!(
+        !original.interrupted,
+        "another scope's cancellation is a process failure for this owner"
+    );
+    let error = original
+        .value
+        .expect_err("a killed shared worker must poison its in-flight queued valid reply");
+    assert!(
+        error.to_string().contains("stopped before response commit"),
+        "{error}"
+    );
+    assert!(worker.evaluate("toy", &[]).is_err());
+    println!(
+        "valid reply flushed before shared cancellation;child reaped before owner resumed;queued reply refused at commit,no retry"
+    );
+}
+
+#[test]
+fn an_owned_committed_reply_remains_valid_after_later_shared_termination() {
+    let files = Files::new();
+    let worker = replying_process(&files);
+    let pid = worker.manifest()["pid"].as_u64().unwrap();
+    let committed = worker.evaluate("toy", &[]).unwrap();
+    assert_eq!(committed, [true]);
+    let cancel = CancellationToken::new();
+    cancel.cancel();
+    let report = cancel.with_cooperative_scope(None, || worker.evaluate("toy", &[]));
+    assert!(report.interrupted);
+    assert!(report.value.is_err());
+    assert_reaped(&worker, pid);
+    assert_eq!(committed, [true]);
+    assert!(worker.evaluate("toy", &[]).is_err());
+    println!(
+        "response committed first;later termination reaped child but retained already-owned output"
+    );
+}
