@@ -138,13 +138,13 @@ impl ScalarClosure {
         self.work.record(&self.work.phase_maps);
         let phase = phase_map.apply(phases, &BitVector::zeros(self.geometry.keep.len())?)?;
         let mut decomposition = options.prepare(&phase, max_terms, catalogue, arithmetic)?;
+        self.work.record(&self.work.phase_resources);
         let transport = decomposition.prepare_native_transport(
             &phase,
             0,
             || Ok(self.geometry.contraction.symbolic_boundary(0)?),
             arithmetic,
         )?;
-        self.work.record(&self.work.phase_resources);
         self.resource = Some(FixedResource {
             decomposition,
             phase_map,

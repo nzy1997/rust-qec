@@ -16,14 +16,20 @@ fn probability(zero: bool) -> ExactScalar {
         .scalar([2.into(), sign.into(), 0.into(), (-sign).into()], -2)
         .unwrap()
 }
-fn preparations(s: QueryWorkStatistics) -> (u64, u64, u64, u64) {
+fn preparations(s: QueryWorkStatistics) -> [u64; 10] {
     assert!(!s.saturated);
-    (
+    [
         s.affine_closures_prepared,
         s.affine_geometry_preparations,
         s.phase_maps_prepared,
         s.phase_resources_prepared,
-    )
+        s.support_projections_prepared,
+        s.support_boundary_maps_prepared,
+        s.support_contractions_prepared,
+        s.support_phase_maps_prepared,
+        s.support_phase_resources_prepared,
+        s.support_parents_prepared,
+    ]
 }
 #[test]
 fn actual_factory_counters_distinguish_warm_evaluation_from_cold_reconstruction() {
@@ -39,7 +45,7 @@ fn actual_factory_counters_distinguish_warm_evaluation_from_cold_reconstruction(
         .prepare_probability_with_fibers(&rows, 256, Default::default(), &a)
         .unwrap();
     let before = u.query_work_statistics();
-    assert_eq!(preparations(before), (1, 1, 1, 1));
+    assert_eq!(preparations(before), [1, 1, 1, 1, 0, 0, 0, 0, 0, 0]);
     for bit in 0..32 {
         assert_eq!(
             plan.evaluate(&u, &bits(1, bit & 1), 256, &a).unwrap().value,
@@ -382,6 +388,7 @@ fn prepared_feedback_layers_reuse_actual_factories_and_match_independent_basis_t
                 QueryPreparation::Trace,
                 QueryPreparation::FixedFibers(Default::default()),
                 QueryPreparation::FixedCatalogue(Default::default()),
+                QueryPreparation::Native(Default::default()),
             ] {
                 for compiler in [
                     CompilerStrategy::ParityCopies,
@@ -467,7 +474,38 @@ fn prepared_feedback_layers_reuse_actual_factories_and_match_independent_basis_t
                         }
                         let after = e.query_work_statistics();
                         let after_source = after.source.unwrap();
-                        assert_eq!(preparations(before_source), preparations(after_source));
+                        if sampler == HistorySampler::AffineSupport
+                            && matches!(mode, QueryPreparation::Trace)
+                        {
+                            // Trace explicitly defers the labelled support resource.
+                            // Its one real first-use construction is not a warm claim.
+                            assert_eq!(prepared.by_kind["reported_support"].cold, 1);
+                            assert_eq!(
+                                &preparations(before_source)[..4],
+                                &preparations(after_source)[..4]
+                            );
+                            assert_eq!(
+                                after_source.support_parents_prepared
+                                    - before_source.support_parents_prepared,
+                                1
+                            );
+                            assert_eq!(
+                                after_source.support_phase_maps_prepared
+                                    - before_source.support_phase_maps_prepared,
+                                1
+                            );
+                            assert_eq!(
+                                after_source.support_phase_resources_prepared
+                                    - before_source.support_phase_resources_prepared,
+                                1
+                            );
+                        } else {
+                            assert_eq!(preparations(before_source), preparations(after_source));
+                            if sampler == HistorySampler::AffineSupport {
+                                assert_eq!(prepared.by_kind["reported_support"].cold, 0);
+                                assert_eq!(before_source.support_parents_prepared, 1);
+                            }
+                        }
                         assert_eq!(before.target, after.target);
                         assert_eq!(calls.load(Ordering::Relaxed), layers * 8);
                         assert_eq!(meter.snapshot().compilation.attempted, 0);
@@ -497,9 +535,9 @@ fn prepared_feedback_layers_reuse_actual_factories_and_match_independent_basis_t
             }
         }
     }
-    assert_eq!(cases, 72);
+    assert_eq!(cases, 96);
     println!(
-        "72prepared feedback cases/576draws:1,3,7layers x2samplers x3policies x2compilers x2targets;0hotfactories;actualquerycounts and independent joint/basis target masses agree"
+        "96prepared feedback cases/768draws:1,3,7layers x2samplers x4policies x2compilers x2targets;fixedpolicies0hotfactories,Traceexplicitlydefers1supportparent;actualquerycounts and independent joint/basis target masses agree"
     );
 }
 

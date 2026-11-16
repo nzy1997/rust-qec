@@ -2108,9 +2108,10 @@ The owning task captures every potential decoder/guard observation and requested
 record in a fixed transport span. Generic instrument proposals retain all records
 unless `with_support_transport` declares a smaller span; a subsequent query
 outside that span fails explicitly. Preparation is immutable and shared across
-branches, built on demand in one fixed slot. A failed low-budget construction is
-not cached. Fixed probability preparation supplies its configured fiber search;
-other probability modes use default fiber-search options for this proposal parent.
+branches, built on demand or during explicit fixed-policy preparation in one
+fixed slot. A failed low-budget construction is not cached. Fixed fiber,
+catalogue and Native policies supply their configured resource options; Cold
+and Trace use the default lazy fiber-search policy for this proposal parent.
 Cold-prefix support parents are ephemeral. Numerical enumeration continues to
 use its conservative structural branch certificate and exact physical marginals.
 `prepared_support_statistics` reports transport labels and fixed resource counts;
@@ -4099,8 +4100,10 @@ later evaluations against those same families.
 
 For `exact_marginal`, preparation includes each group's condition prefix and
 every subsequent bit prefix. For `affine_support`, it validates the captured
-structural support parent and records a `cold` request; no numerical support
-cache is retained. Both prepare the complete final-history probability and the
+support parent. FixedFibers, FixedCatalogue and Native policies retain its
+actual numeric projection, boundary map and phase resource during this stage;
+Trace and Cold policies explicitly report a `cold` request and defer that parent.
+Both samplers prepare the complete final-history probability and the
 conditioned task-response families. The stage does not request unused support
 parents for linear or exact-marginal tasks. `cold_prefix` returns an explicit
 unsupported-scope error because its history-specific programs have no reusable
@@ -6865,3 +6868,14 @@ matrix arithmetic under both compilers, including zero projected pairings. In
 that fixture, 33 closures share one actual projection/contraction map, while
 phase resources remain separate. Another test exercises eight simultaneous
 preparations, distinct biased event rows, malformed rows and weak-map release.
+
+Labelled-support factory observations are separate `support_*` fields: actual
+projections, boundary maps, contractions (including an optional Clifford
+shortcut), phase maps, resources, completed parents and evaluations. A changed
+boundary that falls back to fresh contraction increments
+`support_changed_boundary_fallbacks`. Partial preparation failures retain the
+factory work actually completed. Fixed policies preflight this parent; Trace's
+explicit first-use construction is reported separately from fixed-policy warm
+reuse. The six original dense conditional fixtures now exercise 1,024 draws
+under each compiler (12,288 total), with actual callback counts, target reuse,
+24 exact enumerations and unchanged scalar/support factory counts per draw.

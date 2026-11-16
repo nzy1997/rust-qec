@@ -240,14 +240,8 @@ fn feedback_prefixes_decision_constants_and_guarded_categories_cover_actual_nois
                 let meter = ExecutionMeter::default();
                 let report = e.prepare_sampling_queries(Default::default(), &meter);
                 assert_eq!(report.result, Ok(()));
-                assert_eq!(
-                    report.all_families_retained(),
-                    sampler == HistorySampler::ExactMarginal
-                );
-                assert_eq!(
-                    report.counts.cold,
-                    usize::from(sampler == HistorySampler::AffineSupport)
-                );
+                assert!(report.all_families_retained());
+                assert_eq!(report.counts.cold, 0);
                 assert_eq!(
                     report.history_rows, 7,
                     "zero-input control and one guard per correlated category"
@@ -264,8 +258,8 @@ fn feedback_prefixes_decision_constants_and_guarded_categories_cover_actual_nois
                 assert_eq!(calls.load(Ordering::Relaxed), 0);
                 assert_eq!(meter.snapshot(), ExecutionCosts::default());
                 if sampler == HistorySampler::AffineSupport {
-                    assert_eq!(report.by_kind["reported_support"].cold, 1);
-                    assert_eq!(report.by_kind["reported_support"].created, 0);
+                    assert_eq!(report.by_kind["reported_support"].cold, 0);
+                    assert_eq!(report.by_kind["reported_support"].created, 1);
                 }
                 let records = compare(&e, &base, 24);
                 assert_eq!(calls.load(Ordering::Relaxed), 24 * 2 * 3);
@@ -278,10 +272,7 @@ fn feedback_prefixes_decision_constants_and_guarded_categories_cover_actual_nois
                     again.counts.reused + again.counts.cold,
                     again.counts.planned
                 );
-                assert_eq!(
-                    again.counts.cold,
-                    usize::from(sampler == HistorySampler::AffineSupport)
-                );
+                assert_eq!(again.counts.cold, 0);
                 assert_eq!(caches(&e), caches(&base));
             }
         }

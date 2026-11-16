@@ -129,7 +129,7 @@ impl SupportQueries {
         max_terms: usize,
         arithmetic: &ScalarArithmetic,
     ) -> Result<QueryPreparationOutcome, InstrumentError> {
-        if !matches!(self.mode, QueryPreparation::Native(_)) {
+        if !self.mode.is_fixed() {
             return Ok(QueryPreparationOutcome::Cold);
         }
         let (plan, outcome) = self.plan(state, records, max_terms, arithmetic)?;

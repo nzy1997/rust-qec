@@ -101,7 +101,22 @@ fn retained_after_sampling(
     labels: usize,
     quotient_rank: usize,
     terms: usize,
+    policy: QueryPreparation,
 ) -> Value {
+    if sampler == HistorySampler::ExactMarginal {
+        assert!(before["support"].is_null());
+        return before;
+    }
+    if policy.is_fixed() {
+        assert!(
+            !before["support"].is_null(),
+            "fixed policy must retain its support parent during preparation"
+        );
+        assert_eq!(before["support"]["labels"], labels);
+        assert_eq!(before["support"]["quotient_rank"], quotient_rank);
+        assert_eq!(before["support"]["terms"], terms);
+        return before;
+    }
     assert!(before["support"].is_null());
     if sampler == HistorySampler::AffineSupport {
         before["support"] = json!({
@@ -137,10 +152,7 @@ fn fresh_preparation_owns_deleted_sources_and_separates_later_sampling_costs() {
         assert_eq!(report.execution_costs().query.succeeded, 1);
         assert_eq!(report.execution_costs().decoder.attempted, 0);
         assert_eq!(report.execution_costs().support.attempted, 0);
-        assert_eq!(
-            report.stage().unwrap().all_families_retained(),
-            sampler == HistorySampler::ExactMarginal
-        );
+        assert!(report.stage().unwrap().all_families_retained());
         let receipt = report.to_json();
         assert_eq!(receipt["kind"], "preparation");
         assert_eq!(receipt["status"], "complete");
@@ -168,7 +180,14 @@ fn fresh_preparation_owns_deleted_sources_and_separates_later_sampling_costs() {
         };
         let before = prepared.inspect(&run).unwrap();
         let retained = before["compilation"]["retained_caches"].clone();
-        let retained = retained_after_sampling(retained, sampler, 1, 2, 2);
+        let retained = retained_after_sampling(
+            retained,
+            sampler,
+            1,
+            2,
+            2,
+            QueryPreparation::FixedFibers(Default::default()),
+        );
         drop(files);
         let baseline = file.run(&run).unwrap();
         drop(file);
@@ -271,7 +290,7 @@ fn reused_preparation_has_fresh_quotas_and_an_owned_receipt_without_prior_compil
     assert_eq!(second.raw_result(), Ok(()));
     let c = second.stage().unwrap().counts;
     assert_eq!(c.created, 0);
-    assert_eq!(c.cold, 1);
+    assert_eq!(c.cold, 0);
     assert_eq!(c.reused + c.cold, c.planned);
     assert_eq!(second.execution_costs(), ExecutionCosts::default());
     let value = second.to_json();
@@ -314,7 +333,14 @@ fn nonlinear_preparation_never_invokes_decoders_and_keeps_both_seeded_samplers()
             ..Default::default()
         };
         let before = prepared.inspect(&run).unwrap()["compilation"]["retained_caches"].clone();
-        let before = retained_after_sampling(before, sampler, 4, 0, 1);
+        let before = retained_after_sampling(
+            before,
+            sampler,
+            4,
+            0,
+            1,
+            QueryPreparation::FixedFibers(Default::default()),
+        );
         let a = prepared.run(&run).unwrap();
         let b = file.run(&run).unwrap();
         same_rows(a.raw_result(), b.raw_result());
@@ -663,8 +689,8 @@ fn file_policy_matrix_preserves_literal_projected_target_feedback_and_fresh_batc
                 assert_eq!(prepared.report().execution_costs().decoder.attempted, 0);
                 assert_eq!(
                     prepared.report().stage().unwrap().all_families_retained(),
-                    sampler == HistorySampler::ExactMarginal
-                        && !matches!(policy, QueryPreparation::Cold)
+                    !matches!(policy, QueryPreparation::Cold)
+                        && (sampler == HistorySampler::ExactMarginal || policy.is_fixed())
                 );
                 let run = TaskRunOptions {
                     shots: 64,
@@ -673,7 +699,7 @@ fn file_policy_matrix_preserves_literal_projected_target_feedback_and_fresh_batc
                 };
                 let before = prepared.inspect(&run).unwrap();
                 let retained = before["compilation"]["retained_caches"].clone();
-                let retained = retained_after_sampling(retained, sampler, 1, 2, 2);
+                let retained = retained_after_sampling(retained, sampler, 1, 2, 2, policy);
                 let receipt = prepared.report().to_json();
                 drop(files);
                 let baseline = file.run(&run).unwrap();
@@ -808,10 +834,7 @@ fn catalogue_file_sessions_keep_seeded_results_actual_caches_and_prepared_scope(
                 let prepared = file.prepare_sampling(&Default::default()).unwrap();
                 assert!(prepared.report().is_complete());
                 assert_eq!(calls.load(Ordering::Relaxed), 0);
-                assert_eq!(
-                    prepared.report().stage().unwrap().all_families_retained(),
-                    sampler == HistorySampler::ExactMarginal
-                );
+                assert!(prepared.report().stage().unwrap().all_families_retained());
                 let before =
                     prepared.inspect(&run).unwrap()["compilation"]["retained_caches"].clone();
                 assert!(
@@ -820,15 +843,19 @@ fn catalogue_file_sessions_keep_seeded_results_actual_caches_and_prepared_scope(
                         .unwrap()
                         > 0
                 );
-                let mut before = retained_after_sampling(
+                let before = retained_after_sampling(
                     before,
                     sampler,
                     if nonlinear { 4 } else { 1 },
                     if nonlinear { 0 } else { 2 },
                     if nonlinear { 1 } else { 2 },
+                    QueryPreparation::FixedCatalogue(Default::default()),
                 );
                 if sampler == HistorySampler::AffineSupport {
-                    before["support"]["resource_kind"] = json!("certified_catalogue");
+                    assert_eq!(
+                        before["support"]["resource_kind"],
+                        json!("certified_catalogue")
+                    );
                 }
                 let a = prepared.run(&run).unwrap();
                 let b = file.run(&run).unwrap();

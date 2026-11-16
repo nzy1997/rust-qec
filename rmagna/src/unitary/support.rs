@@ -111,6 +111,8 @@ impl CompiledUnitary {
             .map(|j| BitVector::from_indices(joint.width(), [j, half + j]))
             .collect::<Result<Vec<_>, _>>()?;
         let projection = PreparedZProjection::new(&joint, &rows)?;
+        let work = &self.program.work;
+        work.record(&work.support_projections);
         let mut keep = outputs
             .iter()
             .map(|row| BitVector::from_indices(joint.width(), row.ones()))
@@ -122,7 +124,9 @@ impl CompiledUnitary {
                 .collect::<Result<Vec<_>, _>>()?,
         );
         let boundary_map = projection.prepare_linear_boundary(&keep)?;
+        work.record(&work.support_boundary_maps);
         let contraction = PreparedAffineContraction::new(boundary_map.reference())?;
+        work.record(&work.support_contractions);
         let magic = half - self.width();
         let empty_phase = ParityPhase::new(outputs.len(), 0, [])?;
         let phase = &self.program.query_reference_phase;
@@ -131,11 +135,13 @@ impl CompiledUnitary {
             &[(&empty_phase, false), (phase, false), (phase, true)],
             contraction.output_columns(),
         )?;
+        work.record(&work.support_phase_maps);
         let phase = phase_map.apply(
             &[(&empty_phase, false), (phase, false), (phase, true)],
             &BitVector::zeros(keep.len())?,
         )?;
         let mut resource = options.prepare(&phase, max_terms, catalogue, arithmetic)?;
+        work.record(&work.support_phase_resources);
         let transport_requested = resource.native_transport_requested();
         let native_transport = resource.prepare_native_transport(
             &phase,
@@ -160,6 +166,7 @@ impl CompiledUnitary {
         if !transport_requested {
             prepared.prepare_clifford(&joint, self.width(), arithmetic)?;
         }
+        work.record(&work.support_parents);
         Ok(prepared)
     }
 }
@@ -213,6 +220,9 @@ impl PreparedProbabilitySupport {
         let contraction = PreparedAffineContraction::new(&clifford_probability_ket(
             labelled, global, &quadratic, arithmetic,
         )?)?;
+        self.program
+            .work
+            .record(&self.program.work.support_contractions);
         self.clifford = Some(CliffordSupport {
             phase,
             global,
@@ -247,6 +257,9 @@ impl PreparedProbabilitySupport {
             return Err(UnitaryError::IncompatibleProgram);
         }
         self.resource.check_term_limit(max_terms)?;
+        self.program
+            .work
+            .record(&self.program.work.support_evaluations);
         let joint = state
             .boundary
             .tensor(&state.boundary.conjugate(), arithmetic)?;
@@ -303,7 +316,12 @@ impl PreparedProbabilitySupport {
                 Ok(value) => value,
                 // A changed boundary map also invalidates the retained basis.
                 // Keep the general exact route without growing a cache.
-                Err(StabilizerError::IncompatibleContraction) => labelled.contract(arithmetic)?,
+                Err(StabilizerError::IncompatibleContraction) => {
+                    self.program
+                        .work
+                        .record(&self.program.work.support_changed_boundary_fallbacks);
+                    labelled.contract(arithmetic)?
+                }
                 Err(error) => return Err(error.into()),
             };
             return Ok(ProbabilitySupportExpansion {
