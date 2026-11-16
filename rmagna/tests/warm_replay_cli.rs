@@ -33,6 +33,30 @@ fn bounded_pilot_draws_real_physical_noise_after_a_prescribed_no_fault_query() {
     // first 64 entries. Each odd word selects X from this two-point law.
     assert_eq!(pilot["metrics"]["estimates"]["error"], 38. / 64.);
     assert!(fixture.calls().is_empty());
+    // The default direct Cold expansion has no prepared scalar closure. Its
+    // separate execution-meter queries remain nonzero, outside this scope.
+    let work = &result["query_work"];
+    assert_eq!(work["schema"], "rmagna.query-work.v1");
+    assert_eq!(result["execution_route"], "linear_affine");
+    assert_eq!(result["rust_source_sha256"].as_str().unwrap().len(), 64);
+    let evaluations = |stage: &str| {
+        work[stage]["source"]["closure_evaluations"]
+            .as_u64()
+            .unwrap()
+    };
+    assert_eq!(
+        evaluations("after_first_draw"),
+        evaluations("after_compile")
+    );
+    assert_eq!(
+        evaluations("after_warm_replays"),
+        evaluations("after_first_draw")
+    );
+    assert_eq!(
+        evaluations("after_pilot"),
+        evaluations("after_warm_replays")
+    );
+    assert_eq!(work["after_pilot"]["source"]["saturated"], false);
 }
 
 #[test]
@@ -763,4 +787,59 @@ fn actual_insertion_flags_select_retained_catalogs_and_reject_invalid_limits() {
             "insufficient preparation limits invoked a decoder"
         );
     }
+}
+
+#[test]
+fn fixed_diagnostic_records_actual_work_before_after_first_and_warm_without_inventing_a_pilot() {
+    let fixture = Fixture::new(false);
+    let result = fixture.success(&[
+        "--history",
+        fixture.path("history.json").to_str().unwrap(),
+        "--warm-replays",
+        "2",
+        "--probability-preparation",
+        "fixed",
+        "--density-preparation",
+        "fixed",
+        "--moment-preparation",
+        "fixed",
+    ]);
+    let work = &result["query_work"];
+    assert_eq!(result["execution_route"], "causal_fixed_template");
+    assert!(work["after_pilot"].is_null());
+    for owner in ["source", "target"] {
+        let first = &work["after_first_draw"][owner];
+        let warm = &work["after_warm_replays"][owner];
+        for counter in [
+            "affine_closures_prepared",
+            "affine_geometry_preparations",
+            "phase_maps_prepared",
+            "phase_resources_prepared",
+            "support_projections_prepared",
+            "support_boundary_maps_prepared",
+            "support_contractions_prepared",
+            "support_phase_maps_prepared",
+            "support_phase_resources_prepared",
+            "support_parents_prepared",
+        ] {
+            assert_eq!(first[counter], warm[counter], "{owner}/{counter}");
+        }
+    }
+    assert!(
+        work["after_first_draw"]["source"]["phase_resources_prepared"]
+            .as_u64()
+            .unwrap()
+            > work["after_compile"]["source"]["phase_resources_prepared"]
+                .as_u64()
+                .unwrap()
+    );
+    assert!(
+        work["after_warm_replays"]["source"]["fixed_evaluations"]
+            .as_u64()
+            .unwrap()
+            > work["after_first_draw"]["source"]["fixed_evaluations"]
+                .as_u64()
+                .unwrap()
+    );
+    assert_eq!(fixture.calls().len(), 3);
 }

@@ -71,10 +71,11 @@ impl NativeRouteCounts {
         }
     }
 }
-#[derive(Clone, Copy)]
+/// Explicit policy for freezing an owned exact phase resource.
+#[derive(Clone, Copy, Debug)]
 // Keep the same allocation-free Copy configuration as QueryPreparation.
 #[allow(clippy::large_enum_variant)]
-pub(crate) enum ResourcePreparation {
+pub enum ResourcePreparation {
     Catalogue(PhaseResourceOptions),
     Native(NativePhaseOptions),
 }

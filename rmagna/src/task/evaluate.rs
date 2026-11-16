@@ -40,11 +40,23 @@ pub use run::{
 };
 pub(crate) use run::{RunHooks, run_task_batch_inspected};
 
+/// Which declared external callbacks execute during task sampling.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum ControllerExecution {
+    /// Preserve every declared invocation, including observable callback effects.
+    #[default]
+    Declared,
+    /// Elide callbacks whose outputs cannot affect any quantum operation, noise
+    /// guard, selection, detector or observable, after canonical XOR expansion.
+    /// The caller explicitly permits removing those callback effects and entropy.
+    RequiredForTask,
+}
 #[derive(Clone, Copy, Debug, Default)]
 pub struct EvaluationOptions {
     pub runtime: RuntimeOptions,
     pub scalars: ScalarArithmetic,
     pub fields: FieldArithmetic,
+    pub controller_execution: ControllerExecution,
 }
 struct Target {
     unitary: CompiledUnitary,
@@ -61,6 +73,14 @@ enum Execution {
     },
     Causal(Box<CausalProgram>),
 }
+/// Independent retained source/target program snapshots. This excludes cold
+/// transient owners, manual phase APIs and logical query-cache cardinalities.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, serde::Serialize)]
+pub struct TaskQueryWorkStatistics {
+    pub source: Option<crate::unitary::QueryWorkStatistics>,
+    pub target: Option<crate::unitary::QueryWorkStatistics>,
+}
+
 pub struct TaskEvaluator {
     task: ValidatedTask,
     target: Option<Target>,
@@ -117,6 +137,19 @@ fn error(field: &str, e: impl fmt::Display) -> TaskError {
     TaskError::new(field, e.to_string())
 }
 impl TaskEvaluator {
+    pub fn query_work_statistics(&self) -> TaskQueryWorkStatistics {
+        TaskQueryWorkStatistics {
+            source: match &self.execution {
+                Execution::Linear { instrument, .. } => Some(instrument.query_work_statistics()),
+                Execution::Causal(program) => program.query_work_statistics(),
+            },
+            target: self
+                .target
+                .as_ref()
+                .map(|target| target.unitary.query_work_statistics()),
+        }
+    }
+
     /// Actual execution route selected by task composition and runtime options.
     pub fn execution_route(&self) -> &'static str {
         match &self.execution {
@@ -241,6 +274,10 @@ impl TaskEvaluator {
             None
         };
         let composed = compose::recovery(physical, &task.outputs, modules.recovery.as_ref())?;
+        let composed = match options.controller_execution {
+            ControllerExecution::Declared => composed,
+            ControllerExecution::RequiredForTask => composed.retaining_required_controllers(),
+        };
         let requested = task
             .sample_records
             .iter()

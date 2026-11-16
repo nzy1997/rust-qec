@@ -70,7 +70,7 @@ class PaperPilotTests(unittest.TestCase):
             before=dict(source_files=475, tasks=31, decoder_files=0), after=dict(source_files=475, tasks=31, decoder_files=0),
             rust_binary_sha256="a" * 64, native_sha256="b" * 64,
             runner_files={n: pilot.reference.digest(pilot.HERE / n) for n in
-                          ("paper_benchmark.py", "paper_reference.py", "worker.py", "native_options.py")}, cells=[])
+                          pilot.RUNNER_FILES}, cells=[])
         self.cells = {}
         for task in self.manifest["tasks"]:
             ref = prescribed() | dict(native_sha256="b" * 64)

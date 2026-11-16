@@ -11,6 +11,8 @@ mod preparation;
 pub use insertions::{InsertionPreparation, PreparedInsertionStatistics};
 pub use preparation::{InstrumentQueryLayout, QueryPreparationOutcome};
 mod probabilities;
+mod scalar_cache;
+pub use scalar_cache::InstrumentScalarQuery;
 mod support;
 mod vacuum;
 use crate::circuit::{BitAtom, BitExpr, Circuit};
@@ -438,6 +440,11 @@ impl CompiledInstrument {
                 catalog_entries: c.plan.len(),
                 estimated_peak_bytes: c.plan.estimated_peak_bytes(),
             })
+    }
+    /// Actual scalar and labelled-support factory/evaluation observations
+    /// shared by this program's views.
+    pub fn query_work_statistics(&self) -> crate::unitary::QueryWorkStatistics {
+        self.unitary.query_work_statistics()
     }
     pub fn compilation(&self) -> &crate::unitary::CompilationDiagnostics {
         self.unitary.compilation()

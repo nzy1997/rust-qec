@@ -157,7 +157,8 @@ fn causal_marginals_and_profiles_respect_shared_exact_query_boundaries() {
             config.runtime.history_sampler = sampler;
             let e = prepared(source, "{}", &registry, config);
             let per = if sampler == HistorySampler::ExactMarginal {
-                4
+                // Confirmed joint mass removes the terminal sampling query.
+                3
             } else {
                 2
             };

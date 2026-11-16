@@ -100,7 +100,7 @@ fn same(a: &TaskRunResult, b: &TaskRunResult) {
         b.execution_costs.support.attempted
     );
 }
-fn assert_support_cache_transition(
+fn assert_support_preflight_stable(
     before: &Value,
     after: &Value,
     sampler: HistorySampler,
@@ -109,21 +109,24 @@ fn assert_support_cache_transition(
     terms: usize,
     phase_variables: usize,
 ) {
-    assert!(before["support"].is_null());
-    let mut expected = before.clone();
+    // Affine-support preparation retains its admitted parent before draws.
+    // Exact-marginal preparation has no unused sampling-support parent.
+    let expected = json!({
+        "labels": labels,
+        "quotient_rank": quotient_rank,
+        "terms": terms,
+        "phase_variables": phase_variables,
+        "resource_kind": "clifford_fibers",
+        "native_routes": {"direct":0,"product":0,"walsh":0,"injected":0,"injection_budget_skips":0},
+        "native_transports": {"prepared":0,"budget_skipped":0},
+        "method": "capped_probability_parent_affine_envelope"
+    });
     if sampler == HistorySampler::AffineSupport {
-        expected["support"] = json!({
-            "labels": labels,
-            "quotient_rank": quotient_rank,
-            "terms": terms,
-            "phase_variables": phase_variables,
-            "resource_kind": "clifford_fibers",
-            "native_routes": {"direct":0,"product":0,"walsh":0,"injected":0,"injection_budget_skips":0},
-            "native_transports": {"prepared":0,"budget_skipped":0},
-            "method": "capped_probability_parent_affine_envelope"
-        });
+        assert_eq!(before["support"], expected);
+    } else {
+        assert!(before["support"].is_null());
     }
-    assert_eq!(after, &expected);
+    assert_eq!(after, before);
 }
 const SOURCE: &str = "X_ERROR(1/4) 3\nH 0 1 2\nM 0 1 2\nDETECTOR rec[-3]\nDETECTOR rec[-2]\nDETECTOR rec[-1]\nCONTROL[majority] det[0] det[1] det[2] -> ctrl[0]\nCX ctrl[0] 3\nX_ERROR(1/5) ctrl[0] 3\nM 3\nOBSERVABLE_INCLUDE(0) rec[-1]";
 fn make_registry(calls: &Arc<AtomicUsize>, fail_first: bool) -> ControllerRegistry {
@@ -182,7 +185,7 @@ fn actual_pilots_match_independent_prepared_channels_without_mutating_configurat
         let batch = independent.run(&run).unwrap();
         same(pilot.raw_result().unwrap(), batch.raw_result());
         let saved = pilot.to_json();
-        assert_support_cache_transition(
+        assert_support_preflight_stable(
             &saved["preparation"]["compilation"]["retained_caches"],
             &saved["sampling"]["compilation"]["retained_caches"],
             method,
@@ -499,7 +502,7 @@ fn nonclifford_weighted_pilots_keep_true_sampler_statistics_and_prepared_caches(
                 .unwrap();
             same(pilot.raw_result().unwrap(), batch.raw_result());
             let value = pilot.to_json();
-            assert_support_cache_transition(
+            assert_support_preflight_stable(
                 &value["preparation"]["compilation"]["retained_caches"],
                 &value["sampling"]["compilation"]["retained_caches"],
                 method,
@@ -777,7 +780,7 @@ fn projected_magic_target_pilots_preserve_literal_feedback_moments_and_normaliza
                     .all(|r| r.len() == 2 && r[0] == r[1])
             );
             let receipt = pilot.to_json();
-            assert_support_cache_transition(
+            assert_support_preflight_stable(
                 &receipt["preparation"]["compilation"]["retained_caches"],
                 &receipt["sampling"]["compilation"]["retained_caches"],
                 method,

@@ -1,6 +1,12 @@
 //! Unitary third-hierarchy circuits lowered to Clifford boundaries and phases.
 
+mod cache_key;
+mod query_cache;
+pub use query_cache::{
+    ScalarQuery, ScalarQueryCache, ScalarQueryCacheOptions, ScalarQueryCacheStatistics,
+};
 pub(crate) mod expansion;
+pub(crate) use cache_key::ScalarStateKey;
 mod input;
 pub(crate) mod projected;
 pub use expansion::{
@@ -15,10 +21,12 @@ pub use insertions::{InsertionPreparationOptions, PreparedInsertions};
 mod prepared;
 mod shared;
 mod support;
+mod work;
 pub use prepared::{
     DensityLayout, PreparedDensityOverlap, PreparedPauliMoment, PreparedProbability,
 };
 pub use support::{PreparedProbabilitySupport, ProbabilitySupportExpansion};
+pub use work::QueryWorkStatistics;
 
 use crate::clifford::{CliffordCircuit, CliffordError, CliffordGate};
 use crate::gf2::{AffineSupport, BitVector, Gf2Error};
@@ -32,6 +40,14 @@ use std::sync::Arc;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum UnitaryError {
+    NonHermitianScalarQuery,
+    NonCommutingScalarQuery,
+    QueryCacheLimit {
+        option: &'static str,
+        limit: usize,
+        required: u128,
+    },
+    SymbolicGeometryCacheUnavailable,
     DimensionMismatch,
     DimensionOverflow,
     ZeroStabilizerInput,
@@ -73,6 +89,22 @@ pub enum UnitaryError {
 impl fmt::Display for UnitaryError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
+            Self::NonHermitianScalarQuery => {
+                write!(f, "scalar cache queries require a Hermitian Pauli word")
+            }
+            Self::NonCommutingScalarQuery => write!(
+                f,
+                "scalar cache Pauli query must commute with every event row"
+            ),
+            Self::QueryCacheLimit {
+                option,
+                limit,
+                required,
+            } => write!(f, "{option}={limit} is insufficient; need {required}"),
+            Self::SymbolicGeometryCacheUnavailable => write!(
+                f,
+                "shared scalar geometry cache is unavailable after a preparation panic"
+            ),
             Self::DimensionMismatch => {
                 write!(f, "unitary input, event, or target dimensions disagree")
             }
@@ -377,6 +409,8 @@ impl UnitaryCircuit {
             raw_path_variables,
         });
         let program = Arc::new(InsertionProgram {
+            scalar_geometry: Default::default(),
+            work: Arc::default(),
             reference: Arc::clone(&boundary),
             query_reference: Arc::clone(&boundary),
             observation_reduction: None,
@@ -439,6 +473,8 @@ pub struct CompiledUnitary {
     compilation: Arc<CompilationDiagnostics>,
 }
 struct InsertionProgram {
+    scalar_geometry: prepared::SharedScalarGeometry,
+    work: Arc<work::QueryWorkCounters>,
     reference: Arc<AffineKet>,
     query_reference: Arc<AffineKet>,
     observation_reduction: Option<observations::ObservationReduction>,
@@ -475,6 +511,14 @@ impl<'a> DensityBoundary<'a> {
 }
 
 impl CompiledUnitary {
+    /// Cumulative events from actual closure/map/resource factories. Program
+    /// views share this owner; no physics, RNG or callback is run to inspect it.
+    pub fn query_work_statistics(&self) -> QueryWorkStatistics {
+        let mut statistics = self.program.work.snapshot();
+        statistics.live_affine_geometries = self.program.scalar_geometry.live_count();
+        statistics
+    }
+
     pub fn width(&self) -> usize {
         self.physical_width
     }

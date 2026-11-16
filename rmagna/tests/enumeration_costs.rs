@@ -110,7 +110,8 @@ fn nonlinear_sectors_count_unresolved_and_interrupted_replays_for_both_strategie
             let patterns = weight as u64 + 1;
             assert_eq!(actual.histories, 8 * patterns as usize);
             assert_eq!(actual.replay_attempts, 9 * patterns as usize);
-            assert_eq!(actual.marginal_queries, 24 * patterns as usize);
+            // Each of the eight completed histories reuses its confirmed mass.
+            assert_eq!(actual.marginal_queries, 16 * patterns as usize);
             assert_eq!(
                 actual.masses.accepted,
                 if weight == 0 {
@@ -128,7 +129,7 @@ fn nonlinear_sectors_count_unresolved_and_interrupted_replays_for_both_strategie
                 }
             );
             let costs = meter.snapshot();
-            count(costs.query, (40 * patterns, 40 * patterns, 0));
+            count(costs.query, (32 * patterns, 32 * patterns, 0));
             count(costs.support, (patterns, patterns, 0));
             count(costs.decoder, (8 * patterns, 8 * patterns, 0));
             assert_eq!(calls.load(Ordering::SeqCst), 8 * patterns as usize);
@@ -169,7 +170,9 @@ fn quotas_and_expired_deadlines_stop_before_callbacks_and_leave_actual_costs() {
                 match quota {
                     0 => 1,
                     8 => 2,
-                    _ => 3,
+                    // Reused terminal mass admits the next replay compile
+                    // before the same quota blocks a further physical query.
+                    _ => 4,
                 }
             } else {
                 0
@@ -193,7 +196,7 @@ fn quotas_and_expired_deadlines_stop_before_callbacks_and_leave_actual_costs() {
             .unwrap();
         assert_eq!(result.histories, 16);
         assert_eq!(result.masses.error, scalar(5, 24));
-        count(fresh.snapshot().query, (80, 80, 0));
+        count(fresh.snapshot().query, (64, 64, 0));
     }
 }
 #[test]

@@ -6,6 +6,89 @@ use crate::phase::{
     NativePhaseOptions, PhaseResourceOptions, PreparedPhaseResource, ResourcePreparation,
 };
 use crate::stabilizer::PreparedAffineContraction;
+use std::sync::{Mutex, Weak};
+
+struct ScalarGeometry {
+    projection: PreparedZProjection,
+    contraction: PreparedAffineContraction,
+    keep: Vec<usize>,
+}
+impl ScalarGeometry {
+    fn matches(&self, reference: &AffineKet, rows: &[BitVector], keep: &[usize]) -> bool {
+        self.keep == keep && self.projection.matches_structure(reference, rows)
+    }
+}
+/// Weak interning retains only maps still owned by a live query. Distinct query
+/// resources remain independent. Preparation and Gaussian work never hold the
+/// cache mutex; simultaneous misses may construct twice and both are counted.
+#[derive(Default)]
+pub(super) struct SharedScalarGeometry {
+    entries: Mutex<Vec<Weak<ScalarGeometry>>>,
+}
+impl SharedScalarGeometry {
+    pub(super) fn live_count(&self) -> Option<usize> {
+        self.entries.lock().ok().map(|entries| {
+            entries
+                .iter()
+                .filter(|entry| entry.strong_count() != 0)
+                .count()
+        })
+    }
+    fn matching(
+        entries: &mut Vec<Weak<ScalarGeometry>>,
+        reference: &AffineKet,
+        rows: &[BitVector],
+        keep: &[usize],
+    ) -> Option<Arc<ScalarGeometry>> {
+        let mut found = None;
+        entries.retain(|entry| {
+            let Some(entry) = entry.upgrade() else {
+                return false;
+            };
+            if found.is_none() && entry.matches(reference, rows, keep) {
+                found = Some(entry);
+            }
+            true
+        });
+        found
+    }
+    fn prepare(
+        &self,
+        reference: &AffineKet,
+        rows: &[BitVector],
+        keep: Vec<usize>,
+        work: &super::work::QueryWorkCounters,
+    ) -> Result<Arc<ScalarGeometry>, UnitaryError> {
+        {
+            let mut entries = self
+                .entries
+                .lock()
+                .map_err(|_| UnitaryError::SymbolicGeometryCacheUnavailable)?;
+            if let Some(found) = Self::matching(&mut entries, reference, rows, &keep) {
+                work.record(&work.geometry_reuses);
+                return Ok(found);
+            }
+        }
+        let projection = PreparedZProjection::new(reference, rows)?;
+        let contraction = projection.prepare_sum(&keep)?;
+        work.record(&work.geometry_preparations);
+        let geometry = Arc::new(ScalarGeometry {
+            projection,
+            contraction,
+            keep,
+        });
+        let mut entries = self
+            .entries
+            .lock()
+            .map_err(|_| UnitaryError::SymbolicGeometryCacheUnavailable)?;
+        if let Some(found) = Self::matching(&mut entries, reference, rows, &geometry.keep) {
+            work.record(&work.geometry_reuses);
+            return Ok(found);
+        }
+        entries.push(Arc::downgrade(&geometry));
+        Ok(geometry)
+    }
+}
 
 struct FixedResource {
     decomposition: PreparedPhaseResource,
@@ -14,9 +97,8 @@ struct FixedResource {
 }
 
 struct ScalarClosure {
-    projection: PreparedZProjection,
-    contraction: PreparedAffineContraction,
-    keep: Vec<usize>,
+    work: Arc<super::work::QueryWorkCounters>,
+    geometry: Arc<ScalarGeometry>,
     widths: Vec<usize>,
     resource: Option<FixedResource>,
 }
@@ -25,14 +107,17 @@ impl ScalarClosure {
         reference: &AffineKet,
         rows: &[BitVector],
         legs: Vec<Vec<usize>>,
+        program: &Arc<InsertionProgram>,
     ) -> Result<Self, UnitaryError> {
-        let projection = PreparedZProjection::new(reference, rows)?;
         let keep = legs.iter().flatten().copied().collect::<Vec<_>>();
-        let contraction = projection.prepare_sum(&keep)?;
+        let work = &program.work;
+        let geometry = program
+            .scalar_geometry
+            .prepare(reference, rows, keep, work)?;
+        work.record(&work.affine_closures);
         Ok(Self {
-            projection,
-            contraction,
-            keep,
+            work: Arc::clone(work),
+            geometry,
             widths: legs.iter().map(Vec::len).collect(),
             resource: None,
         })
@@ -45,14 +130,19 @@ impl ScalarClosure {
         catalogue: Option<&PhaseCatalogue>,
         arithmetic: &ScalarArithmetic,
     ) -> Result<(), UnitaryError> {
-        let phase_map =
-            PhaseRestriction::new(&self.widths, phases, self.contraction.output_columns())?;
-        let phase = phase_map.apply(phases, &BitVector::zeros(self.keep.len())?)?;
+        let phase_map = PhaseRestriction::new(
+            &self.widths,
+            phases,
+            self.geometry.contraction.output_columns(),
+        )?;
+        self.work.record(&self.work.phase_maps);
+        let phase = phase_map.apply(phases, &BitVector::zeros(self.geometry.keep.len())?)?;
         let mut decomposition = options.prepare(&phase, max_terms, catalogue, arithmetic)?;
+        self.work.record(&self.work.phase_resources);
         let transport = decomposition.prepare_native_transport(
             &phase,
             0,
-            || Ok(self.contraction.symbolic_boundary(0)?),
+            || Ok(self.geometry.contraction.symbolic_boundary(0)?),
             arithmetic,
         )?;
         self.resource = Some(FixedResource {
@@ -70,23 +160,27 @@ impl ScalarClosure {
         max_terms: usize,
         arithmetic: &ScalarArithmetic,
     ) -> Result<NetworkValue, UnitaryError> {
+        self.work.record(&self.work.evaluations);
         let retained = self
+            .geometry
             .projection
             .project(joint, outcomes)?
-            .map(|ket| ket.retain_boundary(&self.keep))
+            .map(|ket| ket.retain_boundary(&self.geometry.keep))
             .transpose()?;
         let contracted = match retained {
-            Some(ket) => self.contraction.contract(&ket, arithmetic)?,
+            Some(ket) => self.geometry.contraction.contract(&ket, arithmetic)?,
             None => None,
         };
         let Some(resource) = &self.resource else {
+            self.work.record(&self.work.cold);
             return close_retained(contracted, &self.widths, phases, max_terms, arithmetic);
         };
+        self.work.record(&self.work.fixed);
         let Some(ket) = contracted else {
             return Ok(zero_network_value());
         };
         resource.decomposition.check_term_limit(max_terms)?;
-        debug_assert_eq!(ket.columns(), self.contraction.output_columns());
+        debug_assert_eq!(ket.columns(), self.geometry.contraction.output_columns());
         let phase = resource.phase_map.apply(phases, ket.offset())?;
         let (value, native_transport) = match &resource.transport {
             Some(plan) => {
@@ -185,7 +279,7 @@ impl PreparedProbability {
             program: Arc::clone(&state.program),
             physical_width: state.width(),
             event_count: rows.len(),
-            closure: ScalarClosure::new(&joint, &constraints, legs)?,
+            closure: ScalarClosure::new(&joint, &constraints, legs, &state.program)?,
         })
     }
     /// Freeze an explicit phase resource against this family's original reference.
@@ -327,7 +421,12 @@ impl PreparedPauliMoment {
                 (state.width()..half).collect(),
                 (half + state.width()..total).collect(),
             ];
-            Some(ScalarClosure::new(&joint, &constraints, legs)?)
+            Some(ScalarClosure::new(
+                &joint,
+                &constraints,
+                legs,
+                &state.program,
+            )?)
         };
         Ok(Self {
             program: Arc::clone(&state.program),
@@ -488,7 +587,7 @@ impl PreparedDensityOverlap {
             left_events: boundary.event_rows.len(),
             right_events: target_boundary.event_rows.len(),
             trace_count,
-            closure: ScalarClosure::new(&joint, &rows, legs)?,
+            closure: ScalarClosure::new(&joint, &rows, legs, &left.program)?,
         })
     }
     /// Freeze an explicit phase resource against this family's original reference.

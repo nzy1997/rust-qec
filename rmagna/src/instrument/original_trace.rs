@@ -303,6 +303,12 @@ impl OriginalInstrument {
     }
 }
 impl OriginalStaticTrace {
+    /// Actual scalar/labelled query factory work on this compiled owner. This
+    /// excludes inherited-side expansion APIs and bare phase/manual operations.
+    pub fn query_work_statistics(&self) -> crate::unitary::QueryWorkStatistics {
+        self.reference.query_work_statistics()
+    }
+
     fn record_coordinate(&self, name: &str) -> Result<(usize, usize, bool), OriginalError> {
         let &index = self
             .record_indices

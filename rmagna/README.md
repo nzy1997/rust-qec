@@ -2108,9 +2108,10 @@ The owning task captures every potential decoder/guard observation and requested
 record in a fixed transport span. Generic instrument proposals retain all records
 unless `with_support_transport` declares a smaller span; a subsequent query
 outside that span fails explicitly. Preparation is immutable and shared across
-branches, built on demand in one fixed slot. A failed low-budget construction is
-not cached. Fixed probability preparation supplies its configured fiber search;
-other probability modes use default fiber-search options for this proposal parent.
+branches, built on demand or during explicit fixed-policy preparation in one
+fixed slot. A failed low-budget construction is not cached. Fixed fiber,
+catalogue and Native policies supply their configured resource options; Cold
+and Trace use the default lazy fiber-search policy for this proposal parent.
 Cold-prefix support parents are ephemeral. Numerical enumeration continues to
 use its conservative structural branch certificate and exact physical marginals.
 `prepared_support_statistics` reports transport labels and fixed resource counts;
@@ -4099,8 +4100,10 @@ later evaluations against those same families.
 
 For `exact_marginal`, preparation includes each group's condition prefix and
 every subsequent bit prefix. For `affine_support`, it validates the captured
-structural support parent and records a `cold` request; no numerical support
-cache is retained. Both prepare the complete final-history probability and the
+support parent. FixedFibers, FixedCatalogue and Native policies retain its
+actual numeric projection, boundary map and phase resource during this stage;
+Trace and Cold policies explicitly report a `cold` request and defer that parent.
+Both samplers prepare the complete final-history probability and the
 conditioned task-response families. The stage does not request unused support
 parents for linear or exact-marginal tasks. `cold_prefix` returns an explicit
 unsupported-scope error because its history-specific programs have no reusable
@@ -6295,7 +6298,7 @@ external controls compile successfully and fail unchanged semantic assertions.
 The complete original method covers three circuits under both compilers and
 both causal strategies, with exact acceptance 1/2, 1/2 and 1. Reusing the same
 AND decision twice through XOR reduces the final selection to reported record
-one. Its callback remains live on the causal route and each draw accepts one
+one. Under the default declared-controller policy its callback remains live on the causal route and each draw accepts one
 minus its second input. A constant-one XOR selects the complemented record on
 the public linear-affine route, integrating acceptance 1/2 in every draw with
 no external call.
@@ -6304,6 +6307,22 @@ Two echo calls with the same deterministic zero input retain separate call IDs
 zero and one. Their XOR remains a symbolic opaque condition, both ordered
 callbacks run and acceptance is one. Algebraic linearity over opaque decision
 symbols does not establish a reported-record affine expression.
+
+Task callers may explicitly set
+`EvaluationOptions::controller_execution = ControllerExecution::RequiredForTask`
+to remove external calls whose outputs have no remaining quantum, noise-guard,
+selection, detector or observable use after XOR expansion. This policy also
+removes their callback effects and history entropy; the default
+`ControllerExecution::Declared` preserves every declared invocation. Backward
+dependency analysis retains all ordered inputs of a live call, keeps operation
+and call IDs unchanged, and runs after physical/recovery composition. Distinct
+opaque calls remain distinct even when their observed values happen to agree.
+The explicit policy is included in execution fingerprints; default identities
+remain unchanged. A canceled AND example takes the integrated affine route
+with exact error 1/2 and no sampling family or callback. Owning tests also cover
+transitive dependencies, live guards/selection/observables, sparse call IDs and
+the physical/recovery diagnostic boundary. This is an explicit optimization
+contract, not a promise to preserve the removed callbacks' RNG trajectory.
 
 Each complete Rust witness checks 96 seeded draws: 32 AND invocations and 64
 echo invocations, with actual inputs/outputs matched to the public transcript.
@@ -6789,3 +6808,145 @@ no entropy; the second fixture has no common commuting sector. Rust's typed
 `CompletedProbability` sampler replaces the original method-name diagnostic.
 This witness does not establish automatic commuting-sector discovery for other
 inputs or Python bit-stream identity.
+
+## Explicit probability-value reuse for original assignments
+
+`OriginalProbabilityCache` provides a probability-value LRU independently of
+prepared scalar-query geometry. `cache.compile(&plan, assignment)` returns an
+owned `OriginalCachedAssignment`; inspect `cache_hit()` and
+`certificate().probability()`, or take `into_certificate()`. Default capacity is
+32 entries and 1 MiB of serialized key/value payload. `new`, `set_limits`,
+`limits`, `statistics` and `clear` expose explicit retention control. Zero entry
+or byte budgets disable retention while preserving physical evaluation. An
+oversized key/value bypasses retention; failed evaluations never become entries.
+
+Every request captures its assignment, validates immutable source limits,
+executes the actual callbacks and compiles their fresh emissions before lookup.
+The exact key includes the complete compiled affine wavefunction, odd phase
+polynomial and physical projection. A callback version or input fingerprint is
+insufficient: changing an emitted phase with the same version changes its key.
+Callbacks may fail on a would-be hit, and that actual error propagates. Entries
+retain no source IR, callbacks or compiled branches. Results own their branch
+and reported records, including fresh report flips on a reused physical value.
+Changing source, limits or arithmetic means constructing another immutable plan;
+its source identity prevents reuse of another plan's entries.
+
+Proposal probabilities remain external to this physical cache. The same value
+can therefore receive different exact importance weights without duplicating a
+physical entry. Exact zero values are cached and remain ordinary proposals in
+`ExactStatistics`. The reported serialized-byte total counts actual bounded
+key and scalar encoding payload; it excludes Rust container/token metadata,
+allocator capacity, scalar object layout, fresh branch construction and scratch.
+This API saves successful repeated probability evaluation, while each request
+still performs fresh branch compilation. Its capacity is explicit and does not
+claim the separate Native batch geometry cache or private memory layout.
+
+## Shared scalar-query geometry observations
+
+Probability, Pauli-moment and density plans on one compiled insertion program
+intern compatible immutable projection and Gaussian contraction maps. Matching
+requires identical ordered event rows, retained boundary order, support columns,
+quadratic cross terms and linear parity. Offsets, coefficients and even linear
+updates remain numeric query inputs; phase resources stay specific to each
+query. A weak pool shares only live maps and cannot retain them after every
+query releases its reference. Source programs and distinct event structures
+remain separate.
+
+`query_work_statistics()` reports actual closure, geometry, phase-map and phase
+resource factory events, geometry reuse and cold/fixed evaluation entries for
+that program owner. `live_affine_geometries` is a separate live owner count;
+`None` means its retention mutex could not be inspected. Concurrent preparation
+misses can do duplicate real construction outside the pool mutex before the
+winning map is shared; both construction events are counted. Inspect statistics
+at quiescent boundaries. These counters exclude bare phase APIs and transient
+cold-prefix owners, and do not copy Native private object counts. Logical cache
+sizes, exact resource ranks/terms and execution-meter queries remain distinct
+observations.
+
+Owning checks compare 1,024 Pauli/event/fault cells with independent exact dense
+matrix arithmetic under both compilers, including zero projected pairings. In
+that fixture, 33 closures share one actual projection/contraction map, while
+phase resources remain separate. Another test exercises eight simultaneous
+preparations, distinct biased event rows, malformed rows and weak-map release.
+
+Labelled-support factory observations are separate `support_*` fields: actual
+projections, boundary maps, contractions (including an optional Clifford
+shortcut), phase maps, resources, completed parents and evaluations. A changed
+boundary that falls back to fresh contraction increments
+`support_changed_boundary_fallbacks`. Partial preparation failures retain the
+factory work actually completed. Fixed policies preflight this parent; Trace's
+explicit first-use construction is reported separately from fixed-policy warm
+reuse. The six original dense conditional fixtures now exercise 1,024 draws
+under each compiler (12,288 total), with actual callback counts, target reuse,
+24 exact enumerations and unchanged scalar/support factory counts per draw.
+
+## Explicit scalar-plan LRU
+
+`ScalarQueryCache` bounds frozen scalar query plans separately from probability
+values and the existing automatic instrument-family quotas. Its default retains
+32 plans; `ScalarQueryCacheOptions` also declares per-query event/geometry caps,
+batch-request and term limits, and the explicit `phase::ResourcePreparation`
+policy. Optional catalogues are shared through `Arc`. RHS values and inserted
+faults remain numeric inputs. Event structure, Pauli effect and source-program
+ownership define plan reuse. `set_max_plans`, `clear`, `len` and actual
+hit/preparation/eviction/evaluation statistics expose retention behavior. Capacity
+zero prepares ephemeral plans instead of caching them.
+
+`evaluate` and `evaluate_many` reject wrong owners, shapes, non-Hermitian words,
+noncommuting events and declared quotas before preparation. The batch method
+checks every request before any factory runs; a later kernel failure preserves
+successful preparation and counters while returning no partial result vector.
+Warm calls still validate and run the exact kernel. `prepare_query` returns an
+owned immutable plan for parallel numeric work. A caller-held plan can survive
+LRU eviction, so capacity bounds the cache's entries rather than external Arcs.
+Conservative geometry words exclude existing compiled objects, scalar limbs
+and separately bounded phase-resource storage; they are not process RSS.
+
+Instrument callers use `CompiledInstrument::scalar_query_cache` and
+`reported_moment_cached(InstrumentScalarQuery, ...)` to map physical outputs,
+reported parities and fault choices safely. This raw reported-event service
+excludes the instrument's implicit selection predicates, just like
+`reported_probability`; provide explicit rows for desired conditions. Resolved
+fixed-template histories share the real compiled owner while their values,
+decisions and faults remain fresh. New source or quota construction cannot
+borrow another owner's admission, and cold-prefix histories have distinct
+owners. Cache preparation never executes an external controller.
+
+Owning witnesses retain exactly 32 plans across 40 event structures, check
+recency and zero capacity, compare changing biased RHSs and 256 faulted dense
+Pauli cells, and run eight threads on owned plans after clearing the cache.
+The original dynamic callback/guarded-noise scenario runs 30 draws at each of
+capacities four and one. All 60 actual callbacks execute; exact masses, noise,
+controller inputs/outputs, entropy, caller RNG states and errors agree while
+the observed preparation counts change from two to 30 and evictions from zero
+to 29. An independent resolved-view case returns opposite unconditioned Z
+moments from shared preparation and one-half mass for both reported outcomes.
+
+`OriginalTraceView::probe_affine_records` offers a conservative resource-free
+certificate of a uniform affine reported-record law. It reuses the retained
+probability geometry construction, checks the actual view's phase directly and
+returns `None` when uncertified. It never selects a catalogue or constructs a
+phase resource. Retained-row/metadata/packed-geometry admission precedes
+construction; an explicit signature-work bound precedes Clifford conversion.
+Resource policy and term limits apply to the separate ordinary query, not this
+probe. Actual faults and reported inversions/flips remain part of the certificate.
+`OriginalStaticTrace::query_work_statistics` observes this owner's scalar and
+labelled query factories, excluding inherited-side expansion operations.
+
+The full upstream incremental-history circuit is checked against 16 stream
+hashes captured from Rust commit `fbe56895852a92afb547e15e6ef3a016c4b67917`,
+before these R09 changes. Its 1,024 draws cover both compilers, both history
+samplers, magic/no-magic inputs, fixed/cold execution and unbounded/metered runs.
+Each hash includes every physical evaluation field, actual ordered callbacks and
+random words, and the next caller word. Compilation/query counts and resource
+representation sizes are separate observations. Cold-prefix affine bases have
+a distinct seeded convention; the fixture records that difference explicitly.
+No Python RNG digest or private Native LRU option is presented as a Rust ABI.
+
+Full original shared-query and CCZ/destructive-readout fixtures additionally
+check 896 exact cells against independent literal fixed-record branch sums,
+96 isolated fresh plans and 24 actual threaded batches. Retained classical
+labels are checked cell by cell through explicit scalar event rows. Forty-eight
+shared-query plans retain three actual projection/contraction geometries with
+45 observed reuses, while each effect retains its own phase resource. Conflicting
+repeated events return zero, and invalid warm requests fail before preparation.

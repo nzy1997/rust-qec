@@ -17,7 +17,7 @@ pub use absorption::{
     RadicalAbsorptionStage,
 };
 pub use core::{CanonicalPhaseCore, PhaseCoreLimits};
-pub(crate) use resource::ResourcePreparation;
+pub use resource::ResourcePreparation;
 pub use resource::{NativePhaseOptions, NativeRouteCounts};
 pub use resource::{PhaseResourceKind, PhaseResourceOptions, PreparedPhaseResource};
 pub use tensor::{PathTensorError, PathTraceBoundary, PathTraceOptions, PhasePathTensor};

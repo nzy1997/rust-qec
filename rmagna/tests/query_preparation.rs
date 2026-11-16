@@ -100,7 +100,21 @@ fn all_static_layouts_prime_the_same_families_for_faulted_nonzero_outcomes() {
                 .unwrap(),
                 O::Created
             );
-            assert_eq!(p.prepare_query(Q::ReportedSupport, 0, &a).unwrap(), O::Cold);
+            if mode.is_fixed() {
+                // Fixed support preparation now performs real admission here,
+                // rather than silently deferring this parent until a draw.
+                assert!(p.prepare_query(Q::ReportedSupport, 0, &a).is_err());
+                assert_eq!(
+                    p.prepare_query(Q::ReportedSupport, 256, &a).unwrap(),
+                    O::Created
+                );
+                assert_eq!(
+                    p.prepare_query(Q::ReportedSupport, 256, &a).unwrap(),
+                    O::Reused
+                );
+            } else {
+                assert_eq!(p.prepare_query(Q::ReportedSupport, 0, &a).unwrap(), O::Cold);
+            }
             let before = (
                 p.prepared_probability_statistics().unwrap(),
                 p.prepared_density_statistics().unwrap(),
@@ -174,7 +188,10 @@ fn all_static_layouts_prime_the_same_families_for_faulted_nonzero_outcomes() {
             assert_eq!(before.0.catalogue_resources, if catalogue { 3 } else { 0 });
             assert_eq!(before.1.catalogue_resources, usize::from(catalogue));
             assert_eq!(before.2.catalogue_resources, usize::from(catalogue));
-            assert!(p.prepared_support_statistics().unwrap().is_none());
+            assert_eq!(
+                p.prepared_support_statistics().unwrap().is_some(),
+                mode.is_fixed()
+            );
             let site = |denominator: i64| {
                 p.noise_sites()
                     .iter()
@@ -269,7 +286,7 @@ fn all_static_layouts_prime_the_same_families_for_faulted_nonzero_outcomes() {
             assert_eq!(p.prepare_query(density, 256, &a).unwrap(), O::Reused);
             assert_eq!(
                 p.prepare_query(Q::ReportedSupport, 256, &a).unwrap(),
-                O::Cold
+                if mode.is_fixed() { O::Reused } else { O::Cold }
             );
             assert_eq!(
                 before,
@@ -279,7 +296,8 @@ fn all_static_layouts_prime_the_same_families_for_faulted_nonzero_outcomes() {
                     p.prepared_moment_statistics().unwrap(),
                 )
             );
-            // Structural support remains cold; only this numeric query retains a parent.
+            // Structural support never constructs a numeric parent. Fixed policy
+            // preflight retained it already; Trace constructs it below.
             p.reported_support_terms(&r, &[], 256, &a).unwrap();
             assert_eq!(
                 p.prepared_support_statistics()

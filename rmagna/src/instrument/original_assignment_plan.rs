@@ -52,6 +52,11 @@ impl OriginalSharedFaults {
 #[path = "original_trace_cache.rs"]
 mod trace_cache;
 pub use trace_cache::{OriginalTraceCache, OriginalTraceCacheStatistics};
+#[path = "original_probability_cache.rs"]
+mod probability_cache;
+pub use probability_cache::{
+    OriginalCachedAssignment, OriginalProbabilityCache, OriginalProbabilityCacheStatistics,
+};
 
 #[path = "original_record_proposals.rs"]
 mod record_proposals;

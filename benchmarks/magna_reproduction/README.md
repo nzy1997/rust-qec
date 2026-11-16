@@ -3810,3 +3810,52 @@ the small original receipt in a fresh POSIX Python process:
 ```sh
 python3 benchmarks/magna_reproduction/original_long_operation_cancellation.py --upstream "$MAGNA_REFERENCE" --out "$NEW_CANCELLATION_JSON"
 ```
+
+The R09 diagnostic additionally exports `query_work` snapshots after compilation,
+the first draw, same-assignment replays and the optional physical-noise pilot.
+These are actual factory/evaluation observations on retained source/target
+owners. The schema explicitly excludes direct unprepared expansion, bare phase
+operations and transient cold-prefix owners; those routes keep their separate
+execution-meter and logical-query metrics. An unavailable owner or retention
+observation is null. Factory counts are monotonic, live geometry retention is
+separate, and saturated counts cannot certify actual work. No warm-zero or
+speedup threshold is imposed on a pilot result.
+
+Fresh captures require these observations and a source identity embedded by the
+Rust build. `evaluate_task`, its validator and the backend/build inputs are bound
+by the same source manifest used by the proposal probe. The receipt also hashes
+the diagnostic checker and identity verifier. To validate the current-source
+contract explicitly:
+
+```sh
+python3 benchmarks/magna_reproduction/paper_benchmark.py check \
+  --manifest benchmarks/magna_reproduction/paper/pilot.json \
+  --results "$MAGNA_NEW_OUT" --require-query-work
+```
+
+Historical captures remain historical evidence under their retained runner
+version. The default payload validator distinguishes absent historical metrics
+from new required metrics; it never supplies zero observations for missing data.
+The original 67,108,864-work pilot bound remains unchanged, including any logical
+distillation or TQD admission refusals. Eight noisy draws do not establish paper
+throughput or cross-language equality of sample means.
+
+The R09 core-delivery pilot was captured at Rust commit
+`5dd34a3dfd0d525f685511c4c4f86aac18dae097`, with compiled-input digest
+`58995264dba6e73e9223bb7279bf3c214677310aa0527b7170ffdffdb7a89daf`.
+All eight selected tasks were retained: BH2-T, BH2-S, BH10-T, color3, rp2-d3
+and DK completed; logical-distillation and TQD3 retained configured admission
+refusals. Both replays and eight noisy draws added zero observed scalar or
+labelled-support factories for each successful task. BH/color/rp2 tasks retained
+two scalar resources, and DK retained three scalar resources plus one labelled
+support parent. These are actual Rust representation costs, separate from
+Native private parent counts. Prescribed logical-distillation still succeeded;
+affine setup required 92,856,620 signature work. TQD prescribed and affine setup
+required 319,792,620 and 5,647,905,090 respectively, against the unchanged
+67,108,864 cap. These results are a bounded pilot, not paper performance curves.
+
+This R09 core delivery leaves the issue open and the parity ledger unchanged.
+The remaining delivery must qualify the complete constrained-domain, redundant
+label, parity/selection and protocol-to-target continuation/storage contracts.
+New cache/probe and factory observations do not by themselves establish all 25
+assigned source methods or constant Native internal parent counts.

@@ -36,6 +36,72 @@ struct CliffordSupport {
     quadratic: QuadraticForm,
     contraction: PreparedAffineContraction,
 }
+/// Temporary geometry shared by full preparation and the resource-free probe.
+struct ProbabilityGeometry {
+    joint: AffineKet,
+    projection: PreparedZProjection,
+    contraction: PreparedAffineContraction,
+    boundary_map: PreparedLinearBoundary,
+    empty_phase: ParityPhase,
+    phase_map: PhaseRestriction,
+    phase: ParityPhase,
+}
+impl ProbabilityGeometry {
+    fn new(
+        state: &CompiledUnitary,
+        outputs: &[BitVector],
+        arithmetic: &ScalarArithmetic,
+    ) -> Result<Self, UnitaryError> {
+        if outputs.iter().any(|row| row.width() != state.width()) {
+            return Err(UnitaryError::DimensionMismatch);
+        }
+        let reference = &state.program.query_reference;
+        let half = reference.width();
+        let joint = reference.tensor(&reference.conjugate(), arithmetic)?;
+        let rows = (0..state.width())
+            .map(|j| BitVector::from_indices(joint.width(), [j, half + j]))
+            .collect::<Result<Vec<_>, _>>()?;
+        let projection = PreparedZProjection::new(&joint, &rows)?;
+        let work = &state.program.work;
+        work.record(&work.support_projections);
+        let mut keep = outputs
+            .iter()
+            .map(|row| BitVector::from_indices(joint.width(), row.ones()))
+            .collect::<Result<Vec<_>, _>>()?;
+        keep.extend(
+            (state.width()..half)
+                .chain(half + state.width()..joint.width())
+                .map(|j| BitVector::from_indices(joint.width(), [j]))
+                .collect::<Result<Vec<_>, _>>()?,
+        );
+        let boundary_map = projection.prepare_linear_boundary(&keep)?;
+        work.record(&work.support_boundary_maps);
+        let contraction = PreparedAffineContraction::new(boundary_map.reference())?;
+        work.record(&work.support_contractions);
+        let magic = half - state.width();
+        let empty_phase = ParityPhase::new(outputs.len(), 0, [])?;
+        let phase = &state.program.query_reference_phase;
+        let phase_map = PhaseRestriction::new(
+            &[outputs.len(), magic, magic],
+            &[(&empty_phase, false), (phase, false), (phase, true)],
+            contraction.output_columns(),
+        )?;
+        work.record(&work.support_phase_maps);
+        let phase = phase_map.apply(
+            &[(&empty_phase, false), (phase, false), (phase, true)],
+            &BitVector::zeros(keep.len())?,
+        )?;
+        Ok(Self {
+            joint,
+            projection,
+            contraction,
+            boundary_map,
+            empty_phase,
+            phase_map,
+            phase,
+        })
+    }
+}
 impl CompiledUnitary {
     /// Retain ordered computational parity rows in the unselected diagonal
     /// probability tensor. No postselection predicate is introduced.
@@ -93,6 +159,73 @@ impl CompiledUnitary {
             arithmetic,
         )
     }
+    /// Conservatively recognize an actual Clifford labelled probability tensor.
+    /// `None` is uncertified, never proof of nonuniformity. No phase resource or
+    /// catalogue is constructed. The caller admits rows and packed geometry.
+    pub(crate) fn probe_probability_support_affine(
+        &self,
+        outputs: &[BitVector],
+        max_signature_work: usize,
+        arithmetic: &ScalarArithmetic,
+    ) -> Result<Option<Vec<AffineKet>>, UnitaryError> {
+        let geometry = ProbabilityGeometry::new(self, outputs, arithmetic)?;
+        let joint = self
+            .boundary
+            .tensor(&self.boundary.conjugate(), arithmetic)?;
+        let Some(projected) = geometry
+            .projection
+            .project(&joint, &BitVector::zeros(self.width())?)?
+        else {
+            return Ok(Some(vec![]));
+        };
+        let Some(ket) = geometry
+            .contraction
+            .contract(&geometry.boundary_map.apply(&projected)?, arithmetic)?
+        else {
+            return Ok(Some(vec![]));
+        };
+        let phase = geometry.phase_map.apply(
+            &[
+                (&geometry.empty_phase, false),
+                (&self.phase, false),
+                (&self.phase, true),
+            ],
+            ket.offset(),
+        )?;
+        // Deliberately overcharge the full coordinate space, including even
+        // terms. This bounds signature scans and the quadratic conversion;
+        // compressed odd-axis scans may perform less work, never more.
+        let n = phase.num_variables() as u128;
+        let per_pair = n
+            .saturating_mul(2)
+            .saturating_add(phase.terms().len() as u128)
+            .saturating_add(3);
+        let required = n
+            .saturating_mul(n.saturating_add(1))
+            .saturating_div(2)
+            .saturating_mul(per_pair)
+            .saturating_mul(n.div_ceil(64));
+        if required > max_signature_work as u128 {
+            return Err(crate::phase::PhaseError::ResourceLimit {
+                option: "affine_probe.max_signature_work",
+                limit: max_signature_work as u128,
+                required,
+            }
+            .into());
+        }
+        let (global, quadratic) = match phase.clifford() {
+            Ok(value) => value,
+            Err(crate::phase::PhaseError::NotClifford) => return Ok(None),
+            Err(error) => return Err(error.into()),
+        };
+        let labelled = ket.retain_boundary(&(0..outputs.len()).collect::<Vec<_>>())?;
+        Ok(Some(
+            clifford_probability_ket(labelled, global, &quadratic, arithmetic)?
+                .contract(arithmetic)?
+                .into_iter()
+                .collect(),
+        ))
+    }
     fn prepare_probability_support_policy(
         &self,
         outputs: &[BitVector],
@@ -101,41 +234,18 @@ impl CompiledUnitary {
         catalogue: Option<&PhaseCatalogue>,
         arithmetic: &ScalarArithmetic,
     ) -> Result<PreparedProbabilitySupport, UnitaryError> {
-        if outputs.iter().any(|row| row.width() != self.width()) {
-            return Err(UnitaryError::DimensionMismatch);
-        }
-        let reference = &self.program.query_reference;
-        let half = reference.width();
-        let joint = reference.tensor(&reference.conjugate(), arithmetic)?;
-        let rows = (0..self.width())
-            .map(|j| BitVector::from_indices(joint.width(), [j, half + j]))
-            .collect::<Result<Vec<_>, _>>()?;
-        let projection = PreparedZProjection::new(&joint, &rows)?;
-        let mut keep = outputs
-            .iter()
-            .map(|row| BitVector::from_indices(joint.width(), row.ones()))
-            .collect::<Result<Vec<_>, _>>()?;
-        keep.extend(
-            (self.width()..half)
-                .chain(half + self.width()..joint.width())
-                .map(|j| BitVector::from_indices(joint.width(), [j]))
-                .collect::<Result<Vec<_>, _>>()?,
-        );
-        let boundary_map = projection.prepare_linear_boundary(&keep)?;
-        let contraction = PreparedAffineContraction::new(boundary_map.reference())?;
-        let magic = half - self.width();
-        let empty_phase = ParityPhase::new(outputs.len(), 0, [])?;
-        let phase = &self.program.query_reference_phase;
-        let phase_map = PhaseRestriction::new(
-            &[outputs.len(), magic, magic],
-            &[(&empty_phase, false), (phase, false), (phase, true)],
-            contraction.output_columns(),
-        )?;
-        let phase = phase_map.apply(
-            &[(&empty_phase, false), (phase, false), (phase, true)],
-            &BitVector::zeros(keep.len())?,
-        )?;
+        let ProbabilityGeometry {
+            joint,
+            projection,
+            contraction,
+            boundary_map,
+            empty_phase,
+            phase_map,
+            phase,
+        } = ProbabilityGeometry::new(self, outputs, arithmetic)?;
+        let work = &self.program.work;
         let mut resource = options.prepare(&phase, max_terms, catalogue, arithmetic)?;
+        work.record(&work.support_phase_resources);
         let transport_requested = resource.native_transport_requested();
         let native_transport = resource.prepare_native_transport(
             &phase,
@@ -160,6 +270,7 @@ impl CompiledUnitary {
         if !transport_requested {
             prepared.prepare_clifford(&joint, self.width(), arithmetic)?;
         }
+        work.record(&work.support_parents);
         Ok(prepared)
     }
 }
@@ -213,6 +324,9 @@ impl PreparedProbabilitySupport {
         let contraction = PreparedAffineContraction::new(&clifford_probability_ket(
             labelled, global, &quadratic, arithmetic,
         )?)?;
+        self.program
+            .work
+            .record(&self.program.work.support_contractions);
         self.clifford = Some(CliffordSupport {
             phase,
             global,
@@ -247,6 +361,9 @@ impl PreparedProbabilitySupport {
             return Err(UnitaryError::IncompatibleProgram);
         }
         self.resource.check_term_limit(max_terms)?;
+        self.program
+            .work
+            .record(&self.program.work.support_evaluations);
         let joint = state
             .boundary
             .tensor(&state.boundary.conjugate(), arithmetic)?;
@@ -303,7 +420,12 @@ impl PreparedProbabilitySupport {
                 Ok(value) => value,
                 // A changed boundary map also invalidates the retained basis.
                 // Keep the general exact route without growing a cache.
-                Err(StabilizerError::IncompatibleContraction) => labelled.contract(arithmetic)?,
+                Err(StabilizerError::IncompatibleContraction) => {
+                    self.program
+                        .work
+                        .record(&self.program.work.support_changed_boundary_fallbacks);
+                    labelled.contract(arithmetic)?
+                }
                 Err(error) => return Err(error.into()),
             };
             return Ok(ProbabilitySupportExpansion {

@@ -257,6 +257,7 @@ pub struct ResolvedHistory {
     instrument: CompiledInstrument,
     faults: Vec<FaultSelection>,
     history_mass: ExactScalar,
+    history_mass_reused: bool,
     history_proposal_mass: Option<ExactScalar>,
     noise_probability: BigRational,
     noise_likelihood_ratio: BigRational,
@@ -278,6 +279,11 @@ impl ResolvedHistory {
     }
     pub fn history_mass(&self) -> &ExactScalar {
         &self.history_mass
+    }
+    /// The physical joint mass was returned by this draw's last exact marginal
+    /// or prescribed-prefix validation, rather than queried again at completion.
+    pub fn history_mass_reused(&self) -> bool {
+        self.history_mass_reused
     }
     /// Present only for actual affine-support proposals; prescribed diagnostic
     /// histories retain physical conditional normalization.
@@ -658,6 +664,13 @@ impl CausalProgram {
     pub fn strategy(&self) -> CausalStrategy {
         self.options.strategy
     }
+    /// The retained reference owner only; cold-prefix programs are transient
+    /// and their compilations remain visible through the execution meter.
+    pub fn query_work_statistics(&self) -> Option<crate::unitary::QueryWorkStatistics> {
+        self.reference
+            .as_ref()
+            .map(CompiledInstrument::query_work_statistics)
+    }
     pub fn reference_compilations(&self) -> usize {
         1
     }
@@ -939,6 +952,7 @@ impl CausalProgram {
                 && mode.groups().is_none())
             .then_some(ExactScalar::one()),
             zero_prefix: false,
+            confirmed_physical_mass: None,
             noise_entropy_words: draw.entropy_words,
         };
         for (end, located) in self.circuit.operations().iter().enumerate() {
@@ -1008,37 +1022,48 @@ impl CausalProgram {
                 arithmetic,
             )?
         };
+        // A final safe point remains observable even when the completed
+        // physical mass needs no additional quantum query.
+        crate::cancellation::checkpoint(crate::cancellation::SafePoint::HistoryCommit)
+            .map_err(InstrumentError::from)?;
         let instrument = state
             .instrument(self.circuit.operations().len(), arithmetic)?
             .conditioned(&state.conditions)?;
         let faults = state.faults(&instrument)?;
-        let parities = state
-            .conditions
-            .iter()
-            .map(|(p, _)| p.clone())
-            .collect::<Vec<_>>();
-        let values = BitVector::from_indices(
-            parities.len(),
-            state
+        let history_mass_reused = state.confirmed_physical_mass.is_some();
+        let history_mass = if let Some(mass) = state.confirmed_physical_mass.take() {
+            // Future resolved operations are trace preserving for the already
+            // observed records; postselection is applied by the terminal task.
+            mass
+        } else {
+            let parities = state
                 .conditions
                 .iter()
-                .enumerate()
-                .filter_map(|(j, (_, v))| v.then_some(j)),
-        )
-        .map_err(InstrumentError::from)?;
-        state.mode.query()?;
-        let history_mass = observe(meter, OperationKind::Query, || {
-            instrument
-                .reported_probability(
-                    &parities,
-                    &values,
-                    &faults,
-                    self.options.sampling.max_terms,
-                    arithmetic,
-                )
-                .map_err(RuntimeError::from)
-        })?
-        .value;
+                .map(|(p, _)| p.clone())
+                .collect::<Vec<_>>();
+            let values = BitVector::from_indices(
+                parities.len(),
+                state
+                    .conditions
+                    .iter()
+                    .enumerate()
+                    .filter_map(|(j, (_, v))| v.then_some(j)),
+            )
+            .map_err(InstrumentError::from)?;
+            state.mode.query()?;
+            observe(meter, OperationKind::Query, || {
+                instrument
+                    .reported_probability(
+                        &parities,
+                        &values,
+                        &faults,
+                        self.options.sampling.max_terms,
+                        arithmetic,
+                    )
+                    .map_err(RuntimeError::from)
+            })?
+            .value
+        };
         let noise_probability =
             if !draw.defer_guarded && instrument.noise_sites().len() == self.model.num_sites() {
                 // Every potential category remains active, so the already validated
@@ -1058,6 +1083,7 @@ impl CausalProgram {
             requested_values,
             decisions: state.decisions,
             history_mass,
+            history_mass_reused,
             history_proposal_mass: state.proposal_mass,
             noise_probability,
             noise_likelihood_ratio: draw.likelihood_ratio,
@@ -1086,6 +1112,8 @@ struct PathState<'a> {
     mode: HistoryMode<'a>,
     next_group: usize,
     proposal_mass: Option<ExactScalar>,
+    // Per draw only: never cache callback values or masses between histories.
+    confirmed_physical_mass: Option<ExactScalar>,
     zero_prefix: bool,
 }
 impl PathState<'_> {
@@ -1246,7 +1274,7 @@ impl PathState<'_> {
             )
             .map_err(InstrumentError::from)?;
             self.mode.query()?;
-            if observe(self.meter, OperationKind::Query, || {
+            let physical_mass = observe(self.meter, OperationKind::Query, || {
                 instrument
                     .reported_probability(
                         &parities,
@@ -1257,15 +1285,15 @@ impl PathState<'_> {
                     )
                     .map_err(RuntimeError::from)
             })?
-            .value
-            .is_zero()
-            {
+            .value;
+            if physical_mass.is_zero() {
                 return Err(RuntimeError::InvalidHistory {
                     group,
                     message: "observations have zero physical prefix mass".to_owned(),
                 }
                 .into());
             }
+            self.confirmed_physical_mass = Some(physical_mass);
             self.conditions
                 .extend(inputs.iter().cloned().zip(values.iter().copied()));
             return Ok(values.clone());
@@ -1287,9 +1315,13 @@ impl PathState<'_> {
                     arithmetic,
                     self.meter,
                 )?;
+                self.confirmed_physical_mass = Some(draw.mass);
                 (draw.values, draw.entropy_words)
             }
             HistorySampler::AffineSupport => {
+                // A proposal mass is not a physical point mass. This route
+                // retains its explicit physical query at completion.
+                self.confirmed_physical_mass = None;
                 let draw = if self.zero_prefix {
                     self.complete_zero_prefix(inputs, random, &options, arithmetic)?
                 } else {

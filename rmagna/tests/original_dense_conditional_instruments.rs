@@ -17,8 +17,12 @@ use rmagna::task::{
 use rmagna::unitary::CompilerStrategy;
 use std::cmp::Ordering;
 use std::path::PathBuf;
+use std::sync::{
+    Arc,
+    atomic::{AtomicUsize, Ordering as AtomicOrdering},
+};
 
-const DRAWS_PER_CASE: u32 = 512;
+const DRAWS_PER_CASE: u32 = 1024;
 
 struct TargetFile(PathBuf);
 
@@ -97,10 +101,18 @@ fn check_sampling(
     accepted: &ExactField,
     error: &ExactField,
     external: bool,
+    calls: &AtomicUsize,
 ) {
+    let calls_before = calls.load(AtomicOrdering::Relaxed);
     let meter = ExecutionMeter::default();
     let prepared = sampling.prepare_sampling_queries(Default::default(), &meter);
     assert_eq!(prepared.result, Ok(()), "{label}");
+    assert_eq!(
+        calls.load(AtomicOrdering::Relaxed),
+        calls_before,
+        "preparation must not execute actual callbacks"
+    );
+    let work_before = sampling.query_work_statistics();
     assert!(prepared.all_families_retained(), "{label}");
     assert_eq!(prepared.counts.failed, 0, "{label}");
     assert_eq!(prepared.by_kind["acceptance"].planned, 1, "{label}");
@@ -201,6 +213,54 @@ fn check_sampling(
         observed_non_unit_correction,
         "{label} must exercise non-unit history correction on a nonzero contribution"
     );
+    let work_after = sampling.query_work_statistics();
+    let factories = |s: rmagna::unitary::QueryWorkStatistics| {
+        [
+            s.affine_closures_prepared,
+            s.affine_geometry_preparations,
+            s.phase_maps_prepared,
+            s.phase_resources_prepared,
+            s.support_projections_prepared,
+            s.support_boundary_maps_prepared,
+            s.support_contractions_prepared,
+            s.support_phase_maps_prepared,
+            s.support_phase_resources_prepared,
+            s.support_parents_prepared,
+        ]
+    };
+    assert_eq!(
+        factories(work_before.source.unwrap()),
+        factories(work_after.source.unwrap()),
+        "{label} must not construct any scalar/support map or resource per draw"
+    );
+    assert_eq!(
+        work_before.source.unwrap().live_affine_geometries,
+        work_after.source.unwrap().live_affine_geometries
+    );
+    assert_eq!(work_before.target, work_after.target);
+    assert_eq!(
+        work_after
+            .source
+            .unwrap()
+            .support_changed_boundary_fallbacks,
+        work_before
+            .source
+            .unwrap()
+            .support_changed_boundary_fallbacks,
+        "{label} changed-boundary reconstruction must remain absent"
+    );
+    assert_eq!(
+        calls.load(AtomicOrdering::Relaxed) - calls_before,
+        usize::from(external) * DRAWS_PER_CASE as usize
+    );
+    assert_eq!(
+        sampling.prepared_density_reuses(),
+        Some(u64::from(DRAWS_PER_CASE))
+    );
+    println!(
+        "{label}:draws={DRAWS_PER_CASE},actualcallbacks={},work_before={work_before:?},work_after={work_after:?}",
+        usize::from(external) * DRAWS_PER_CASE as usize
+    );
     let costs = meter.snapshot();
     assert_eq!(costs.compilation.attempted, 0, "{label}");
     assert_eq!(costs.query.failed, 0, "{label}");
@@ -215,9 +275,12 @@ fn check_sampling(
 #[test]
 fn original_dense_conditional_instruments_and_sampling() {
     let files = TargetFile::new();
+    let calls = Arc::new(AtomicUsize::new(0));
+    let seen = Arc::clone(&calls);
     let mut registry = ControllerRegistry::default();
     registry
-        .register("and", "1", |bits: &[bool]| {
+        .register("and", "1", move |bits: &[bool]| {
+            seen.fetch_add(1, AtomicOrdering::Relaxed);
             let [a, b] = bits else {
                 panic!("original AND requires two reported inputs");
             };
@@ -318,12 +381,17 @@ fn original_dense_conditional_instruments_and_sampling() {
                     QueryPreparation::Native(Default::default());
                 options.runtime.compile.density_preparation =
                     QueryPreparation::Native(Default::default());
+                let calls_before = calls.load(AtomicOrdering::Relaxed);
                 let sampling = TaskEvaluator::new(&physical, &modules, &registry, options).unwrap();
-                check_sampling(&sampling, &label, &accepted, &error, detector != 0);
+                assert_eq!(calls.load(AtomicOrdering::Relaxed), calls_before);
+                check_sampling(&sampling, &label, &accepted, &error, detector != 0, &calls);
                 draws += DRAWS_PER_CASE;
             }
         }
     }
     assert_eq!(enumerations, 24);
-    assert_eq!(draws, 6144);
+    assert_eq!(draws, 12288);
+    println!(
+        "12source-paired dense mode/feedback/compiler cells:24exact enumerations,12288draws,0hot scalar/support factories,actualcallbacks andtarget reuse checked"
+    );
 }

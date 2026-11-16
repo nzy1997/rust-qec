@@ -120,7 +120,7 @@ impl CompiledInstrument {
                 )
             }
             InstrumentQueryLayout::ReportedSupport => {
-                // Native mode primes the actual parent used by numeric support.
+                // Fixed policies prime the actual parent used by numeric support.
                 if self.record_wires.iter().any(|&q| q >= self.unitary.width()) {
                     return Err(UnitaryError::DimensionMismatch.into());
                 }
