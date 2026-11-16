@@ -16,6 +16,7 @@ impl PreparedQuadraticSum {
         let mut state = QuadraticElimination::new(reference)?;
         let mut actions = Vec::new();
         loop {
+            crate::cancellation::checkpoint(crate::cancellation::SafePoint::QuadraticStep)?;
             let next = (0..state.active.len())
                 .find(|&i| state.active[i] && state.values.linear[i] & 1 != 0)
                 .or_else(|| state.active.iter().position(|&bit| bit));
@@ -46,6 +47,7 @@ impl PreparedQuadraticSum {
         }
         let mut values = QuadraticValues::new(updated);
         for action in &self.actions {
+            crate::cancellation::checkpoint(crate::cancellation::SafePoint::QuadraticStep)?;
             if !action.apply(&mut values)? {
                 return Ok(ExactScalar::zero());
             }

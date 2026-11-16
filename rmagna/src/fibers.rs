@@ -172,6 +172,7 @@ impl PreparedCliffordFibers {
             .collect::<Result<Vec<_>, _>>()?;
         let mut terms = Vec::with_capacity(self.num_terms());
         for fiber in &self.fibers {
+            crate::cancellation::checkpoint(crate::cancellation::SafePoint::Fiber)?;
             let mut offset = boundary.offset().clone();
             offset.xor_assign(&image(&fiber.shift)?)?;
             let phase = add_quadratic(
@@ -201,6 +202,7 @@ impl PreparedCliffordFibers {
         let (global, boundary) = self.updated_boundary(updated, boundary)?;
         let mut total = ExactScalar::zero();
         for fiber in &self.fibers {
+            crate::cancellation::checkpoint(crate::cancellation::SafePoint::Fiber)?;
             let phase = add_quadratic(
                 &fiber.phase,
                 &boundary.restrict(&fiber.shift, &self.directions)?,

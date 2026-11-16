@@ -42,6 +42,13 @@ use std::{
     fmt,
     sync::Arc,
 };
+#[path = "original_complex_boundary.rs"]
+mod complex_boundary;
+pub use complex_boundary::{
+    OriginalComplexBoundaryError, OriginalFeedbackBoundaryDraw, OriginalFeedbackBoundaryOptions,
+    OriginalFeedbackBoundaryProgram, OriginalFeedbackBoundaryRoute,
+    OriginalFeedbackBoundarySampler, OriginalFeedbackBoundaryStatistics, OriginalPhaseFeedback,
+};
 #[path = "original_branch_probability.rs"]
 mod branch_probability;
 pub use branch_probability::PreparedOriginalBranchProbability;

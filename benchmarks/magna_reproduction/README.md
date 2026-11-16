@@ -3677,3 +3677,136 @@ needed deposited JSON files, and removes its import cache afterward. Ordinary
 PR checks use committed small data and do not import these optional packages.
 This deliverable adds no original-method promotions and executes no paper-scale
 precision or timing campaign; those remain B03/B04/B05/B06.
+
+
+### Original-operation complex feedback boundaries (R07)
+
+`OriginalFeedbackBoundaryProgram` owns an R04 assignment-plan snapshot and
+classifies authoritative control rules before sampling. Structurally affine
+rules keep the existing direct static boundary route; controlled odd phase
+arithmetic and general callbacks use an explicit bounded literal-prefix route.
+This classification does not catch resource errors and retry another backend.
+The existing `OriginalStaticTrace` API remains available for advanced direct
+resource/catalogue policies; the general wrapper uses its default direct policy.
+
+Opaque callbacks require `OriginalPhaseFeedback` metadata. Its live-wire set and
+implicit single-wire axes, plus explicit extra even/odd parity axes, define a
+fixed odd phase signature. Actual emissions are validated after normalized
+phase aggregation: Pauli-frame conjugation changes phase signs but not parity.
+Missing declarations fail at construction; non-Pauli/phase gates, undeclared
+wires/axes or changed parity produce an explicit `FeedbackMismatch`. Typed
+`OriginalDeclaredControl` rules are authoritative unitary declarations and need
+no separate opaque-family metadata, including when their odd phase depends on
+reports.
+
+Prepare a program from the source, a map from opaque control IDs to families,
+`OriginalFeedbackBoundaryOptions`, and `ScalarArithmetic`. Then call
+`program.prepare_task(&task)` and `sampler.sample(&assignment, &mut rng)`.
+The result owns the joint history mass, accepted joint mass, joint signed
+moments, required reported/true bits, and actual compilation/query/callback/
+entropy counters. The boundary task declares Pauli effects rather than a target
+error metric. Do not divide the joint results implicitly; the caller knows the
+sampling/likelihood contract. Source callbacks execute once per actual control,
+with declared parent order. Earlier sampled reports are reused, and unrequested
+final records (including junk in postselection) are integrated out.
+
+Complex prefix queries stop before the next actual callback. Prior emissions
+are frozen into pure literal extractors; exhaustive kernels never replay the
+source callbacks or execute a future callback early. Prefix distributions are
+physical and unconditioned on future postselection. Final acceptance and moments
+apply postselection only after all callbacks. The service uses full exact
+literal-prefix tables rather than a common-axis affine proposal shortcut; it
+exports no Native common-axis certificate or private plan-cache counter and
+retains no prefix-plan cache. This is a correctness route, with no matched
+Native throughput or automatic fallback claim. Original scalar/kernel limits
+still apply, together with prospective literal-record, branch/query, metadata,
+source/gate-visit and cumulative entropy budgets. Metadata admission excludes
+arbitrary-precision limbs, which have their existing arithmetic limit.
+
+`cargo test --locked -p rmagna --test original_complex_boundary` exercises all
+five assigned original methods through complete pinned Native branch tables and
+explicit Rust word-stream replay. Python Random implementation/seed identity is
+not promised. The owning suite covers even/odd routing, two callbacks with
+future postselection/faults/report flips, omitted junk, the noncommuting T/H/T
+reference, constructor/runtime declaration errors, normalized phase signatures,
+limits before callbacks/entropy, and owned results after program drop. One
+fixed-word counterexample distinguishes the unconditioned first decoder input
+from the incorrectly future-conditioned law. Actual source mutations of family
+validation, future-conditioning and callback freezing are all detected.
+
+The portable producer runs all five unchanged original methods (50 sampler
+draws), captures six full literal tables from their original exhaustive helper,
+and adds a full literal table of the fifth method's exact source fixture. That
+method's independent-reference/controller-order/RNG assertions still execute.
+Source/frontend/helper/producer identities and attribution are retained. No
+Native rebuild or environment copy is needed:
+
+```sh
+python3 benchmarks/magna_reproduction/original_complex_boundary.py --upstream "$MAGNA_REFERENCE" --native-helper "$MAGNA_NATIVE_HELPER" --out "$NEW_COMPLEX_JSON"
+```
+
+
+### Cooperative cancellation of long work (R08)
+
+`CancellationToken` remains available from `rmagna::task` and now from
+`rmagna::cancellation`. A token by itself retains the existing between-draw
+contract. Opt into same-thread synchronous kernel safe points explicitly:
+
+```rust,ignore
+let observed = token.with_cooperative_scope(None, || {
+    compiled.run_cancellable(&run_options, &token)
+});
+let report = observed.value?;
+```
+
+The scope covers phase terms, cold/prepared quadratic elimination steps,
+Clifford fibers, and bounded chunks of signature work. Requests become observed
+cancellation only at an actual safe point. Existing kernel errors propagate
+through typed `ScalarError::Cancelled`; no panic drives cancellation. The
+scope restores its previous context on return, error or unwind. Nested scopes
+replace the parent temporarily; spawned threads need their own scope. Optional
+`CheckpointObserver` instrumentation supports deterministic rendezvous and must
+return. Arbitrary blocked in-process callbacks and individual OS or big-integer
+calls are outside cooperative preemption. There is no hard wall-time guarantee
+or automatic preparation cancellation unless preparation is inside the scope.
+
+A cancelled in-flight row is `interrupted=1`, distinct from `completed`, `failed`
+and `not_attempted`. Their sum equals `requested`. Only fully committed rows,
+records, statistics and completed-resource counts survive. Actual attempted
+work and consumed entropy are retained; nothing rewinds the caller's RNG or
+invents a completed row. An ordinary decoder error remains a failure when no
+safe point refused work, even if that decoder requested token cancellation.
+Finalization errors retain their failure status rather than being hidden by
+cancellation.
+
+Managed process decoders poll active scopes while waiting for their session lock
+or response. Poll waits are at most 10 ms; the positive exchange timeout remains
+an absolute deadline including lock acquisition, serialization, I/O and
+validation. This is a safe-point policy, not a real-time latency claim. A
+termination handle independent of the session lock kills and reaps the direct
+managed child before recording successful cancellation. Cleanup errors remain
+errors. Termination poisons the whole shared worker and all bindings, including
+another caller's uncommitted in-flight exchange; no request is retried.
+Validated response commits and termination share the child lifecycle mutex.
+When termination wins that ordering, even an already queued valid reply fails;
+when the response commits first, its owned result remains valid. Descendant process
+management is outside this direct-child contract. `ControllerProcess::try_wait`
+inspects the actual managed child without taking the exchange lock.
+
+`cargo test --locked -p rmagna --test long_operation_cancellation -- --show-output`
+checks a single4096-term contraction at term4, cold/warm elimination at step3,
+context restoration, committed prefixes and JSON counters, actual caller-owned
+entropy after a callback, decoder-error precedence, blocked process response,
+contended lock and registered-process batch cancellation. The process tests
+check the actual child exit status (and PID absence on Unix), not a stopped flag.
+No uncontrolled ten-million-row Rust workload or timing threshold is needed.
+
+The pinned original SIGALRM method separately executes unchanged, including its
+own ten-million-draw request, 0.2-second alarm, `Stop` exception assertion and
+original time bound. Its actual timer/handler setter protocol and restoration
+are captured; Rust does not claim that Python signal/exception ABI. Regenerate
+the small original receipt in a fresh POSIX Python process:
+
+```sh
+python3 benchmarks/magna_reproduction/original_long_operation_cancellation.py --upstream "$MAGNA_REFERENCE" --out "$NEW_CANCELLATION_JSON"
+```

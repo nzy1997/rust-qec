@@ -1,0 +1,11 @@
+This bounded witness observes the unchanged test
+FileApiTests.test_signal_handlers_run_during_one_long_native_batch from
+itpyi/magna commit56847478c840395735146ef1e1ccdc3d8aedc10f,
+tests/core/test_file_api.py, licensed under MPL-2.0.
+Full license: ../fixtures/original_many_record_input.LICENSE.
+
+Producer: benchmarks/magna_reproduction/original_long_operation_cancellation.py.
+The actual original assertions and timer/handler restoration execute in the
+protected pinned Native environment. The source/reference/frontend/producer
+hashes and observed setter protocol are retained. Elapsed seconds are an
+observation, not a Rust latency threshold or Python signal/exception ABI claim.

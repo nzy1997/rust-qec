@@ -534,6 +534,7 @@ impl PreparedPhaseSum {
             reference.restrict(&BitVector::zeros(reference.width)?, quotient.complement())?;
         let mut coefficients = Vec::new();
         for x in 0..terms {
+            crate::cancellation::checkpoint(crate::cancellation::SafePoint::PhaseTerm)?;
             let vector = assignment(quotient.rank, x)?;
             coefficients.push(arithmetic.omega(i64::from(resource.evaluate(&vector)?), 0)?);
         }
@@ -584,6 +585,7 @@ impl PreparedPhaseSum {
             .collect::<Result<Vec<_>, _>>()?;
         let mut total = ExactScalar::zero();
         for (x, resource) in self.coefficients.iter().enumerate() {
+            crate::cancellation::checkpoint(crate::cancellation::SafePoint::PhaseTerm)?;
             let shift = assignment(width, x)?;
             let sum = phase.restrict(&shift, &remaining)?.gauss_sum(arithmetic)?;
             total = arithmetic.add(&total, &arithmetic.multiply(resource, &sum)?)?;

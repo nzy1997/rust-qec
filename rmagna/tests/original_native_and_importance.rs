@@ -303,6 +303,7 @@ fn summarize_rows(rows: &[Vec<R>], weights: &[R]) -> TaskRunResult {
         requested: count,
         completed: count,
         failed: 0,
+        interrupted: 0,
         not_attempted: 0,
         seed: 0,
         statistics: Some(statistics),

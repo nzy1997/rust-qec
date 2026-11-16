@@ -7,7 +7,11 @@ use std::collections::BTreeMap;
 use std::fmt;
 use std::io::{BufRead, BufReader, Read, Write};
 use std::process::{Child, Command, Stdio};
-use std::sync::{Arc, Mutex, mpsc};
+use std::sync::{
+    Arc, Mutex, MutexGuard, TryLockError,
+    atomic::{AtomicBool, Ordering},
+    mpsc,
+};
 use std::time::{Duration, Instant};
 
 const PROTOCOL: &str = "rmagna.controller.v1";
@@ -39,8 +43,99 @@ impl std::error::Error for ProcessError {}
 fn error(message: impl Into<String>) -> ProcessError {
     ProcessError(message.into())
 }
+// Termination is independent of the serialized exchange lock. A scoped
+// caller waiting behind another exchange can cancel the whole managed worker,
+// exactly as a failed/timeout exchange already poisons every shared binding.
+struct Worker {
+    child: Mutex<Child>,
+    stopped: AtomicBool,
+    timeout: Duration,
+}
+impl Worker {
+    // This lock is the lifecycle linearization point shared with terminate.
+    // No response can commit after a completed termination, even if the I/O
+    // thread queued its valid bytes before the managed child was killed.
+    fn commit_response(&self, started: Instant) -> Result<(), ProcessError> {
+        let _lifecycle = self
+            .child
+            .lock()
+            .map_err(|_| error("worker process mutex poisoned"))?;
+        if self.stopped.load(Ordering::Acquire) {
+            return Err(error("worker stopped before response commit"));
+        }
+        if started.elapsed() >= self.timeout {
+            return Err(error("response validation exceeded the exchange timeout"));
+        }
+        Ok(())
+    }
+    fn terminate(&self) -> Result<(), ProcessError> {
+        let mut child = self
+            .child
+            .lock()
+            .map_err(|_| error("worker process mutex poisoned"))?;
+        if child
+            .try_wait()
+            .map_err(|e| error(format!("cannot inspect worker: {e}")))?
+            .is_none()
+        {
+            if let Err(kill_error) = child.kill() {
+                // A child may exit naturally between try_wait and kill.
+                if child
+                    .try_wait()
+                    .map_err(|e| error(format!("cannot inspect worker: {e}")))?
+                    .is_none()
+                {
+                    return Err(error(format!("cannot terminate worker: {kill_error}")));
+                }
+            }
+            child
+                .wait()
+                .map_err(|e| error(format!("cannot reap worker: {e}")))?;
+        }
+        self.stopped.store(true, Ordering::Release);
+        Ok(())
+    }
+}
+impl From<crate::scalar::ScalarError> for ProcessError {
+    fn from(value: crate::scalar::ScalarError) -> Self {
+        error(value.to_string())
+    }
+}
+fn process_checkpoint(worker: &Worker) -> Result<(), ProcessError> {
+    crate::cancellation::checkpoint_with_cleanup(
+        crate::cancellation::SafePoint::DecoderWait,
+        || worker.terminate(),
+    )
+}
+fn lock_session<'a>(
+    session: &'a Mutex<Session>,
+    worker: &Worker,
+    started: Instant,
+) -> Result<MutexGuard<'a, Session>, ProcessError> {
+    if crate::cancellation::observed().is_none() {
+        return session
+            .lock()
+            .map_err(|_| error("controller process mutex poisoned"));
+    }
+    loop {
+        match session.try_lock() {
+            Ok(guard) => return Ok(guard),
+            Err(TryLockError::Poisoned(_)) => {
+                return Err(error("controller process mutex poisoned"));
+            }
+            Err(TryLockError::WouldBlock) => {}
+        }
+        let remaining = worker.timeout.saturating_sub(started.elapsed());
+        if remaining.is_zero() {
+            worker.terminate()?;
+            return Err(error("session lock exceeded the exchange timeout"));
+        }
+        process_checkpoint(worker)?;
+        std::thread::sleep(remaining.min(Duration::from_millis(10)));
+    }
+}
 struct Session {
-    child: Child,
+    worker: Arc<Worker>,
     requests: mpsc::SyncSender<Vec<u8>>,
     responses: mpsc::Receiver<Result<Box<RawValue>, String>>,
     options: ProcessOptions,
@@ -51,20 +146,43 @@ impl Session {
     fn fail(&mut self, message: impl Into<String>) -> ProcessError {
         let message = message.into();
         self.failed = Some(message.clone());
-        let _ = self.child.kill();
-        let _ = self.child.wait();
+        let _ = self.worker.terminate();
         error(message)
     }
-    fn receive(&mut self) -> Result<Box<RawValue>, ProcessError> {
-        match self.responses.recv_timeout(self.options.timeout) {
-            Ok(Ok(value)) => Ok(value),
-            Ok(Err(message)) => Err(self.fail(message)),
-            Err(e) => Err(self.fail(format!("response unavailable: {e}"))),
+    fn receive(&mut self, started: Instant) -> Result<Box<RawValue>, ProcessError> {
+        loop {
+            let remaining = self.options.timeout.saturating_sub(started.elapsed());
+            if remaining.is_zero() {
+                return Err(self.fail("response unavailable: exchange timeout"));
+            }
+            if let Err(e) = process_checkpoint(&self.worker) {
+                self.failed = Some(e.to_string());
+                return Err(e);
+            }
+            let wait = if crate::cancellation::observed().is_some() {
+                remaining.min(Duration::from_millis(10))
+            } else {
+                remaining
+            };
+            match self.responses.recv_timeout(wait) {
+                Ok(Ok(value)) => return Ok(value),
+                Ok(Err(message)) => return Err(self.fail(message)),
+                Err(mpsc::RecvTimeoutError::Timeout) => {}
+                Err(e) => return Err(self.fail(format!("response unavailable: {e}"))),
+            }
         }
     }
-    fn evaluate(&mut self, name: &str, bits: &[bool]) -> Result<Vec<bool>, ProcessError> {
+    fn evaluate(
+        &mut self,
+        name: &str,
+        bits: &[bool],
+        started: Instant,
+    ) -> Result<Vec<bool>, ProcessError> {
         if let Some(message) = &self.failed {
             return Err(error(format!("session previously failed: {message}")));
+        }
+        if self.worker.stopped.load(Ordering::Acquire) {
+            return Err(error("worker process has been stopped"));
         }
         if bits.len() > self.options.max_bits {
             return Err(error("input bit budget exceeded before sending request"));
@@ -82,11 +200,17 @@ impl Session {
                 "request frame budget exceeded before sending request",
             ));
         }
-        let started = Instant::now();
+        if started.elapsed() >= self.options.timeout {
+            return Err(self.fail("exchange timeout before sending request"));
+        }
+        if let Err(e) = process_checkpoint(&self.worker) {
+            self.failed = Some(e.to_string());
+            return Err(e);
+        }
         if let Err(e) = self.requests.try_send(bytes) {
             return Err(self.fail(format!("cannot send request: {e}")));
         }
-        let response = self.receive()?;
+        let response = self.receive(started)?;
         let response: wire::Response = serde_json::from_str(response.get())
             .map_err(|e| self.fail(format!("invalid controller response: {e}")))?;
         if response.id != id {
@@ -101,16 +225,16 @@ impl Session {
         if outputs.len() > self.options.max_bits {
             return Err(self.fail("output bit budget exceeded"));
         }
-        if started.elapsed() > self.options.timeout {
-            return Err(self.fail("response validation exceeded the exchange timeout"));
+        let outputs = outputs.into_iter().map(|bit| bit.0).collect();
+        if let Err(e) = self.worker.commit_response(started) {
+            return Err(self.fail(e.0));
         }
-        Ok(outputs.into_iter().map(|bit| bit.0).collect())
+        Ok(outputs)
     }
 }
 impl Drop for Session {
     fn drop(&mut self) {
-        let _ = self.child.kill();
-        let _ = self.child.wait();
+        let _ = self.worker.terminate();
     }
 }
 fn read_frame(reader: &mut impl BufRead, limit: usize) -> Result<Box<RawValue>, String> {
@@ -132,6 +256,7 @@ fn read_frame(reader: &mut impl BufRead, limit: usize) -> Result<Box<RawValue>, 
 #[derive(Clone)]
 pub struct ControllerProcess {
     session: Arc<Mutex<Session>>,
+    worker: Arc<Worker>,
     versions: BTreeMap<String, String>,
     manifest: Value,
 }
@@ -185,8 +310,13 @@ impl ControllerProcess {
                 let _ = child.wait();
                 error(format!("cannot start worker I/O: {e}"))
             })?;
+        let worker = Arc::new(Worker {
+            child: Mutex::new(child),
+            stopped: AtomicBool::new(false),
+            timeout: options.timeout,
+        });
         let mut session = Session {
-            child,
+            worker: Arc::clone(&worker),
             requests,
             responses,
             options,
@@ -194,7 +324,7 @@ impl ControllerProcess {
             failed: None,
         };
         let started = Instant::now();
-        let hello: wire::Hello = serde_json::from_str(session.receive()?.get())
+        let hello: wire::Hello = serde_json::from_str(session.receive(started)?.get())
             .map_err(|e| error(format!("invalid worker greeting: {e}")))?;
         if hello.protocol != PROTOCOL {
             return Err(error("unsupported worker greeting protocol or fields"));
@@ -219,9 +349,28 @@ impl ControllerProcess {
         }
         Ok(Self {
             session: Arc::new(Mutex::new(session)),
+            worker,
             versions,
             manifest,
         })
+    }
+    /// Inspect/reap the actual managed child without acquiring the exchange
+    /// lock. A returned exit status also prevents any later request/retry.
+    pub fn try_wait(&self) -> Result<Option<std::process::ExitStatus>, ProcessError> {
+        let mut child = self
+            .worker
+            .child
+            .lock()
+            .map_err(|_| error("worker process mutex poisoned"))?;
+        let status = child
+            .try_wait()
+            .map_err(|e| error(format!("cannot inspect worker: {e}")))?;
+        // Keep the lifecycle lock through the stop transition, just as
+        // terminate does, so a response cannot commit between these events.
+        if status.is_some() {
+            self.worker.stopped.store(true, Ordering::Release);
+        }
+        Ok(status)
     }
     pub fn versions(&self) -> &BTreeMap<String, String> {
         &self.versions
@@ -235,22 +384,20 @@ impl ControllerProcess {
         if !self.versions.contains_key(name) {
             return Err(error(format!("worker has no binding {name:?}")));
         }
-        self.session
-            .lock()
-            .map_err(|_| error("controller process mutex poisoned"))?
-            .evaluate(name, inputs)
+        let started = Instant::now();
+        lock_session(&self.session, &self.worker, started)?.evaluate(name, inputs, started)
     }
     /// Atomic registration: a collision leaves the caller's registry unchanged.
     pub fn register_all(&self, registry: &mut ControllerRegistry) -> Result<(), RuntimeError> {
         let mut candidate = registry.clone();
         for (name, version) in &self.versions {
             let session = self.session.clone();
+            let worker = Arc::clone(&self.worker);
             let name = name.clone();
             candidate.register(name.clone(), version.clone(), move |bits: &[bool]| {
-                session
-                    .lock()
-                    .map_err(|_| "controller process mutex poisoned".to_owned())?
-                    .evaluate(&name, bits)
+                let started = Instant::now();
+                lock_session(&session, &worker, started)
+                    .and_then(|mut session| session.evaluate(&name, bits, started))
                     .map_err(|e| e.to_string())
             })?;
         }
