@@ -111,4 +111,3 @@ def exact_from_rows(k, rows, p):
     return dict(acceptance=acceptance, joint_success=good,
                 accepted_failure=acceptance-good,
                 conditional_error=(acceptance-good)/acceptance if acceptance else None)
-
