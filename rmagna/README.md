@@ -6805,3 +6805,35 @@ no entropy; the second fixture has no common commuting sector. Rust's typed
 `CompletedProbability` sampler replaces the original method-name diagnostic.
 This witness does not establish automatic commuting-sector discovery for other
 inputs or Python bit-stream identity.
+
+## Explicit probability-value reuse for original assignments
+
+`OriginalProbabilityCache` provides a probability-value LRU independently of
+prepared scalar-query geometry. `cache.compile(&plan, assignment)` returns an
+owned `OriginalCachedAssignment`; inspect `cache_hit()` and
+`certificate().probability()`, or take `into_certificate()`. Default capacity is
+32 entries and 1 MiB of serialized key/value payload. `new`, `set_limits`,
+`limits`, `statistics` and `clear` expose explicit retention control. Zero entry
+or byte budgets disable retention while preserving physical evaluation. An
+oversized key/value bypasses retention; failed evaluations never become entries.
+
+Every request captures its assignment, validates immutable source limits,
+executes the actual callbacks and compiles their fresh emissions before lookup.
+The exact key includes the complete compiled affine wavefunction, odd phase
+polynomial and physical projection. A callback version or input fingerprint is
+insufficient: changing an emitted phase with the same version changes its key.
+Callbacks may fail on a would-be hit, and that actual error propagates. Entries
+retain no source IR, callbacks or compiled branches. Results own their branch
+and reported records, including fresh report flips on a reused physical value.
+Changing source, limits or arithmetic means constructing another immutable plan;
+its source identity prevents reuse of another plan's entries.
+
+Proposal probabilities remain external to this physical cache. The same value
+can therefore receive different exact importance weights without duplicating a
+physical entry. Exact zero values are cached and remain ordinary proposals in
+`ExactStatistics`. The reported serialized-byte total counts actual bounded
+key and scalar encoding payload; it excludes Rust container/token metadata,
+allocator capacity, scalar object layout, fresh branch construction and scratch.
+This API saves successful repeated probability evaluation, while each request
+still performs fresh branch compilation. Its capacity is explicit and does not
+claim the separate Native batch geometry cache or private memory layout.

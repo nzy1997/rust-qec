@@ -758,3 +758,450 @@ fn required_controller_dependencies_keep_sparse_call_ids_guards_selection_and_re
         "48draws:transitive livecallIDs1/2,3guard/selection/observable roots,and recoverycall1 afterdeadprotocolcall0;unneeded callbacks returnerrorsifactuallyexecuted"
     );
 }
+
+fn literal_plan(
+    width: usize,
+    operations: Vec<rmagna::instrument::OriginalOperation>,
+    controls: Vec<rmagna::instrument::OriginalControl>,
+    limits: rmagna::instrument::OriginalLimits,
+) -> rmagna::instrument::OriginalAssignmentPlan {
+    use rmagna::{clifford::CliffordCircuit, instrument::*, unitary::CompilerStrategy};
+    let a = ScalarArithmetic::default();
+    OriginalAssignmentPlan::from_owned(
+        OriginalInstrument::new(
+            (0..width as i64).collect(),
+            (0..width as i64).collect(),
+            CliffordCircuit::computational(BitVector::zeros(width).unwrap()).unwrap(),
+            operations,
+            controls,
+            limits,
+            &a,
+        )
+        .unwrap(),
+        CompilerStrategy::ParityCopies,
+        a,
+    )
+}
+fn original_op(
+    id: &str,
+    gate: rmagna::instrument::OriginalGate,
+) -> rmagna::instrument::OriginalOperation {
+    rmagna::instrument::OriginalOperation {
+        id: id.into(),
+        gate,
+    }
+}
+fn original_z(record: &str, wire: i64) -> rmagna::instrument::OriginalGate {
+    rmagna::instrument::OriginalGate::Measure {
+        factors: vec![(wire, rmagna::instrument::OriginalPauli::Z)],
+        inverted: false,
+        record: record.into(),
+    }
+}
+
+#[test]
+fn probability_value_cache_keeps_true_fault_report_and_proposal_inputs_separate() {
+    use rmagna::{field::FieldArithmetic, instrument::*};
+    let ops = vec![
+        original_op("i", OriginalGate::Identity(vec![0])),
+        original_op("m", original_z("m", 0)),
+    ];
+    let plan = literal_plan(1, ops.clone(), vec![], OriginalLimits::default());
+    let mut cache = OriginalProbabilityCache::new(2, 1 << 20);
+    let mut assignment = OriginalAssignment {
+        true_values: vec![("m".into(), false)],
+        ..Default::default()
+    };
+    let first = cache.compile(&plan, assignment.clone()).unwrap();
+    assert!(!first.cache_hit());
+    assert_eq!(*first.certificate().probability(), ExactScalar::one());
+    assert!(
+        cache
+            .compile(&plan, assignment.clone())
+            .unwrap()
+            .cache_hit()
+    );
+    assignment.true_values[0].1 = true;
+    let zero = cache.compile(&plan, assignment.clone()).unwrap();
+    assert!(!zero.cache_hit());
+    assert!(zero.certificate().probability().is_zero());
+    assert!(
+        cache
+            .compile(&plan, assignment.clone())
+            .unwrap()
+            .cache_hit(),
+        "zero values are cached too"
+    );
+    assignment.faults.push(OriginalFault {
+        after: "i".into(),
+        wire: 0,
+        pauli: OriginalPauli::X,
+    });
+    assignment.report_flips.push("m".into());
+    let fault = cache.compile(&plan, assignment.clone()).unwrap();
+    assert_eq!(*fault.certificate().probability(), ExactScalar::one());
+    assert!(!fault.certificate().branch().records()[0].reported_value);
+    assignment.faults[0].pauli = OriginalPauli::Z;
+    assert!(
+        cache
+            .compile(&plan, assignment.clone())
+            .unwrap()
+            .certificate()
+            .probability()
+            .is_zero()
+    );
+    assert_eq!(
+        *first.certificate().probability(),
+        ExactScalar::one(),
+        "old results own their values"
+    );
+    let before = cache.statistics();
+    assert!(cache.compile(&plan, OriginalAssignment::default()).is_err());
+    assert_eq!(
+        cache.statistics(),
+        before,
+        "bad capture never enters cache kernel"
+    );
+    cache.clear();
+    assert!(cache.is_empty());
+    assert_eq!(cache.statistics().serialized_bytes, 0);
+    let assignment = OriginalAssignment {
+        true_values: vec![("m".into(), false)],
+        ..Default::default()
+    };
+    let f = FieldArithmetic::default();
+    for (index, denominator) in [3, 4].into_iter().enumerate() {
+        let result = cache.compile(&plan, assignment.clone()).unwrap();
+        assert_eq!(result.cache_hit(), index != 0);
+        let weighted = f
+            .scale(
+                &f.from_scalar(result.certificate().probability()).unwrap(),
+                &num_rational::BigRational::from_integer(denominator.into()),
+            )
+            .unwrap();
+        assert_eq!(
+            weighted,
+            f.from_rational(num_rational::BigRational::from_integer(denominator.into()))
+                .unwrap()
+        );
+    }
+    let mut statistics = rmagna::statistics::ExactStatistics::new(1, Default::default()).unwrap();
+    for (true_value, reciprocal_numerator) in [(false, 3), (true, 0), (true, 0)] {
+        let input = OriginalAssignment {
+            true_values: vec![("m".into(), true_value)],
+            ..Default::default()
+        };
+        let result = cache.compile(&plan, input).unwrap();
+        let inverse_q =
+            num_rational::BigRational::new(3.into(), if true_value { 2.into() } else { 1.into() });
+        let weight = f
+            .scale(
+                &f.from_scalar(result.certificate().probability()).unwrap(),
+                &inverse_q,
+            )
+            .unwrap();
+        assert_eq!(
+            weight,
+            f.from_rational(num_rational::BigRational::from_integer(
+                reciprocal_numerator.into()
+            ))
+            .unwrap()
+        );
+        statistics.push(&[weight.clone()], &weight).unwrap();
+    }
+    let summary = statistics.summarize().unwrap().unwrap();
+    assert_eq!(summary.count, 3);
+    assert_eq!(summary.means, vec![rmagna::field::ExactField::one()]);
+    assert_eq!(
+        summary.effective_sample_size,
+        rmagna::field::ExactField::one()
+    );
+    let replaced = literal_plan(
+        1,
+        vec![
+            original_op(
+                "i",
+                OriginalGate::Pauli {
+                    wire: 0,
+                    pauli: OriginalPauli::X,
+                },
+            ),
+            original_op("m", original_z("m", 0)),
+        ],
+        vec![],
+        OriginalLimits::default(),
+    );
+    let changed = cache.compile(&replaced, assignment).unwrap();
+    assert!(!changed.cache_hit());
+    assert!(changed.certificate().probability().is_zero());
+    println!(
+        "physical value LRU:true/report/fault changes,owned zero/nonzero values,invalid capture,explicit newsource;proposal1/3and1/4share physical entry andgive weights3and4;cachedzero drawsretain3proposal mean1andESS1"
+    );
+}
+
+#[test]
+fn probability_value_cache_recollects_real_emissions_and_does_not_own_callback_sources() {
+    use rmagna::instrument::*;
+    use std::sync::{
+        Arc,
+        atomic::{AtomicBool, AtomicUsize, Ordering},
+    };
+    let calls = Arc::new(AtomicUsize::new(0));
+    let toggle = Arc::new(AtomicBool::new(false));
+    let lifetime = Arc::new(());
+    let weak = Arc::downgrade(&lifetime);
+    let (seen, changed, owned) = (
+        Arc::clone(&calls),
+        Arc::clone(&toggle),
+        Arc::clone(&lifetime),
+    );
+    let control = OriginalControl {
+        operation: "c".into(),
+        parents: vec![],
+        version: "same".into(),
+        callback: Arc::new(move |_| {
+            let _ = &owned;
+            seen.fetch_add(1, Ordering::Relaxed);
+            Ok(vec![if changed.load(Ordering::Relaxed) {
+                OriginalGate::Pauli {
+                    wire: 0,
+                    pauli: OriginalPauli::X,
+                }
+            } else {
+                OriginalGate::Identity(vec![0])
+            }])
+        }),
+    };
+    let plan = literal_plan(
+        1,
+        vec![
+            original_op("c", OriginalGate::Control),
+            original_op("m", original_z("m", 0)),
+        ],
+        vec![control],
+        OriginalLimits::default(),
+    );
+    drop(lifetime);
+    let mut cache = OriginalProbabilityCache::default();
+    let input = OriginalAssignment {
+        true_values: vec![("m".into(), false)],
+        ..Default::default()
+    };
+    let mut last = None;
+    for (index, (emits_x, hit)) in [
+        (false, false),
+        (false, true),
+        (true, false),
+        (true, true),
+        (false, true),
+    ]
+    .into_iter()
+    .enumerate()
+    {
+        toggle.store(emits_x, Ordering::Relaxed);
+        let result = cache.compile(&plan, input.clone()).unwrap();
+        assert_eq!(result.cache_hit(), hit);
+        assert_eq!(result.certificate().probability().is_zero(), emits_x);
+        assert_eq!(calls.load(Ordering::Relaxed), index + 1);
+        last = Some(result);
+    }
+    assert_eq!(cache.statistics().probability_evaluations, 2);
+    drop(plan);
+    assert!(
+        weak.upgrade().is_none(),
+        "neither LRU nor returned certificate retains callback owner"
+    );
+    assert_eq!(
+        *last.unwrap().certificate().probability(),
+        ExactScalar::one()
+    );
+    assert_eq!(cache.len(), 2);
+    println!(
+        "5actual callbacks,same declared version;2different emission bodies evaluated,3safe value hits;cache/results release source callback owner"
+    );
+}
+
+#[test]
+fn probability_value_cache_evicts_real_entries_by_both_count_and_encoded_bytes() {
+    use rmagna::instrument::*;
+    let mut ops = vec![];
+    for q in 0..3 {
+        ops.push(original_op(&format!("h{q}"), OriginalGate::H(q)));
+        ops.push(original_op(
+            &format!("m{q}"),
+            original_z(&format!("m{q}"), q),
+        ));
+    }
+    let plan = literal_plan(3, ops, vec![], OriginalLimits::default());
+    let input = |word| OriginalAssignment {
+        true_values: (0..3)
+            .map(|j| (format!("m{j}"), word & (1 << j) != 0))
+            .collect(),
+        ..Default::default()
+    };
+    let mut cache = OriginalProbabilityCache::new(2, 1 << 20);
+    for word in 0..8 {
+        let result = cache.compile(&plan, input(word)).unwrap();
+        assert!(!result.cache_hit());
+        assert_eq!(
+            *result.certificate().probability(),
+            ScalarArithmetic::default().omega(0, -6).unwrap()
+        );
+        assert_eq!(cache.len(), (word + 1).min(2));
+        assert!(cache.statistics().serialized_bytes <= cache.limits().1);
+    }
+    assert_eq!(cache.statistics().evictions, 6);
+    assert!(cache.compile(&plan, input(7)).unwrap().cache_hit());
+    assert!(!cache.compile(&plan, input(0)).unwrap().cache_hit());
+    let one_entry_bytes = cache.statistics().serialized_bytes / 2;
+    cache.set_limits(2, one_entry_bytes);
+    assert_eq!(cache.len(), 1);
+    assert_eq!(cache.statistics().serialized_bytes, one_entry_bytes);
+    cache.set_limits(2, one_entry_bytes - 1);
+    assert!(cache.is_empty());
+    let before = cache.statistics().bypasses;
+    assert!(!cache.compile(&plan, input(1)).unwrap().cache_hit());
+    assert!(cache.is_empty());
+    assert_eq!(cache.statistics().bypasses, before + 1);
+    cache.set_limits(0, 1 << 20);
+    assert!(!cache.compile(&plan, input(1)).unwrap().cache_hit());
+    assert!(cache.is_empty());
+    println!(
+        "8three-bit physical assignments:2-entry LRU6evictions;recency,byte shrink,value-too-large andzero-entry bypass preserve exact1/8"
+    );
+}
+
+#[test]
+fn a_new_tighter_source_budget_is_not_bypassed_by_a_warm_probability_value() {
+    use rmagna::instrument::*;
+    let ops = vec![
+        original_op("h", OriginalGate::H(0)),
+        original_op(
+            "t",
+            OriginalGate::Phase {
+                wires: vec![0],
+                turns: 1,
+            },
+        ),
+        original_op(
+            "m",
+            OriginalGate::Measure {
+                factors: vec![(0, OriginalPauli::X)],
+                inverted: false,
+                record: "m".into(),
+            },
+        ),
+    ];
+    let normal = literal_plan(1, ops.clone(), vec![], OriginalLimits::default());
+    let input = OriginalAssignment {
+        true_values: vec![("m".into(), false)],
+        ..Default::default()
+    };
+    let mut cache = OriginalProbabilityCache::default();
+    assert_eq!(
+        *cache
+            .compile(&normal, input.clone())
+            .unwrap()
+            .certificate()
+            .probability(),
+        probability(true)
+    );
+    assert!(cache.compile(&normal, input.clone()).unwrap().cache_hit());
+    let mut limits = OriginalLimits::default();
+    limits.expansion.max_side_terms = 1;
+    let tight = literal_plan(1, ops, vec![], limits);
+    let before = cache.statistics();
+    let error = cache
+        .compile(&tight, input)
+        .err()
+        .expect("new finite expansion budget must still fail");
+    assert!(
+        matches!(
+            error,
+            OriginalError::Unitary(_) | OriginalError::ResourceLimit { .. }
+        ),
+        "{error:?}"
+    );
+    assert_eq!(cache.statistics().hits, before.hits);
+    assert_eq!(cache.len(), 1, "failed results are never cached");
+    println!(
+        "warm exact Tmass doesnot bypass newsource max_side_terms1;failed evaluation absentfromcache"
+    );
+}
+
+#[test]
+fn fresh_callback_phase_tables_invalidate_value_entries_without_version_changes() {
+    use rmagna::instrument::*;
+    use std::sync::{
+        Arc,
+        atomic::{AtomicUsize, Ordering},
+    };
+    let turns = Arc::new(AtomicUsize::new(0));
+    let selected = Arc::clone(&turns);
+    let calls = Arc::new(AtomicUsize::new(0));
+    let seen = Arc::clone(&calls);
+    let control = OriginalControl {
+        operation: "c".into(),
+        parents: vec![],
+        version: "unchanged".into(),
+        callback: Arc::new(move |_| {
+            seen.fetch_add(1, Ordering::Relaxed);
+            let value = selected.load(Ordering::Relaxed);
+            if value == 99 {
+                return Err(OriginalCallbackError::Failed(
+                    "actual callback refusal".into(),
+                ));
+            }
+            Ok(vec![OriginalGate::Phase {
+                wires: vec![0],
+                turns: value as i64,
+            }])
+        }),
+    };
+    let plan = literal_plan(
+        1,
+        vec![
+            original_op("h", OriginalGate::H(0)),
+            original_op("c", OriginalGate::Control),
+            original_op("h2", OriginalGate::H(0)),
+            original_op("m", original_z("m", 0)),
+        ],
+        vec![control],
+        OriginalLimits::default(),
+    );
+    let input = OriginalAssignment {
+        true_values: vec![("m".into(), false)],
+        ..Default::default()
+    };
+    let a = ScalarArithmetic::default();
+    let mut cache = OriginalProbabilityCache::default();
+    for (index, t) in [0, 1, 3, 2, 0, 1].into_iter().enumerate() {
+        turns.store(t, Ordering::Relaxed);
+        let row = cache.compile(&plan, input.clone()).unwrap();
+        let expected = match t {
+            0 => ExactScalar::one(),
+            1 => probability(true),
+            3 => probability(false),
+            2 => a.omega(0, -2).unwrap(),
+            _ => unreachable!(),
+        };
+        assert_eq!(*row.certificate().probability(), expected);
+        assert_eq!(row.cache_hit(), index >= 4);
+    }
+    assert_eq!(cache.len(), 4);
+    assert_eq!(cache.statistics().probability_evaluations, 4);
+    let before = cache.statistics();
+    turns.store(99, Ordering::Relaxed);
+    let error = cache
+        .compile(&plan, input)
+        .err()
+        .expect("actual callback failure must not use an older value");
+    assert!(
+        matches!(error,OriginalError::Callback{error:OriginalCallbackError::Failed(ref message),..} if message=="actual callback refusal")
+    );
+    assert_eq!(calls.load(Ordering::Relaxed), 7);
+    assert_eq!(cache.statistics(), before);
+    println!(
+        "4same-version phase tables return literal1,(2+sqrt2)/4,(2-sqrt2)/4,1/2;2safe value hits;seventh actual callback error propagates before lookup"
+    );
+}

@@ -105,9 +105,10 @@ mod assignment_plan;
 pub use assignment_plan::{
     OriginalAffineRecordProposal, OriginalAssignmentBatch, OriginalAssignmentBatchStatistics,
     OriginalAssignmentCertificate, OriginalAssignmentExecutionPolicy, OriginalAssignmentInput,
-    OriginalAssignmentPlan, OriginalCompactAssignment, OriginalCompactNoiseChannel,
-    OriginalCompactNoiseLayout, OriginalIndependentRecordProposal, OriginalNoiseAssignmentStream,
-    OriginalNoiseCodeSelection, OriginalProposalDraw, OriginalProposalDrawError,
+    OriginalAssignmentPlan, OriginalCachedAssignment, OriginalCompactAssignment,
+    OriginalCompactNoiseChannel, OriginalCompactNoiseLayout, OriginalIndependentRecordProposal,
+    OriginalNoiseAssignmentStream, OriginalNoiseCodeSelection, OriginalProbabilityCache,
+    OriginalProbabilityCacheStatistics, OriginalProposalDraw, OriginalProposalDrawError,
     OriginalProposalOptions, OriginalSharedFaults, OriginalTraceCache,
     OriginalTraceCacheStatistics,
 };

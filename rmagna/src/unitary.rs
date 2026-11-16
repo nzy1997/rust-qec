@@ -1,6 +1,8 @@
 //! Unitary third-hierarchy circuits lowered to Clifford boundaries and phases.
 
+mod cache_key;
 pub(crate) mod expansion;
+pub(crate) use cache_key::ScalarStateKey;
 mod input;
 pub(crate) mod projected;
 pub use expansion::{
