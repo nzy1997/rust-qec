@@ -6837,3 +6837,31 @@ allocator capacity, scalar object layout, fresh branch construction and scratch.
 This API saves successful repeated probability evaluation, while each request
 still performs fresh branch compilation. Its capacity is explicit and does not
 claim the separate Native batch geometry cache or private memory layout.
+
+## Shared scalar-query geometry observations
+
+Probability, Pauli-moment and density plans on one compiled insertion program
+intern compatible immutable projection and Gaussian contraction maps. Matching
+requires identical ordered event rows, retained boundary order, support columns,
+quadratic cross terms and linear parity. Offsets, coefficients and even linear
+updates remain numeric query inputs; phase resources stay specific to each
+query. A weak pool shares only live maps and cannot retain them after every
+query releases its reference. Source programs and distinct event structures
+remain separate.
+
+`query_work_statistics()` reports actual closure, geometry, phase-map and phase
+resource factory events, geometry reuse and cold/fixed evaluation entries for
+that program owner. `live_affine_geometries` is a separate live owner count;
+`None` means its retention mutex could not be inspected. Concurrent preparation
+misses can do duplicate real construction outside the pool mutex before the
+winning map is shared; both construction events are counted. Inspect statistics
+at quiescent boundaries. These counters exclude bare phase APIs and transient
+cold-prefix owners, and do not copy Native private object counts. Logical cache
+sizes, exact resource ranks/terms and execution-meter queries remain distinct
+observations.
+
+Owning checks compare 1,024 Pauli/event/fault cells with independent exact dense
+matrix arithmetic under both compilers, including zero projected pairings. In
+that fixture, 33 closures share one actual projection/contraction map, while
+phase resources remain separate. Another test exercises eight simultaneous
+preparations, distinct biased event rows, malformed rows and weak-map release.

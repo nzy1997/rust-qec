@@ -36,6 +36,7 @@ use std::sync::Arc;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum UnitaryError {
+    SymbolicGeometryCacheUnavailable,
     DimensionMismatch,
     DimensionOverflow,
     ZeroStabilizerInput,
@@ -77,6 +78,10 @@ pub enum UnitaryError {
 impl fmt::Display for UnitaryError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
+            Self::SymbolicGeometryCacheUnavailable => write!(
+                f,
+                "shared scalar geometry cache is unavailable after a preparation panic"
+            ),
             Self::DimensionMismatch => {
                 write!(f, "unitary input, event, or target dimensions disagree")
             }
@@ -381,6 +386,7 @@ impl UnitaryCircuit {
             raw_path_variables,
         });
         let program = Arc::new(InsertionProgram {
+            scalar_geometry: Default::default(),
             work: Arc::default(),
             reference: Arc::clone(&boundary),
             query_reference: Arc::clone(&boundary),
@@ -444,6 +450,7 @@ pub struct CompiledUnitary {
     compilation: Arc<CompilationDiagnostics>,
 }
 struct InsertionProgram {
+    scalar_geometry: prepared::SharedScalarGeometry,
     work: Arc<work::QueryWorkCounters>,
     reference: Arc<AffineKet>,
     query_reference: Arc<AffineKet>,
@@ -484,7 +491,9 @@ impl CompiledUnitary {
     /// Cumulative events from actual closure/map/resource factories. Program
     /// views share this owner; no physics, RNG or callback is run to inspect it.
     pub fn query_work_statistics(&self) -> QueryWorkStatistics {
-        self.program.work.snapshot()
+        let mut statistics = self.program.work.snapshot();
+        statistics.live_affine_geometries = self.program.scalar_geometry.live_count();
+        statistics
     }
 
     pub fn width(&self) -> usize {

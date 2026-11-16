@@ -1,13 +1,19 @@
-//! Monotonic observations from actual scalar-closure preparation factories.
+//! Factory observations and live symbolic-map retention.
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 
 /// Work observed for one immutable insertion-program owner and all its views.
-/// These are factory/evaluation events, not cache sizes or Native private
+/// Factory/evaluation counts are monotonic; live geometry retention is separate.
+/// These observations are not logical query-cache sizes or Native private
 /// object counts. Bare phase APIs and unrelated compiled owners are excluded.
 /// Snapshot at quiescent boundaries when comparing concurrent workloads.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, serde::Serialize)]
 pub struct QueryWorkStatistics {
     pub affine_closures_prepared: u64,
+    pub affine_geometry_preparations: u64,
+    pub affine_geometry_reuses: u64,
+    /// Actual live interned projection/contraction owners. None means the
+    /// retention mutex could not be inspected; no fake zero is returned.
+    pub live_affine_geometries: Option<usize>,
     pub phase_maps_prepared: u64,
     pub phase_resources_prepared: u64,
     pub closure_evaluations: u64,
@@ -18,6 +24,8 @@ pub struct QueryWorkStatistics {
 #[derive(Default)]
 pub(super) struct QueryWorkCounters {
     pub affine_closures: AtomicU64,
+    pub geometry_preparations: AtomicU64,
+    pub geometry_reuses: AtomicU64,
     pub phase_maps: AtomicU64,
     pub phase_resources: AtomicU64,
     pub evaluations: AtomicU64,
@@ -38,6 +46,9 @@ impl QueryWorkCounters {
         let read = |counter: &AtomicU64| counter.load(Ordering::Relaxed);
         QueryWorkStatistics {
             affine_closures_prepared: read(&self.affine_closures),
+            affine_geometry_preparations: read(&self.geometry_preparations),
+            affine_geometry_reuses: read(&self.geometry_reuses),
+            live_affine_geometries: None,
             phase_maps_prepared: read(&self.phase_maps),
             phase_resources_prepared: read(&self.phase_resources),
             closure_evaluations: read(&self.evaluations),

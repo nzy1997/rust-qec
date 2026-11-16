@@ -586,6 +586,11 @@ pub struct PreparedZProjection {
     paths: PreparedPathProjection,
 }
 impl PreparedZProjection {
+    /// Structural reuse permits offsets, coefficients and even linear updates.
+    /// The constraint rows themselves and their order remain exact.
+    pub(crate) fn matches_structure(&self, reference: &AffineKet, rows: &[BitVector]) -> bool {
+        self.rows == rows && self.paths.reference.same_structure(reference)
+    }
     pub fn new(reference: &AffineKet, rows: &[BitVector]) -> Result<Self, StabilizerError> {
         let equations = reference.constraint_matrix(rows)?;
         Ok(Self {

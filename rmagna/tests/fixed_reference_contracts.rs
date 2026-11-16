@@ -16,10 +16,11 @@ fn probability(zero: bool) -> ExactScalar {
         .scalar([2.into(), sign.into(), 0.into(), (-sign).into()], -2)
         .unwrap()
 }
-fn preparations(s: QueryWorkStatistics) -> (u64, u64, u64) {
+fn preparations(s: QueryWorkStatistics) -> (u64, u64, u64, u64) {
     assert!(!s.saturated);
     (
         s.affine_closures_prepared,
+        s.affine_geometry_preparations,
         s.phase_maps_prepared,
         s.phase_resources_prepared,
     )
@@ -38,7 +39,7 @@ fn actual_factory_counters_distinguish_warm_evaluation_from_cold_reconstruction(
         .prepare_probability_with_fibers(&rows, 256, Default::default(), &a)
         .unwrap();
     let before = u.query_work_statistics();
-    assert_eq!(preparations(before), (1, 1, 1));
+    assert_eq!(preparations(before), (1, 1, 1, 1));
     for bit in 0..32 {
         assert_eq!(
             plan.evaluate(&u, &bits(1, bit & 1), 256, &a).unwrap().value,
@@ -1203,5 +1204,251 @@ fn fresh_callback_phase_tables_invalidate_value_entries_without_version_changes(
     assert_eq!(cache.statistics(), before);
     println!(
         "4same-version phase tables return literal1,(2+sqrt2)/4,(2-sqrt2)/4,1/2;2safe value hits;seventh actual callback error propagates before lookup"
+    );
+}
+
+fn dense_three_wire_reference() -> Vec<ExactScalar> {
+    let a = ScalarArithmetic::default();
+    let mut state = vec![ExactScalar::zero(); 8];
+    // H on all three wires, then T0, S1, CCZ012 and CX02.
+    for v in 0usize..8 {
+        let turns = (v & 1) as i64 + 2 * ((v >> 1) & 1) as i64 + if v == 7 { 4 } else { 0 };
+        let out = v ^ if v & 1 != 0 { 4 } else { 0 };
+        state[out] = a.omega(turns, -3).unwrap();
+    }
+    // H1 followed by T1; matrix arithmetic is independent of compiled maps.
+    let mut out = vec![ExactScalar::zero(); 8];
+    for v in (0usize..8).filter(|v| v & 2 == 0) {
+        out[v] = a
+            .multiply(
+                &a.add(&state[v], &state[v | 2]).unwrap(),
+                &a.omega(0, -1).unwrap(),
+            )
+            .unwrap();
+        out[v | 2] = a
+            .multiply(
+                &a.subtract(&state[v], &state[v | 2]).unwrap(),
+                &a.omega(1, -1).unwrap(),
+            )
+            .unwrap();
+    }
+    out
+}
+fn dense_pauli(state: &[ExactScalar], x: usize, z: usize) -> Vec<ExactScalar> {
+    let a = ScalarArithmetic::default();
+    let mut out = vec![ExactScalar::zero(); 8];
+    for v in 0usize..8 {
+        let phase = 2 * i64::from((x & z).count_ones()) + 4 * i64::from((v & z).count_ones() & 1);
+        out[v ^ x] = a.multiply(&state[v], &a.omega(phase, 0).unwrap()).unwrap();
+    }
+    out
+}
+fn dense_projected_moment(
+    state: &[ExactScalar],
+    x: usize,
+    z: usize,
+    outcome: usize,
+) -> ExactScalar {
+    let a = ScalarArithmetic::default();
+    let mut value = ExactScalar::zero();
+    for v in 0usize..8 {
+        if (v >> 2) & 1 != outcome || ((v ^ x) >> 2) & 1 != outcome {
+            continue;
+        }
+        let phase = 2 * i64::from((x & z).count_ones()) + 4 * i64::from((v & z).count_ones() & 1);
+        let term = a
+            .multiply(
+                &a.multiply(&state[v ^ x].conjugate(), &state[v]).unwrap(),
+                &a.omega(phase, 0).unwrap(),
+            )
+            .unwrap();
+        value = a.add(&value, &term).unwrap();
+    }
+    value
+}
+#[test]
+fn shared_symbolic_geometry_preserves_all_pauli_rhs_fault_and_zero_pairing_values() {
+    use rmagna::{
+        clifford::CliffordGate as C,
+        unitary::{CompilerStrategy, UnitaryCircuit, UnitaryGate as G},
+    };
+    let a = ScalarArithmetic::default();
+    let circuit = UnitaryCircuit::new(
+        3,
+        vec![
+            G::Clifford(C::H(0)),
+            G::Clifford(C::H(1)),
+            G::Clifford(C::H(2)),
+            G::T { qubit: 0, turns: 1 },
+            G::Clifford(C::S { qubit: 1, turns: 1 }),
+            G::Ccz { a: 0, b: 1, c: 2 },
+            G::Clifford(C::Cx {
+                control: 0,
+                target: 2,
+            }),
+            G::Clifford(C::H(1)),
+            G::T { qubit: 1, turns: 1 },
+        ],
+    )
+    .unwrap();
+    let dense = dense_three_wire_reference();
+    let row = [bits(3, 4)];
+    let (mut cases, mut zero, mut nonzero) = (0, 0, 0);
+    for compiler in [
+        CompilerStrategy::ParityCopies,
+        CompilerStrategy::SharedCommutingLayer,
+    ] {
+        let u = circuit
+            .compile_with_strategy(&bits(3, 0), &a, compiler)
+            .unwrap();
+        // Independent dense amplitudes validate the entire reference state.
+        for v in 0..8 {
+            assert_eq!(u.amplitude(&bits(3, v), 256, &a).unwrap().value, dense[v]);
+        }
+        let probability = u
+            .prepare_probability_with_fibers(&row, 256, Default::default(), &a)
+            .unwrap();
+        let mut queries = Vec::new();
+        for x in 0usize..8 {
+            for z in 0usize..8 {
+                let word = PauliWord::new(bits(3, x), bits(3, z), (2 * (x & z).count_ones()) as u8)
+                    .unwrap();
+                queries.push((
+                    x,
+                    z,
+                    u.prepare_pauli_moment_with_fibers(&word, &row, 256, Default::default(), &a)
+                        .unwrap(),
+                ));
+            }
+        }
+        let prepared = u.query_work_statistics();
+        assert_eq!(prepared.affine_closures_prepared, 33);
+        assert_eq!(prepared.affine_geometry_preparations, 1);
+        assert_eq!(prepared.affine_geometry_reuses, 32);
+        assert_eq!(prepared.live_affine_geometries, Some(1));
+        for (fx, fz) in [(0, 0), (1, 0), (2, 2), (0, 4)] {
+            let fault =
+                PauliWord::new(bits(3, fx), bits(3, fz), (2 * (fx & fz).count_ones()) as u8)
+                    .unwrap();
+            let view = u
+                .with_insertions(
+                    &[PauliInsertion {
+                        before_gate: circuit.gates().len(),
+                        word: fault,
+                    }],
+                    &a,
+                )
+                .unwrap();
+            let expected = dense_pauli(&dense, fx, fz);
+            for outcome in 0..2 {
+                assert_eq!(
+                    probability
+                        .evaluate(&view, &bits(1, outcome), 256, &a)
+                        .unwrap()
+                        .value,
+                    dense_projected_moment(&expected, 0, 0, outcome)
+                );
+                for (x, z, query) in &queries {
+                    let actual = query
+                        .evaluate(&view, &bits(1, outcome), 256, &a)
+                        .unwrap()
+                        .value;
+                    assert_eq!(
+                        actual,
+                        dense_projected_moment(&expected, *x, *z, outcome),
+                        "{compiler:?} fault{fx}/{fz},Pauli{x}/{z},outcome{outcome}"
+                    );
+                    if actual.is_zero() {
+                        zero += 1;
+                    } else {
+                        nonzero += 1;
+                    }
+                    cases += 1;
+                }
+            }
+        }
+        let warm = u.query_work_statistics();
+        assert_eq!(preparations(prepared), preparations(warm));
+        assert_eq!(
+            warm.affine_geometry_preparations,
+            prepared.affine_geometry_preparations
+        );
+        assert_eq!(warm.cold_evaluations, 0);
+        drop(queries);
+        drop(probability);
+        assert_eq!(
+            u.query_work_statistics().live_affine_geometries,
+            Some(0),
+            "weak pool must release unused maps"
+        );
+        let recreated = u.prepare_probability(&row, &a).unwrap();
+        assert_eq!(u.query_work_statistics().affine_geometry_preparations, 2);
+        assert_eq!(
+            recreated.evaluate(&u, &bits(1, 0), 256, &a).unwrap().value,
+            dense_projected_moment(&dense, 0, 0, 0)
+        );
+    }
+    assert_eq!(cases, 1024);
+    assert!(zero > 0 && nonzero > 0);
+    println!(
+        "{cases}exact dense Pauli/RHS/fault cells across2compilers;{zero}zero/{nonzero}nonzero;33closures share1actualsymbolicgeometry perowner,0hotreconstruction;weak lifetime releases maps"
+    );
+}
+
+#[test]
+fn concurrent_scalar_preparations_share_one_live_geometry_and_keep_event_structures_distinct() {
+    use std::sync::{Arc, Barrier};
+    let a = ScalarArithmetic::default();
+    let u = Arc::new(
+        compile_unitary(
+            &parse_circuit("H 0\nT 0\nH 0\nCX 0 1\nX 1", &ParseOptions::default()).unwrap(),
+            &CompileOptions::default(),
+            &a,
+        )
+        .unwrap(),
+    );
+    let start = Arc::new(Barrier::new(8));
+    let plans = std::thread::scope(|scope| {
+        let mut jobs = vec![];
+        for _ in 0..8 {
+            let (u, start) = (Arc::clone(&u), Arc::clone(&start));
+            jobs.push(scope.spawn(move || {
+                start.wait();
+                u.prepare_probability(&[bits(2, 1)], &a).unwrap()
+            }));
+        }
+        jobs.into_iter()
+            .map(|job| job.join().unwrap())
+            .collect::<Vec<_>>()
+    });
+    let work = u.query_work_statistics();
+    assert_eq!(work.affine_closures_prepared, 8);
+    assert!((1..=8).contains(&work.affine_geometry_preparations));
+    assert_eq!(work.affine_geometry_reuses, 7);
+    assert_eq!(work.live_affine_geometries, Some(1));
+    for plan in &plans {
+        for bit in 0..2 {
+            assert_eq!(
+                plan.evaluate(&u, &bits(1, bit), 256, &a).unwrap().value,
+                probability(bit == 0)
+            );
+        }
+    }
+    let another = u.prepare_probability(&[bits(2, 2)], &a).unwrap();
+    assert_eq!(
+        another.evaluate(&u, &bits(1, 1), 256, &a).unwrap().value,
+        probability(true)
+    );
+    assert_eq!(u.query_work_statistics().live_affine_geometries, Some(2));
+    let before = u.query_work_statistics();
+    assert!(u.prepare_probability(&[bits(3, 1)], &a).is_err());
+    assert_eq!(u.query_work_statistics(), before);
+    drop(plans);
+    assert_eq!(u.query_work_statistics().live_affine_geometries, Some(1));
+    drop(another);
+    assert_eq!(u.query_work_statistics().live_affine_geometries, Some(0));
+    println!(
+        "8simultaneouspreparations:oneactualretainedgeometry,7actualreuses,{}realconstructions(includingracingmisses);differentrowsretainsecondmap;malformedrowsdo no work;weak release0",
+        work.affine_geometry_preparations
     );
 }

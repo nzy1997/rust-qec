@@ -476,6 +476,7 @@ pub(super) fn compile(
     });
     let program = Arc::new(InsertionProgram {
         work: Arc::default(),
+        scalar_geometry: Default::default(),
         reference: Arc::clone(&boundary),
         query_reference: Arc::clone(&query_reference),
         observation_reduction,
