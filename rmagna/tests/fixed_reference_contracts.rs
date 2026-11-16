@@ -222,9 +222,11 @@ fn completed_exact_histories_reuse_actual_physical_mass_and_preserve_every_callb
                         },
                     )
                     .unwrap();
-                    let mut options = RuntimeOptions::default();
-                    options.strategy = strategy;
-                    options.history_sampler = sampler;
+                    let mut options = RuntimeOptions {
+                        strategy,
+                        history_sampler: sampler,
+                        ..Default::default()
+                    };
                     options.compile.compiler_strategy = compiler;
                     let program = CausalProgram::new(&circuit, &registry, options, &a).unwrap();
                     let mut observed = std::collections::BTreeSet::new();
@@ -327,9 +329,11 @@ fn cached_physical_prefix_mass_is_independent_of_future_selection_and_guarded_no
                 },
             )
             .unwrap();
-            let mut options = RuntimeOptions::default();
-            options.strategy = strategy;
-            options.history_sampler = HistorySampler::ExactMarginal;
+            let options = RuntimeOptions {
+                strategy,
+                history_sampler: HistorySampler::ExactMarginal,
+                ..Default::default()
+            };
             let program = CausalProgram::new(&circuit, &registry, options, &a).unwrap();
             for seed in 0..16 {
                 let history = program
@@ -946,7 +950,9 @@ fn probability_value_cache_keeps_true_fault_report_and_proposal_inputs_separate(
             ))
             .unwrap()
         );
-        statistics.push(&[weight.clone()], &weight).unwrap();
+        statistics
+            .push(std::slice::from_ref(&weight), &weight)
+            .unwrap();
     }
     let summary = statistics.summarize().unwrap().unwrap();
     assert_eq!(summary.count, 3);
@@ -1340,8 +1346,8 @@ fn shared_symbolic_geometry_preserves_all_pauli_rhs_fault_and_zero_pairing_value
             .compile_with_strategy(&bits(3, 0), &a, compiler)
             .unwrap();
         // Independent dense amplitudes validate the entire reference state.
-        for v in 0..8 {
-            assert_eq!(u.amplitude(&bits(3, v), 256, &a).unwrap().value, dense[v]);
+        for (v, expected) in dense.iter().enumerate() {
+            assert_eq!(u.amplitude(&bits(3, v), 256, &a).unwrap().value, *expected);
         }
         let probability = u
             .prepare_probability_with_fibers(&row, 256, Default::default(), &a)
@@ -1488,5 +1494,671 @@ fn concurrent_scalar_preparations_share_one_live_geometry_and_keep_event_structu
     println!(
         "8simultaneouspreparations:oneactualretainedgeometry,7actualreuses,{}realconstructions(includingracingmisses);differentrowsretainsecondmap;malformedrowsdo no work;weak release0",
         work.affine_geometry_preparations
+    );
+}
+
+#[test]
+fn explicit_scalar_plan_lru_caps_forty_event_structures_at_thirty_two_and_validates_warm_calls() {
+    use rmagna::unitary::{ScalarQuery, ScalarQueryCache, ScalarQueryCacheOptions, UnitaryError};
+    let a = ScalarArithmetic::default();
+    let circuit = parse_circuit("H 0", &ParseOptions::default()).unwrap();
+    let u = compile_unitary(&circuit, &CompileOptions::default(), &a).unwrap();
+    let identity = PauliWord::identity(1).unwrap();
+    let mut cache = ScalarQueryCache::new(&u, Default::default(), None);
+    let mut query = |n| {
+        let rows = vec![bits(1, 0); n];
+        let rhs = bits(n, 0);
+        cache
+            .evaluate(
+                &u,
+                ScalarQuery {
+                    events: &rows,
+                    outcomes: &rhs,
+                    pauli: &identity,
+                },
+                &a,
+            )
+            .unwrap()
+            .value
+    };
+    for n in 0..40 {
+        assert_eq!(query(n), ExactScalar::one());
+    }
+    assert_eq!(cache.len(), 32);
+    assert_eq!(cache.statistics().preparations, 40);
+    assert_eq!(cache.statistics().evictions, 8);
+    for (n, expected_hit) in [(8, true), (0, false), (8, true), (9, false)] {
+        let rows = vec![bits(1, 0); n];
+        let rhs = bits(n, 0);
+        let before = cache.statistics();
+        assert_eq!(
+            cache
+                .evaluate(
+                    &u,
+                    ScalarQuery {
+                        events: &rows,
+                        outcomes: &rhs,
+                        pauli: &identity
+                    },
+                    &a
+                )
+                .unwrap()
+                .value,
+            ExactScalar::one()
+        );
+        assert_eq!(
+            cache.statistics().hits - before.hits,
+            usize::from(expected_hit)
+        );
+        assert_eq!(cache.len(), 32);
+    }
+    let row = [bits(1, 1)];
+    let rhs = bits(1, 0);
+    let z = PauliWord::new(bits(1, 0), bits(1, 1), 0).unwrap();
+    cache
+        .evaluate(
+            &u,
+            ScalarQuery {
+                events: &row,
+                outcomes: &rhs,
+                pauli: &z,
+            },
+            &a,
+        )
+        .unwrap();
+    let before = cache.statistics();
+    let work = u.query_work_statistics();
+    let wrong_rhs = bits(0, 0);
+    let wrong_rows = [bits(2, 1)];
+    let x = PauliWord::new(bits(1, 1), bits(1, 0), 0).unwrap();
+    let skew = PauliWord::new(bits(1, 1), bits(1, 1), 0).unwrap();
+    for (q, expected) in [
+        (
+            ScalarQuery {
+                events: &row,
+                outcomes: &wrong_rhs,
+                pauli: &z,
+            },
+            UnitaryError::DimensionMismatch,
+        ),
+        (
+            ScalarQuery {
+                events: &wrong_rows,
+                outcomes: &rhs,
+                pauli: &z,
+            },
+            UnitaryError::DimensionMismatch,
+        ),
+        (
+            ScalarQuery {
+                events: &row,
+                outcomes: &rhs,
+                pauli: &x,
+            },
+            UnitaryError::NonCommutingScalarQuery,
+        ),
+        (
+            ScalarQuery {
+                events: &[],
+                outcomes: &wrong_rhs,
+                pauli: &skew,
+            },
+            UnitaryError::NonHermitianScalarQuery,
+        ),
+    ] {
+        assert_eq!(cache.evaluate(&u, q, &a).unwrap_err(), expected);
+    }
+    let foreign = compile_unitary(&circuit, &CompileOptions::default(), &a).unwrap();
+    assert_eq!(
+        cache.evaluate_many(&foreign, &[], &a).unwrap_err(),
+        UnitaryError::IncompatibleProgram
+    );
+    assert_eq!(cache.statistics(), before);
+    assert_eq!(u.query_work_statistics(), work);
+    cache.set_max_plans(1);
+    assert_eq!(cache.len(), 1);
+    cache.clear();
+    assert!(cache.is_empty());
+    assert_eq!(u.query_work_statistics().live_affine_geometries, Some(0));
+    let options = ScalarQueryCacheOptions {
+        max_plans: 0,
+        ..Default::default()
+    };
+    let mut disabled = ScalarQueryCache::new(&u, options, None);
+    for _ in 0..2 {
+        assert_eq!(
+            disabled
+                .evaluate(
+                    &u,
+                    ScalarQuery {
+                        events: &[],
+                        outcomes: &wrong_rhs,
+                        pauli: &identity
+                    },
+                    &a
+                )
+                .unwrap()
+                .value,
+            ExactScalar::one()
+        );
+    }
+    assert!(disabled.is_empty());
+    assert_eq!(disabled.statistics().preparations, 2);
+    println!(
+        "40event structures retain exactly32plans,8initialevictions;LRUtouch8protects8while9evicts;warmmalformed/noncommuting/nonHermitian/foreigncalls do no work;zero capacity prepares real ephemeral plans"
+    );
+}
+
+#[test]
+fn scalar_plan_batch_admission_is_atomic_and_failed_resource_preparation_is_not_cached() {
+    use rmagna::unitary::{ScalarQuery, ScalarQueryCache, ScalarQueryCacheOptions, UnitaryError};
+    let a = ScalarArithmetic::default();
+    let u = compile_unitary(
+        &parse_circuit("H 0\nT 0\nH 0", &ParseOptions::default()).unwrap(),
+        &CompileOptions::default(),
+        &a,
+    )
+    .unwrap();
+    let i = PauliWord::identity(1).unwrap();
+    let rows = [bits(1, 1)];
+    let rhs = bits(1, 0);
+    let empty = bits(0, 0);
+    let valid = ScalarQuery {
+        events: &rows,
+        outcomes: &rhs,
+        pauli: &i,
+    };
+    let invalid = ScalarQuery {
+        events: &rows,
+        outcomes: &empty,
+        pauli: &i,
+    };
+    let mut cache = ScalarQueryCache::new(&u, Default::default(), None);
+    let before = u.query_work_statistics();
+    assert_eq!(
+        cache.evaluate_many(&u, &[valid, invalid], &a).unwrap_err(),
+        UnitaryError::DimensionMismatch
+    );
+    assert_eq!(cache.statistics(), Default::default());
+    assert_eq!(u.query_work_statistics(), before);
+    for options in [
+        ScalarQueryCacheOptions {
+            max_geometry_words: 0,
+            ..Default::default()
+        },
+        ScalarQueryCacheOptions {
+            max_event_rows: 0,
+            ..Default::default()
+        },
+        ScalarQueryCacheOptions {
+            max_batch_queries: 0,
+            ..Default::default()
+        },
+    ] {
+        let mut refused = ScalarQueryCache::new(&u, options, None);
+        assert!(matches!(
+            refused.evaluate_many(&u, &[valid], &a),
+            Err(UnitaryError::QueryCacheLimit { .. })
+        ));
+        assert_eq!(refused.statistics(), Default::default());
+        assert_eq!(u.query_work_statistics(), before);
+    }
+    let mut failed = ScalarQueryCache::new(
+        &u,
+        ScalarQueryCacheOptions {
+            max_terms: 0,
+            ..Default::default()
+        },
+        None,
+    );
+    assert!(failed.evaluate(&u, valid, &a).is_err());
+    assert!(failed.is_empty());
+    assert_eq!(failed.statistics().preparation_attempts, 1);
+    assert_eq!(failed.statistics().preparations, 0);
+    assert_eq!(failed.statistics().evaluations, 0);
+    assert_eq!(
+        cache.evaluate_many(&u, &[valid], &a).unwrap()[0].value,
+        probability(true)
+    );
+    let opposite = bits(1, 1);
+    assert_eq!(
+        cache
+            .evaluate(
+                &u,
+                ScalarQuery {
+                    outcomes: &opposite,
+                    ..valid
+                },
+                &a
+            )
+            .unwrap()
+            .value,
+        probability(false)
+    );
+    assert_eq!(cache.statistics().preparations, 1);
+    assert_eq!(cache.statistics().hits, 1);
+    println!(
+        "batchshape/row/geometry/request caps refuse before any factory;max_terms0 retains failed attempt without entry;both literalTbranches share1plan with changingRHS"
+    );
+}
+
+#[test]
+fn frozen_lru_plans_preserve_dense_faulted_batches_and_live_outside_eviction_for_threads() {
+    use rmagna::unitary::{ScalarQuery, ScalarQueryCache, ScalarQueryCacheOptions};
+    use std::sync::Arc;
+    let a = ScalarArithmetic::default();
+    let circuit = parse_circuit(
+        "H 0 1 2\nT 0\nS 1\nCCZ 0 1 2\nCX 0 2\nH 1\nT 1",
+        &ParseOptions::default(),
+    )
+    .unwrap();
+    let u = Arc::new(compile_unitary(&circuit, &CompileOptions::default(), &a).unwrap());
+    let dense = dense_three_wire_reference();
+    let empty = bits(0, 0);
+    let words = (0usize..8)
+        .flat_map(|x| {
+            (0usize..8).map(move |z| {
+                (
+                    x,
+                    z,
+                    PauliWord::new(bits(3, x), bits(3, z), (2 * (x & z).count_ones()) as u8)
+                        .unwrap(),
+                )
+            })
+        })
+        .collect::<Vec<_>>();
+    let requests = words
+        .iter()
+        .map(|(_, _, word)| ScalarQuery {
+            events: &[],
+            outcomes: &empty,
+            pauli: word,
+        })
+        .collect::<Vec<_>>();
+    let mut cache = ScalarQueryCache::new(
+        &u,
+        ScalarQueryCacheOptions {
+            max_plans: 64,
+            ..Default::default()
+        },
+        None,
+    );
+    let mut owned = vec![];
+    for request in &requests {
+        owned.push(cache.prepare_query(&u, *request, &a).unwrap());
+    }
+    let work = u.query_work_statistics();
+    assert_eq!(cache.statistics().preparations, 64);
+    assert_eq!(cache.statistics().evaluations, 0);
+    let mut cases = 0;
+    for (fx, fz) in [(0, 0), (1, 0), (2, 2), (0, 4)] {
+        // The parsed text expands the initial H instruction to three gates.
+        let terminal = circuit
+            .operations()
+            .iter()
+            .filter(|op| matches!(op.operation, rmagna::circuit::Operation::Unitary { .. }))
+            .count();
+        let fault =
+            PauliWord::new(bits(3, fx), bits(3, fz), (2 * (fx & fz).count_ones()) as u8).unwrap();
+        let view = u
+            .with_insertions(
+                &[PauliInsertion {
+                    before_gate: terminal,
+                    word: fault,
+                }],
+                &a,
+            )
+            .unwrap();
+        let expected = dense_pauli(&dense, fx, fz);
+        let values = cache.evaluate_many(&view, &requests, &a).unwrap();
+        for ((x, z, _), value) in words.iter().zip(values) {
+            let shifted = dense_pauli(&expected, *x, *z);
+            let mut sum = ExactScalar::zero();
+            for v in 0..8 {
+                sum = a
+                    .add(
+                        &sum,
+                        &a.multiply(&expected[v].conjugate(), &shifted[v]).unwrap(),
+                    )
+                    .unwrap();
+            }
+            assert_eq!(value.value, sum);
+            cases += 1;
+        }
+    }
+    assert_eq!(preparations(u.query_work_statistics()), preparations(work));
+    assert_eq!(cache.statistics().preparations, 64);
+    assert_eq!(cache.statistics().evaluations, 256);
+    cache.clear();
+    assert!(cache.is_empty());
+    assert!(
+        u.query_work_statistics().live_affine_geometries.unwrap() > 0,
+        "external prepared owners survive eviction"
+    );
+    std::thread::scope(|scope| {
+        let mut jobs = vec![];
+        for _ in 0..8 {
+            let (u, plans, words) = (Arc::clone(&u), &owned, &words);
+            jobs.push(scope.spawn(move || {
+                for ((_, _, word), plan) in words.iter().zip(plans) {
+                    let expected = u
+                        .pauli_moment(word, &[], &bits(0, 0), 256, &a)
+                        .unwrap()
+                        .value;
+                    assert_eq!(
+                        plan.evaluate(&u, &bits(0, 0), 256, &a).unwrap().value,
+                        expected
+                    );
+                }
+            }));
+        }
+        for job in jobs {
+            job.join().unwrap();
+        }
+    });
+    drop(owned);
+    assert_eq!(u.query_work_statistics().live_affine_geometries, Some(0));
+    assert_eq!(cases, 256);
+    println!(
+        "64frozen Pauli plans:256independent dense faultedbatch values,0warmfactories;8threads x64numericqueries onownedplans aftercacheclear,independentworkspaces;lastownerrelease0livegeometry"
+    );
+}
+
+#[test]
+fn resolved_instrument_views_share_lru_preparation_but_not_decisions_values_or_new_quotas() {
+    use rmagna::{
+        circuit::{BitAtom, BitExpr},
+        instrument::InstrumentScalarQuery,
+        runtime::{CausalProgram, ControllerRegistry, RuntimeOptions},
+        unitary::UnitaryError,
+    };
+    let a = ScalarArithmetic::default();
+    let mut registry = ControllerRegistry::default();
+    registry
+        .register("echo", "1", |v: &[bool]| Ok(v.to_vec()))
+        .unwrap();
+    let source = "H 0\nM 0\nDETECTOR rec[-1]\nCONTROL[echo] det[0] -> ctrl[0]\nCX ctrl[0] 1\nCZ rec[-1] 1\nZ_ERROR(1/4) 1";
+    let circuit = parse_circuit(
+        source,
+        &ParseOptions {
+            controllers: registry.names(),
+            ..Default::default()
+        },
+    )
+    .unwrap();
+    let program = CausalProgram::new(&circuit, &registry, RuntimeOptions::default(), &a).unwrap();
+    let histories = [false, true].map(|value| {
+        program
+            .resolve_prescribed_history(&[], &[], &[vec![value]], &a)
+            .unwrap()
+    });
+    let mut cache = histories[0]
+        .instrument()
+        .scalar_query_cache(Default::default(), None);
+    let z = PauliWord::new(bits(1, 0), bits(1, 1), 0).unwrap();
+    let i = PauliWord::identity(0).unwrap();
+    let none = bits(0, 0);
+    let row = [BitExpr::atom(BitAtom::Record(0))];
+    for (value, h) in [false, true].into_iter().zip(&histories) {
+        let actual = h
+            .instrument()
+            .reported_moment_cached(
+                &mut cache,
+                InstrumentScalarQuery {
+                    outputs: &[1],
+                    pauli: &z,
+                    parities: &[],
+                    outcomes: &none,
+                },
+                h.faults(),
+                &a,
+            )
+            .unwrap()
+            .value;
+        assert_eq!(
+            actual,
+            if value {
+                ExactScalar::one().negated()
+            } else {
+                ExactScalar::one()
+            }
+        );
+        for bit in 0..2 {
+            let rhs = bits(1, bit);
+            assert_eq!(
+                h.instrument()
+                    .reported_moment_cached(
+                        &mut cache,
+                        InstrumentScalarQuery {
+                            outputs: &[],
+                            pauli: &i,
+                            parities: &row,
+                            outcomes: &rhs
+                        },
+                        h.faults(),
+                        &a
+                    )
+                    .unwrap()
+                    .value,
+                a.omega(0, -2).unwrap()
+            );
+        }
+    }
+    assert_eq!(cache.len(), 2);
+    assert_eq!(cache.statistics().preparations, 2);
+    assert_eq!(cache.statistics().hits, 4);
+    assert_eq!(program.reference_compilations(), 1);
+    let mut tight = RuntimeOptions::default();
+    tight.compile.max_path_bits = 0;
+    let error = CausalProgram::new(&circuit, &registry, tight, &a)
+        .err()
+        .expect("new raw path quota must be admitted");
+    assert!(
+        matches!(
+            error,
+            rmagna::runtime::RuntimeError::Instrument(
+                rmagna::instrument::InstrumentError::Unitary(UnitaryError::RawPathLimit {
+                    limit: 0,
+                    ..
+                })
+            )
+        ),
+        "{error:?}"
+    );
+    let mut limited = histories[0].instrument().scalar_query_cache(
+        rmagna::unitary::ScalarQueryCacheOptions {
+            max_geometry_words: 0,
+            ..Default::default()
+        },
+        None,
+    );
+    let before_work = histories[0].instrument().query_work_statistics();
+    assert!(matches!(
+        histories[0].instrument().reported_moment_cached(
+            &mut limited,
+            InstrumentScalarQuery {
+                outputs: &[],
+                pauli: &i,
+                parities: &row,
+                outcomes: &bits(1, 0)
+            },
+            &[],
+            &a
+        ),
+        Err(rmagna::instrument::InstrumentError::Unitary(
+            UnitaryError::QueryCacheLimit {
+                option: "scalar_query_cache.max_geometry_words",
+                ..
+            }
+        ))
+    ));
+    assert_eq!(
+        histories[0].instrument().query_work_statistics(),
+        before_work
+    );
+    assert_eq!(limited.statistics(), Default::default());
+    let foreign = CausalProgram::new(&circuit, &registry, RuntimeOptions::default(), &a)
+        .unwrap()
+        .resolve_prescribed_history(&[], &[], &[vec![false]], &a)
+        .unwrap();
+    let before = cache.statistics();
+    assert!(matches!(
+        foreign.instrument().reported_moment_cached(
+            &mut cache,
+            InstrumentScalarQuery {
+                outputs: &[],
+                pauli: &i,
+                parities: &row,
+                outcomes: &bits(1, 0)
+            },
+            foreign.faults(),
+            &a
+        ),
+        Err(rmagna::instrument::InstrumentError::Unitary(
+            UnitaryError::IncompatibleProgram
+        ))
+    ));
+    assert_eq!(cache.statistics(), before);
+    println!(
+        "2resolved decision views/6scalar cells share2realLRUplans on1program;unconditionedZ=+/-1,recordmass1/2;newsource/newrawpathquota cannot bypass ownership/admission"
+    );
+}
+
+#[test]
+fn instrument_lru_eviction_keeps_all_sixty_actual_callbacks_guarded_noise_masses_and_rng_words() {
+    use rmagna::{
+        instrument::InstrumentScalarQuery,
+        noise::SplitMix64,
+        runtime::{CausalProgram, ControllerRegistry, RuntimeOptions},
+        unitary::ScalarQueryCacheOptions,
+    };
+    use std::sync::{Arc, Mutex};
+    let a = ScalarArithmetic::default();
+    let calls = Arc::new(Mutex::new(Vec::<Vec<bool>>::new()));
+    let seen = Arc::clone(&calls);
+    let mut registry = ControllerRegistry::default();
+    registry
+        .register("echo", "1", move |v: &[bool]| {
+            seen.lock().unwrap().push(v.to_vec());
+            Ok(v.to_vec())
+        })
+        .unwrap();
+    let source = "H 0\nM 0\nDETECTOR rec[-1]\nCONTROL[echo] det[0] -> ctrl[0]\nCX ctrl[0] 1\nX_ERROR(1/2) ctrl[0] 1\nM 1";
+    let circuit = parse_circuit(
+        source,
+        &ParseOptions {
+            controllers: registry.names(),
+            ..Default::default()
+        },
+    )
+    .unwrap();
+    let program = CausalProgram::new(&circuit, &registry, RuntimeOptions::default(), &a).unwrap();
+    let target = compile_unitary(
+        &parse_circuit("I 0", &ParseOptions::default()).unwrap(),
+        &CompileOptions::default(),
+        &a,
+    )
+    .unwrap();
+    let words = [
+        PauliWord::identity(1).unwrap(),
+        PauliWord::new(bits(1, 0), bits(1, 1), 0).unwrap(),
+    ];
+    let mut results = vec![];
+    for capacity in [4, 1] {
+        let calls_before = calls.lock().unwrap().len();
+        let mut random = SplitMix64::new(5);
+        let mut cache = None;
+        let mut transcript = vec![];
+        let mut observed_outputs = [false; 2];
+        for index in 0..30 {
+            let h = program.resolve(&[], &mut random, &a).unwrap();
+            let cache = cache.get_or_insert_with(|| {
+                h.instrument().scalar_query_cache(
+                    ScalarQueryCacheOptions {
+                        max_plans: capacity,
+                        ..Default::default()
+                    },
+                    None,
+                )
+            });
+            let parities = h
+                .conditions()
+                .iter()
+                .map(|(p, _)| p.clone())
+                .collect::<Vec<_>>();
+            let rhs = BitVector::from_indices(
+                parities.len(),
+                h.conditions()
+                    .iter()
+                    .enumerate()
+                    .filter_map(|(j, (_, v))| v.then_some(j)),
+            )
+            .unwrap();
+            let word = &words[index % 2];
+            let actual = h
+                .instrument()
+                .reported_moment_cached(
+                    cache,
+                    InstrumentScalarQuery {
+                        outputs: &[1],
+                        pauli: word,
+                        parities: &parities,
+                        outcomes: &rhs,
+                    },
+                    h.faults(),
+                    &a,
+                )
+                .unwrap()
+                .value;
+            let cold = h
+                .instrument()
+                .pauli_moment(&[1], word, h.faults(), 256, &a)
+                .unwrap()
+                .value;
+            assert_eq!(actual, cold);
+            let masses = h
+                .instrument()
+                .masses(&[1], &target, h.faults(), 256, &a)
+                .unwrap();
+            let bit = h.controller_calls()[0].inputs[0];
+            let output = bit ^ !h.faults().is_empty();
+            observed_outputs[usize::from(output)] = true;
+            assert_eq!(*h.history_mass(), a.omega(0, -2).unwrap());
+            assert_eq!(masses.accepted.value, *h.history_mass());
+            assert_eq!(
+                masses.error,
+                if output {
+                    h.history_mass().clone()
+                } else {
+                    ExactScalar::zero()
+                }
+            );
+            assert_eq!(h.network_compilations(), 0);
+            assert!(cache.len() <= capacity);
+            transcript.push((
+                h.history_mass().clone(),
+                h.noise_probability().clone(),
+                h.noise_likelihood_ratio().clone(),
+                h.controller_calls().to_vec(),
+                h.entropy_words(),
+                random.state(),
+                actual,
+                masses.error,
+            ));
+        }
+        assert_eq!(calls.lock().unwrap().len() - calls_before, 30);
+        assert_eq!(observed_outputs, [true, true]);
+        let statistics = cache.unwrap().statistics();
+        assert_eq!(statistics.preparations, if capacity == 1 { 30 } else { 2 });
+        assert_eq!(statistics.evictions, if capacity == 1 { 29 } else { 0 });
+        results.push(transcript);
+    }
+    assert_eq!(results[0], results[1]);
+    let calls = calls.lock().unwrap();
+    assert_eq!(calls.len(), 60);
+    assert!(calls.iter().any(|v| v == &[false]));
+    assert!(calls.iter().any(|v| v == &[true]));
+    println!(
+        "30draws each atLRU4/LRU1:60actualcallbacks;2vs30realpreparations/0vs29evictions;entirephysicalmass/noise/entropy/RNG/controller/error transcriptidentical;literal conditional output oracle agrees"
     );
 }

@@ -6879,3 +6879,45 @@ explicit first-use construction is reported separately from fixed-policy warm
 reuse. The six original dense conditional fixtures now exercise 1,024 draws
 under each compiler (12,288 total), with actual callback counts, target reuse,
 24 exact enumerations and unchanged scalar/support factory counts per draw.
+
+## Explicit scalar-plan LRU
+
+`ScalarQueryCache` bounds frozen scalar query plans separately from probability
+values and the existing automatic instrument-family quotas. Its default retains
+32 plans; `ScalarQueryCacheOptions` also declares per-query event/geometry caps,
+batch-request and term limits, and the explicit `phase::ResourcePreparation`
+policy. Optional catalogues are shared through `Arc`. RHS values and inserted
+faults remain numeric inputs. Event structure, Pauli effect and source-program
+ownership define plan reuse. `set_max_plans`, `clear`, `len` and actual
+hit/preparation/eviction/evaluation statistics expose retention behavior. Capacity
+zero prepares ephemeral plans instead of caching them.
+
+`evaluate` and `evaluate_many` reject wrong owners, shapes, non-Hermitian words,
+noncommuting events and declared quotas before preparation. The batch method
+checks every request before any factory runs; a later kernel failure preserves
+successful preparation and counters while returning no partial result vector.
+Warm calls still validate and run the exact kernel. `prepare_query` returns an
+owned immutable plan for parallel numeric work. A caller-held plan can survive
+LRU eviction, so capacity bounds the cache's entries rather than external Arcs.
+Conservative geometry words exclude existing compiled objects, scalar limbs
+and separately bounded phase-resource storage; they are not process RSS.
+
+Instrument callers use `CompiledInstrument::scalar_query_cache` and
+`reported_moment_cached(InstrumentScalarQuery, ...)` to map physical outputs,
+reported parities and fault choices safely. This raw reported-event service
+excludes the instrument's implicit selection predicates, just like
+`reported_probability`; provide explicit rows for desired conditions. Resolved
+fixed-template histories share the real compiled owner while their values,
+decisions and faults remain fresh. New source or quota construction cannot
+borrow another owner's admission, and cold-prefix histories have distinct
+owners. Cache preparation never executes an external controller.
+
+Owning witnesses retain exactly 32 plans across 40 event structures, check
+recency and zero capacity, compare changing biased RHSs and 256 faulted dense
+Pauli cells, and run eight threads on owned plans after clearing the cache.
+The original dynamic callback/guarded-noise scenario runs 30 draws at each of
+capacities four and one. All 60 actual callbacks execute; exact masses, noise,
+controller inputs/outputs, entropy, caller RNG states and errors agree while
+the observed preparation counts change from two to 30 and evictions from zero
+to 29. An independent resolved-view case returns opposite unconditioned Z
+moments from shared preparation and one-half mass for both reported outcomes.

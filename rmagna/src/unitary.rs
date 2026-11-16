@@ -1,6 +1,10 @@
 //! Unitary third-hierarchy circuits lowered to Clifford boundaries and phases.
 
 mod cache_key;
+mod query_cache;
+pub use query_cache::{
+    ScalarQuery, ScalarQueryCache, ScalarQueryCacheOptions, ScalarQueryCacheStatistics,
+};
 pub(crate) mod expansion;
 pub(crate) use cache_key::ScalarStateKey;
 mod input;
@@ -36,6 +40,13 @@ use std::sync::Arc;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum UnitaryError {
+    NonHermitianScalarQuery,
+    NonCommutingScalarQuery,
+    QueryCacheLimit {
+        option: &'static str,
+        limit: usize,
+        required: u128,
+    },
     SymbolicGeometryCacheUnavailable,
     DimensionMismatch,
     DimensionOverflow,
@@ -78,6 +89,18 @@ pub enum UnitaryError {
 impl fmt::Display for UnitaryError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
+            Self::NonHermitianScalarQuery => {
+                write!(f, "scalar cache queries require a Hermitian Pauli word")
+            }
+            Self::NonCommutingScalarQuery => write!(
+                f,
+                "scalar cache Pauli query must commute with every event row"
+            ),
+            Self::QueryCacheLimit {
+                option,
+                limit,
+                required,
+            } => write!(f, "{option}={limit} is insufficient; need {required}"),
             Self::SymbolicGeometryCacheUnavailable => write!(
                 f,
                 "shared scalar geometry cache is unavailable after a preparation panic"

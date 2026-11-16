@@ -11,6 +11,8 @@ mod preparation;
 pub use insertions::{InsertionPreparation, PreparedInsertionStatistics};
 pub use preparation::{InstrumentQueryLayout, QueryPreparationOutcome};
 mod probabilities;
+mod scalar_cache;
+pub use scalar_cache::InstrumentScalarQuery;
 mod support;
 mod vacuum;
 use crate::circuit::{BitAtom, BitExpr, Circuit};
