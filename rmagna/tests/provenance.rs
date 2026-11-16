@@ -763,3 +763,15 @@ fn reference_scratch_option_preserves_absent_fingerprints_and_distinguishes_all_
     }
     assert_eq!(identities.len(), 9);
 }
+
+#[test]
+fn explicit_controller_elision_changes_configuration_identity_and_default_restores_it() {
+    let mut environment = Environment::new("I 0", r#"{"outputs":[0]}"#, Path::new("."));
+    let declared = environment.fingerprints();
+    environment.evaluation.controller_execution =
+        rmagna::task::ControllerExecution::RequiredForTask;
+    let required = environment.fingerprints();
+    assert_ne!(required.options, declared.options);
+    environment.evaluation.controller_execution = rmagna::task::ControllerExecution::Declared;
+    assert_eq!(environment.fingerprints(), declared);
+}

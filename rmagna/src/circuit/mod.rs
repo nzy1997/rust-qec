@@ -7,6 +7,7 @@ pub use feedback::{
 };
 mod parse;
 mod program;
+mod required_controllers;
 mod view;
 use crate::probability::Probability;
 pub use parse::{ParseError, ParseOptions, ParseResource, ParseResourceLimit, parse_circuit};

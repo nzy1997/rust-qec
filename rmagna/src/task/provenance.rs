@@ -305,6 +305,9 @@ pub(crate) fn execution_configuration(evaluation: EvaluationOptions, run: TaskRu
     });
     // Preserve existing default fingerprints; an explicit new completion cap
     // is still part of the declared execution configuration.
+    if evaluation.controller_execution == super::ControllerExecution::RequiredForTask {
+        options["controller_execution"] = json!("required_for_task");
+    }
     if runtime.max_zero_prefix_words
         != crate::runtime::RuntimeOptions::default().max_zero_prefix_words
     {

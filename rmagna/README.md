@@ -6295,7 +6295,7 @@ external controls compile successfully and fail unchanged semantic assertions.
 The complete original method covers three circuits under both compilers and
 both causal strategies, with exact acceptance 1/2, 1/2 and 1. Reusing the same
 AND decision twice through XOR reduces the final selection to reported record
-one. Its callback remains live on the causal route and each draw accepts one
+one. Under the default declared-controller policy its callback remains live on the causal route and each draw accepts one
 minus its second input. A constant-one XOR selects the complemented record on
 the public linear-affine route, integrating acceptance 1/2 in every draw with
 no external call.
@@ -6304,6 +6304,22 @@ Two echo calls with the same deterministic zero input retain separate call IDs
 zero and one. Their XOR remains a symbolic opaque condition, both ordered
 callbacks run and acceptance is one. Algebraic linearity over opaque decision
 symbols does not establish a reported-record affine expression.
+
+Task callers may explicitly set
+`EvaluationOptions::controller_execution = ControllerExecution::RequiredForTask`
+to remove external calls whose outputs have no remaining quantum, noise-guard,
+selection, detector or observable use after XOR expansion. This policy also
+removes their callback effects and history entropy; the default
+`ControllerExecution::Declared` preserves every declared invocation. Backward
+dependency analysis retains all ordered inputs of a live call, keeps operation
+and call IDs unchanged, and runs after physical/recovery composition. Distinct
+opaque calls remain distinct even when their observed values happen to agree.
+The explicit policy is included in execution fingerprints; default identities
+remain unchanged. A canceled AND example takes the integrated affine route
+with exact error 1/2 and no sampling family or callback. Owning tests also cover
+transitive dependencies, live guards/selection/observables, sparse call IDs and
+the physical/recovery diagnostic boundary. This is an explicit optimization
+contract, not a promise to preserve the removed callbacks' RNG trajectory.
 
 Each complete Rust witness checks 96 seeded draws: 32 AND invocations and 64
 echo invocations, with actual inputs/outputs matched to the public transcript.

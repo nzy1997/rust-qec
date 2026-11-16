@@ -501,3 +501,260 @@ fn prepared_feedback_layers_reuse_actual_factories_and_match_independent_basis_t
         "72prepared feedback cases/576draws:1,3,7layers x2samplers x3policies x2compilers x2targets;0hotfactories;actualquerycounts and independent joint/basis target masses agree"
     );
 }
+
+struct TaskFiles(std::path::PathBuf);
+impl TaskFiles {
+    fn new() -> Self {
+        use std::sync::atomic::{AtomicUsize, Ordering};
+        static NEXT: AtomicUsize = AtomicUsize::new(0);
+        let path = std::env::temp_dir().join(format!(
+            "rmagna-fixed-task-{}-{}",
+            std::process::id(),
+            NEXT.fetch_add(1, Ordering::Relaxed)
+        ));
+        std::fs::create_dir(&path).unwrap();
+        std::fs::write(path.join("ideal.magna"), "I 0").unwrap();
+        Self(path)
+    }
+    fn evaluator(
+        &self,
+        source: &str,
+        task: &str,
+        registry: &rmagna::runtime::ControllerRegistry,
+        options: rmagna::task::EvaluationOptions,
+    ) -> rmagna::task::TaskEvaluator {
+        let parse = ParseOptions {
+            controllers: registry.names(),
+            ..Default::default()
+        };
+        let circuit = parse_circuit(source, &parse).unwrap();
+        let modules = rmagna::task::parse_task(task, &self.0, &Default::default())
+            .unwrap()
+            .load_modules(&circuit, &parse)
+            .unwrap();
+        rmagna::task::TaskEvaluator::new(&circuit, &modules, registry, options).unwrap()
+    }
+}
+impl Drop for TaskFiles {
+    fn drop(&mut self) {
+        let _ = std::fs::remove_dir_all(&self.0);
+    }
+}
+
+#[test]
+fn explicit_controller_elision_removes_cancelled_symbols_before_routing_and_preserves_default_effects()
+ {
+    use rmagna::{
+        costs::ExecutionMeter,
+        noise::SplitMix64,
+        runtime::ControllerRegistry,
+        task::{ControllerExecution, EvaluationOptions},
+        unitary::CompilerStrategy,
+    };
+    use std::sync::{
+        Arc,
+        atomic::{AtomicUsize, Ordering},
+    };
+    let files = TaskFiles::new();
+    let source = "H 1 2\nM 1 2\nDETECTOR rec[-2]\nDETECTOR rec[-1]\nCONTROL[and] det[-2] det[-1] -> ctrl[0]\nCONTROL[XOR] ctrl[0] rec[-1] -> ctrl[1]\nCONTROL[XOR] ctrl[0] ctrl[1] -> ctrl[2]\nCX ctrl[2] 0";
+    let task = r#"{"outputs":[0],"ideal_state":"ideal.magna"}"#;
+    let a = ScalarArithmetic::default();
+    for compiler in [
+        CompilerStrategy::ParityCopies,
+        CompilerStrategy::SharedCommutingLayer,
+    ] {
+        let calls = Arc::new(AtomicUsize::new(0));
+        let seen = Arc::clone(&calls);
+        let mut registry = ControllerRegistry::default();
+        registry
+            .register("and", "1", move |v: &[bool]| {
+                seen.fetch_add(1, Ordering::Relaxed);
+                Ok(vec![v[0] & v[1]])
+            })
+            .unwrap();
+        let mut options = EvaluationOptions::default();
+        options.runtime.compile.compiler_strategy = compiler;
+        let declared = files.evaluator(source, task, &registry, options);
+        assert_eq!(declared.execution_route(), "causal_fixed_template");
+        let draw = declared.sample(&mut SplitMix64::new(9)).unwrap();
+        assert_eq!(calls.load(Ordering::Relaxed), 1);
+        let bit = draw.controller_calls[0].inputs[1];
+        assert_eq!(
+            draw.raw_error,
+            if bit {
+                draw.history_mass.clone()
+            } else {
+                ExactScalar::zero()
+            }
+        );
+        options.controller_execution = ControllerExecution::RequiredForTask;
+        let required = files.evaluator(source, task, &registry, options);
+        assert_eq!(required.execution_route(), "linear_affine");
+        let report =
+            required.prepare_sampling_queries(Default::default(), &ExecutionMeter::default());
+        assert_eq!(report.result, Ok(()));
+        assert!(!report.by_kind.contains_key("reported_probability"));
+        assert!(!report.by_kind.contains_key("reported_support"));
+        for seed in 0..16 {
+            let (draw, diagnostics) = required
+                .sample_with_diagnostics(&mut SplitMix64::new(seed), &Default::default())
+                .unwrap();
+            assert!(draw.controller_calls.is_empty());
+            assert_eq!(diagnostics.history_entropy_words, 0);
+            assert_eq!(diagnostics.protocol_controller_calls, 0);
+            assert_eq!(draw.raw_acceptance, ExactScalar::one());
+            assert_eq!(draw.history_mass, ExactScalar::one());
+            assert_eq!(draw.raw_error, a.omega(0, -2).unwrap());
+        }
+        assert_eq!(
+            calls.load(Ordering::Relaxed),
+            1,
+            "elision must remove actual callbacks,not just their reported count"
+        );
+        assert_eq!(
+            parse_circuit(
+                source,
+                &ParseOptions {
+                    controllers: registry.names(),
+                    ..Default::default()
+                }
+            )
+            .unwrap()
+            .external_calls(),
+            1
+        );
+    }
+    println!(
+        "2compilers/32integrateddraws:cancelled nonlinear callback absent before route/preparation;exact independent error1/2,nohistoryentropy;default declared effect retained"
+    );
+}
+
+#[test]
+fn required_controller_dependencies_keep_sparse_call_ids_guards_selection_and_recovery_namespaces()
+{
+    use rmagna::{
+        noise::SplitMix64,
+        runtime::ControllerRegistry,
+        task::{ControllerExecution, EvaluationOptions},
+    };
+    let files = TaskFiles::new();
+    let mut registry = ControllerRegistry::default();
+    registry
+        .register("dead", "1", |_: &[bool]| {
+            Err("elided callback executed".into())
+        })
+        .unwrap();
+    registry
+        .register("echo", "1", |v: &[bool]| Ok(v.to_vec()))
+        .unwrap();
+    let options = EvaluationOptions {
+        controller_execution: ControllerExecution::RequiredForTask,
+        ..Default::default()
+    };
+    let source = "H 0\nM 0\nDETECTOR rec[-1]\nCONTROL[dead] det[0] -> ctrl[0]\nCONTROL[echo] det[0] -> ctrl[1]\nCONTROL[echo] ctrl[1] -> ctrl[2]\nCX ctrl[2] 1\nCONTROL[dead] ctrl[1] -> ctrl[3]";
+    let evaluator = files.evaluator(
+        source,
+        r#"{"outputs":[1],"sample_records":[0],"ideal_state":"ideal.magna"}"#,
+        &registry,
+        options,
+    );
+    let mut cases = 0;
+    for seed in 0..16 {
+        let draw = evaluator.sample(&mut SplitMix64::new(seed)).unwrap();
+        assert_eq!(
+            draw.controller_calls
+                .iter()
+                .map(|c| c.call)
+                .collect::<Vec<_>>(),
+            vec![1, 2]
+        );
+        assert_eq!(draw.controller_calls[0].inputs, draw.sampled_records);
+        assert_eq!(draw.controller_calls[1].inputs, draw.sampled_records);
+        assert_eq!(
+            draw.raw_error,
+            if draw.sampled_records[0] {
+                draw.history_mass.clone()
+            } else {
+                ExactScalar::zero()
+            }
+        );
+        cases += 1;
+    }
+    for root in [
+        "X_ERROR(1/3) ctrl[0] 1",
+        "POSTSELECT ctrl[0]",
+        "OBSERVABLE_INCLUDE(0) ctrl[0]",
+    ] {
+        let source =
+            format!("I 1\nH 0\nM 0\nDETECTOR rec[-1]\nCONTROL[echo] det[0] -> ctrl[0]\n{root}");
+        let e = files.evaluator(
+            &source,
+            r#"{"outputs":[1],"sample_records":[0],"ideal_state":"ideal.magna"}"#,
+            &registry,
+            options,
+        );
+        for seed in 0..8 {
+            let draw = e.sample(&mut SplitMix64::new(seed)).unwrap();
+            assert_eq!(draw.controller_calls.len(), 1, "live root:{root}");
+            assert_eq!(draw.controller_calls[0].inputs, draw.sampled_records);
+            cases += 1;
+        }
+        let integrated = files.evaluator(
+            &source,
+            r#"{"outputs":[1],"ideal_state":"ideal.magna"}"#,
+            &registry,
+            options,
+        );
+        let exact = integrated.enumerate_physical(&Default::default()).unwrap();
+        let f = rmagna::field::FieldArithmetic::default();
+        let rational = |n: i64, d: i64| {
+            f.from_rational(num_rational::BigRational::new(n.into(), d.into()))
+                .unwrap()
+        };
+        assert_eq!(
+            exact.masses.accepted,
+            rational(1, if root.starts_with("POSTSELECT") { 2 } else { 1 })
+        );
+        assert_eq!(
+            exact.masses.error,
+            if root.starts_with("X_ERROR") {
+                rational(1, 6)
+            } else {
+                rational(0, 1)
+            }
+        );
+    }
+    std::fs::write(
+        files.0.join("recovery.magna"),
+        "H 1\nM 1\nDETECTOR rec[-1]\nCONTROL[echo] det[0] -> ctrl[0]\nCX ctrl[0] 0",
+    )
+    .unwrap();
+    let e = files.evaluator(
+        "I 0\nCONTROL[dead] -> ctrl[0]",
+        r#"{"outputs":[0],"ideal_state":"ideal.magna","recovery":"recovery.magna"}"#,
+        &registry,
+        options,
+    );
+    for seed in 0..8 {
+        let (draw, d) = e
+            .sample_with_diagnostics(&mut SplitMix64::new(seed), &Default::default())
+            .unwrap();
+        assert_eq!(draw.controller_calls.len(), 1);
+        assert_eq!(draw.controller_calls[0].call, 1);
+        assert_eq!(d.protocol_controller_calls, 0);
+        assert_eq!(d.recovery_controller_calls, 1);
+        assert_eq!(
+            draw.raw_error,
+            if draw.controller_calls[0].inputs[0] {
+                draw.history_mass.clone()
+            } else {
+                ExactScalar::zero()
+            }
+        );
+        cases += 1;
+    }
+    assert_eq!(cases, 48);
+    println!(
+        "48draws:transitive livecallIDs1/2,3guard/selection/observable roots,and recoverycall1 afterdeadprotocolcall0;unneeded callbacks returnerrorsifactuallyexecuted"
+    );
+}

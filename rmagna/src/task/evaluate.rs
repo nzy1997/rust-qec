@@ -40,11 +40,23 @@ pub use run::{
 };
 pub(crate) use run::{RunHooks, run_task_batch_inspected};
 
+/// Which declared external callbacks execute during task sampling.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum ControllerExecution {
+    /// Preserve every declared invocation, including observable callback effects.
+    #[default]
+    Declared,
+    /// Elide callbacks whose outputs cannot affect any quantum operation, noise
+    /// guard, selection, detector or observable, after canonical XOR expansion.
+    /// The caller explicitly permits removing those callback effects and entropy.
+    RequiredForTask,
+}
 #[derive(Clone, Copy, Debug, Default)]
 pub struct EvaluationOptions {
     pub runtime: RuntimeOptions,
     pub scalars: ScalarArithmetic,
     pub fields: FieldArithmetic,
+    pub controller_execution: ControllerExecution,
 }
 struct Target {
     unitary: CompiledUnitary,
@@ -262,6 +274,10 @@ impl TaskEvaluator {
             None
         };
         let composed = compose::recovery(physical, &task.outputs, modules.recovery.as_ref())?;
+        let composed = match options.controller_execution {
+            ControllerExecution::Declared => composed,
+            ControllerExecution::RequiredForTask => composed.retaining_required_controllers(),
+        };
         let requested = task
             .sample_records
             .iter()

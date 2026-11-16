@@ -8,12 +8,12 @@ pub use export::{
 };
 mod evaluate;
 pub use evaluate::{
-    BatchProgress, CancellationToken, ContractionResources, EvaluationOptions, ExactInterval,
-    FamilyPreparationCounts, ProgressObserver, ProgressReceipt, RunFailure, RunPhase, RunStatus,
-    RunTimings, SamplingPreparationOptions, SamplingPreparationReport, StreamRecordRetention,
-    SuppliedActionEvaluator, SuppliedActionLimits, SuppliedNoiseActions, SuppliedPauliAction,
-    TaskEnumeration, TaskEnumerationOptions, TaskEvaluation, TaskEvaluator, TaskPatternResponse,
-    TaskQueryWorkStatistics, TaskRunOptions, TaskRunResult, TaskRunStatistics,
+    BatchProgress, CancellationToken, ContractionResources, ControllerExecution, EvaluationOptions,
+    ExactInterval, FamilyPreparationCounts, ProgressObserver, ProgressReceipt, RunFailure,
+    RunPhase, RunStatus, RunTimings, SamplingPreparationOptions, SamplingPreparationReport,
+    StreamRecordRetention, SuppliedActionEvaluator, SuppliedActionLimits, SuppliedNoiseActions,
+    SuppliedPauliAction, TaskEnumeration, TaskEnumerationOptions, TaskEvaluation, TaskEvaluator,
+    TaskPatternResponse, TaskQueryWorkStatistics, TaskRunOptions, TaskRunResult, TaskRunStatistics,
     TaskSampleDiagnosticOptions, TaskSampleDiagnostics, TaskSectorMasses, TaskStream,
     TaskStreamIdentity, TaskStreamOptions, TaskStreamReport, TaskStreamStatus, TaskVariances,
     TaskWeightSector, run_task_batch, run_task_batch_cancellable,
