@@ -351,8 +351,22 @@
     },
     {
       "id": "test_capped_affine.CappedAffineTests.test_nonuniform_dense_feedback_and_guarded_noise",
-      "status": "unmapped",
-      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+      "status": "verified",
+      "contract": "Full original six dense mode/feedback fixtures under both compilers:24 exact finite enumerations,12288 affine-support draws, independent acceptance/error coefficients, actual guarded noise and callbacks; no hot scalar/support factories. Actual program/Gaussian/weak-slot capacities stay fixed; scalar caches and one support parent obey explicit Rust bounds, not Native private three-parent identity.",
+      "rust_tests": [
+        {
+          "package": "rmagna",
+          "target": "original_dense_conditional_instruments",
+          "test": "original_dense_conditional_instruments_and_sampling",
+          "source_sha256": "e8370d95de8cb250bb41aa2f5bd6cef1f0be9f022c2dc234d0b564607dd327f5"
+        },
+        {
+          "package": "rmagna",
+          "target": "fixed_reference_contracts",
+          "test": "prepared_feedback_layers_reuse_actual_factories_and_match_independent_basis_targets",
+          "source_sha256": "24952b063dc6840114e931373f6340113c304cbf71d93854824b5864d81b2a85"
+        }
+      ]
     },
     {
       "id": "test_capped_affine.CappedAffineTests.test_reconfigure_prepares_optional_route",
@@ -615,7 +629,7 @@
           "package": "rmagna",
           "target": "original_dense_conditional_instruments",
           "test": "original_dense_conditional_instruments_and_sampling",
-          "source_sha256": "c11823ea5c5a6508c8d636a61db0e820af201cd8052aa4ae8c5523785b258d53"
+          "source_sha256": "e8370d95de8cb250bb41aa2f5bd6cef1f0be9f022c2dc234d0b564607dd327f5"
         }
       ]
     },
@@ -1174,7 +1188,7 @@
           "package": "rmagna",
           "target": "original_file_batches_and_reuse",
           "test": "original_aggregate_matches_single_draws",
-          "source_sha256": "9987a55434e10b0c512a5e2854ec206fb0bcea2aaf086d8e9a11afdc3c185b8a"
+          "source_sha256": "bc116d8beb73d01dc957363fd1329ae18ba19dc7c2d8d179b0c05a5e891495b0"
         }
       ]
     },
@@ -1187,7 +1201,7 @@
           "package": "rmagna",
           "target": "original_file_batches_and_reuse",
           "test": "original_failure_retains_only_completed_prefix",
-          "source_sha256": "9987a55434e10b0c512a5e2854ec206fb0bcea2aaf086d8e9a11afdc3c185b8a"
+          "source_sha256": "bc116d8beb73d01dc957363fd1329ae18ba19dc7c2d8d179b0c05a5e891495b0"
         }
       ]
     },
@@ -1369,19 +1383,35 @@
           "package": "rmagna",
           "target": "original_file_batches_and_reuse",
           "test": "original_batch_failure_keeps_completed_prefix_and_query_budget_contract",
-          "source_sha256": "9987a55434e10b0c512a5e2854ec206fb0bcea2aaf086d8e9a11afdc3c185b8a"
+          "source_sha256": "bc116d8beb73d01dc957363fd1329ae18ba19dc7c2d8d179b0c05a5e891495b0"
         }
       ]
     },
     {
       "id": "test_file_reuse.FileReuseTests.test_equivalent_resolved_histories_share_only_preparation",
-      "status": "unmapped",
-      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+      "status": "verified",
+      "contract": "Full echo/CX/CZ/noise source:resolved0/1 histories share one immutable program and exactly2 prepared layouts while +/-Z values and both half-mass record RHS remain dynamic; new raw-path and geometry budgets reject before reuse. Rust explicit immutable sessions replace Python engine-object identity.",
+      "rust_tests": [
+        {
+          "package": "rmagna",
+          "target": "fixed_reference_contracts",
+          "test": "resolved_instrument_views_share_lru_preparation_but_not_decisions_values_or_new_quotas",
+          "source_sha256": "24952b063dc6840114e931373f6340113c304cbf71d93854824b5864d81b2a85"
+        }
+      ]
     },
     {
       "id": "test_file_reuse.FileReuseTests.test_external_callbacks_guarded_noise_and_eviction_remain_dynamic",
-      "status": "unmapped",
-      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+      "status": "verified",
+      "contract": "Complete original30-draw external echo/guarded-X/noise/readout fixture:automatic per-family LRU1 and un-evicted plans preserve every TaskEvaluation field, actual60callbacks, both inputs and next caller words across both compilers/samplers/four preparation modes. Per-family limits are explicit rather than Native combined-plan object identity.",
+      "rust_tests": [
+        {
+          "package": "rmagna",
+          "target": "original_file_batches_and_reuse",
+          "test": "original_dynamic_file_samples_use_automatic_eviction_without_memoizing_callbacks_or_changing_rng",
+          "source_sha256": "bc116d8beb73d01dc957363fd1329ae18ba19dc7c2d8d179b0c05a5e891495b0"
+        }
+      ]
     },
     {
       "id": "test_file_reuse.FileReuseTests.test_fixed_preparation_is_reused_for_new_original_faults",
@@ -1392,7 +1422,7 @@
           "package": "rmagna",
           "target": "original_file_batches_and_reuse",
           "test": "original_fixed_preparation_is_reused_for_new_original_faults",
-          "source_sha256": "9987a55434e10b0c512a5e2854ec206fb0bcea2aaf086d8e9a11afdc3c185b8a"
+          "source_sha256": "bc116d8beb73d01dc957363fd1329ae18ba19dc7c2d8d179b0c05a5e891495b0"
         }
       ]
     },
@@ -1778,8 +1808,22 @@
     },
     {
       "id": "test_incremental_history.IncrementalHistoryTests.test_complete_draw_rng_and_controller_replay",
-      "status": "unmapped",
-      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+      "status": "verified",
+      "contract": "Complete original incremental circuit:1024 draws across both compilers,magic modes,history samplers,fixed/cold strategies and metered/unbounded budgets. Every exact physics field,actual four-call/RNG interleaving and next word matches retained preoptimization Rust digests. Full retained program/Gaussian/weak-slot capacities remain fixed; Native MT19937/private max_plans are separate declared contracts.",
+      "rust_tests": [
+        {
+          "package": "rmagna",
+          "target": "fixed_reference_contracts",
+          "test": "complete_incremental_history_stream_matches_preoptimization_baselines_and_real_work_budgets",
+          "source_sha256": "24952b063dc6840114e931373f6340113c304cbf71d93854824b5864d81b2a85"
+        },
+        {
+          "package": "rmagna",
+          "target": "fixed_reference_contracts",
+          "test": "prepared_feedback_layers_reuse_actual_factories_and_match_independent_basis_targets",
+          "source_sha256": "24952b063dc6840114e931373f6340113c304cbf71d93854824b5864d81b2a85"
+        }
+      ]
     },
     {
       "id": "test_incremental_history.IncrementalHistoryTests.test_interference_zero_prefix_completes_controllers_and_guarded_noise",
@@ -3472,23 +3516,67 @@
     },
     {
       "id": "test_query_reuse.PreparedBoundaryResources.test_affine_probe_does_not_expand_a_nonaffine_resource",
-      "status": "unmapped",
-      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+      "status": "verified",
+      "contract": "Exact original HTH readout refuses affine-only certification without constructing a phase resource; ordinary rank-zero Native closing and zero geometry/signature budgets fail.48 compiler/fault/report/inversion cases include positive Clifford certifications and unknown-label refusal.",
+      "rust_tests": [
+        {
+          "package": "rmagna",
+          "target": "fixed_reference_contracts",
+          "test": "affine_probe_refuses_biased_t_readout_without_building_a_phase_resource",
+          "source_sha256": "24952b063dc6840114e931373f6340113c304cbf71d93854824b5864d81b2a85"
+        }
+      ]
     },
     {
       "id": "test_query_reuse.PreparedBoundaryResources.test_eager_and_lazy_preparation_match_after_faults",
-      "status": "unmapped",
-      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+      "status": "verified",
+      "contract": "Complete original H,H,T,CX,M,CY,T,H schedule with zero-probability supplied-action channels:128 compiler/I-X-Y-Z fault/report flip/event RHS/Pauli cells. Fresh cold and eager prepared resources equal an independent Bloch oracle with nonzero and zero cases; no hot geometry/map/resource factories.",
+      "rust_tests": [
+        {
+          "package": "rmagna",
+          "target": "fixed_reference_contracts",
+          "test": "original_eager_lazy_fault_report_event_and_pauli_cells",
+          "source_sha256": "24952b063dc6840114e931373f6340113c304cbf71d93854824b5864d81b2a85"
+        }
+      ]
     },
     {
       "id": "test_query_reuse.PreparedBoundaryResources.test_file_compilation_prepares_all_stages_without_decoders_or_draws",
-      "status": "unmapped",
-      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+      "status": "verified",
+      "contract": "Full original protocol CH/recovery/target scenario under both compilers and samplers:explicit preparation retains acceptance,target and history families without callback/RNG/query execution;16 draws execute32 actual calls and preserve fixed inventories. Rust recovery selected-output numbering is explicitly remapped; target normalization fails before all3draws with1failed preparation query, rather than Native private query-counter zero.",
+      "rust_tests": [
+        {
+          "package": "rmagna",
+          "target": "fixed_reference_contracts",
+          "test": "original_protocol_recovery_prepares_before_callbacks_and_captures_preparation_failure",
+          "source_sha256": "24952b063dc6840114e931373f6340113c304cbf71d93854824b5864d81b2a85"
+        },
+        {
+          "package": "rmagna",
+          "target": "sampling_preparation",
+          "test": "feedback_prefixes_decision_constants_and_guarded_categories_cover_actual_noisy_draws",
+          "source_sha256": "763265eedbee3429420b5b58787d5504cbb8112483a4d7e9aa37fe42cef26deb"
+        },
+        {
+          "package": "rmagna",
+          "target": "sampling_preparation",
+          "test": "preflight_caps_deadlines_and_partial_failures_retain_honest_receipts_and_retry",
+          "source_sha256": "763265eedbee3429420b5b58787d5504cbb8112483a4d7e9aa37fe42cef26deb"
+        }
+      ]
     },
     {
       "id": "test_query_reuse.PreparedBoundaryResources.test_prepared_entries_and_exact_event_transport",
-      "status": "unmapped",
-      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+      "status": "verified",
+      "contract": "Full original H,T,H,M template:prepare both retained-record entries and scalar event family, then64 actual compiler/RHS/report-flip scalar queries and16 retained-tensor evaluations preserve exact(2+/-sqrt2)/4,including nonzero event outcomes; scalar and labelled resources/maps remain fixed.",
+      "rust_tests": [
+        {
+          "package": "rmagna",
+          "target": "fixed_reference_contracts",
+          "test": "original_prepared_record_entries_transport_both_irrational_event_masses",
+          "source_sha256": "24952b063dc6840114e931373f6340113c304cbf71d93854824b5864d81b2a85"
+        }
+      ]
     },
     {
       "id": "test_query_reuse.PreparedBoundaryResources.test_public_prepared_query_validates_rhs_and_boundary",
@@ -3518,13 +3606,35 @@
     },
     {
       "id": "test_query_reuse.QueryReuse.test_shared_plan_threads_and_batched_paulis",
-      "status": "unmapped",
-      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+      "status": "verified",
+      "contract": "Complete original CCZ/CX/destructive-MX source:three actual fault/report assignments times four Pauli plans,12 threaded batches use one immutable owner with independent workspaces. Warm scalar and symbolic geometry factories remain unchanged; each result matches fixed-record literal branch sums.",
+      "rust_tests": [
+        {
+          "package": "rmagna",
+          "target": "fixed_reference_contracts",
+          "test": "original_ccz_destructive_trace_reuses_all_fault_rhs_effects_and_threaded_batches",
+          "source_sha256": "24952b063dc6840114e931373f6340113c304cbf71d93854824b5864d81b2a85"
+        }
+      ]
     },
     {
       "id": "test_query_reuse.QueryReuse.test_traced_network_reuse_matches_fresh_plans_and_event_changes",
-      "status": "unmapped",
-      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+      "status": "verified",
+      "contract": "Complete original CCZ/CX/destructive-MX source:all I/X/Y/Z faults,both event RHS and four effects match independent fixed-record branch moments,including repeated warm evaluations,contradictory events and threaded batches. Noncommuting effects and malformed warm RHS still reject; actual geometry sharing avoids reconstruction.",
+      "rust_tests": [
+        {
+          "package": "rmagna",
+          "target": "fixed_reference_contracts",
+          "test": "original_ccz_destructive_trace_reuses_all_fault_rhs_effects_and_threaded_batches",
+          "source_sha256": "24952b063dc6840114e931373f6340113c304cbf71d93854824b5864d81b2a85"
+        },
+        {
+          "package": "rmagna",
+          "target": "fixed_reference_contracts",
+          "test": "shared_symbolic_geometry_preserves_all_pauli_rhs_fault_and_zero_pairing_values",
+          "source_sha256": "24952b063dc6840114e931373f6340113c304cbf71d93854824b5864d81b2a85"
+        }
+      ]
     },
     {
       "id": "test_reference_layer_compiler.ReferenceLayerCompilerTests.test_clifford_parent_can_select_first_target_layer",
@@ -3606,13 +3716,35 @@
     },
     {
       "id": "test_reference_networks.ReferenceNetworkTests.test_affine_batch_reuses_protocol_assignment_without_sampling_parent",
-      "status": "unmapped",
-      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+      "status": "verified",
+      "contract": "Complete original H,T,Z_ERROR(1/4) source:16batched+16single draws per compiler/sampler preserve all exact fields and word state,with exactly one numeric source assignment per draw shared by acceptance and target,no sampling parent,and32actual target-plan reuses. Paired density closures share source/target programs; separate full504-generator continuation proof validates suffix transport without duplicate protocol positions.",
+      "rust_tests": [
+        {
+          "package": "rmagna",
+          "target": "fixed_reference_contracts",
+          "test": "original_affine_tasks_have_only_terminal_roles_and_batch_target_reuse_preserves_the_word_stream",
+          "source_sha256": "24952b063dc6840114e931373f6340113c304cbf71d93854824b5864d81b2a85"
+        },
+        {
+          "package": "rmagna",
+          "target": "fixed_reference_contracts",
+          "test": "full_original_continuation_generators_match_fresh_compilation_and_output_orders",
+          "source_sha256": "24952b063dc6840114e931373f6340113c304cbf71d93854824b5864d81b2a85"
+        }
+      ]
     },
     {
       "id": "test_reference_networks.ReferenceNetworkTests.test_affine_sector_enumerates_free_coordinates_not_redundant_labels",
-      "status": "unmapped",
-      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+      "status": "verified",
+      "contract": "Complete original12redundant-label echo source:all4 compiler/causal configurations enumerate exactly2 histories from1freebit under max_record_bits1/max_branches2,12actual equal-input callbacks perhistory,exact A1 E0; branch1/rank0 refusal occurs beforecallbacks.",
+      "rust_tests": [
+        {
+          "package": "rmagna",
+          "target": "fixed_reference_contracts",
+          "test": "twelve_redundant_decoded_labels_enumerate_two_histories_under_one_independent_bit",
+          "source_sha256": "24952b063dc6840114e931373f6340113c304cbf71d93854824b5864d81b2a85"
+        }
+      ]
     },
     {
       "id": "test_reference_networks.ReferenceNetworkTests.test_affine_support_offset_and_report_flip",
@@ -3629,48 +3761,156 @@
     },
     {
       "id": "test_reference_networks.ReferenceNetworkTests.test_affine_task_has_two_parents",
-      "status": "unmapped",
-      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+      "status": "verified",
+      "contract": "Full original affine H,T,measurement,feedback,postselection and magic target task prepares only acceptance/fidelity terminal request roles,no sampling family.16literal postselection draws have A1/2 E0; actual source and target remain independent shared immutable owners.",
+      "rust_tests": [
+        {
+          "package": "rmagna",
+          "target": "fixed_reference_contracts",
+          "test": "original_affine_tasks_have_only_terminal_roles_and_batch_target_reuse_preserves_the_word_stream",
+          "source_sha256": "24952b063dc6840114e931373f6340113c304cbf71d93854824b5864d81b2a85"
+        }
+      ]
     },
     {
       "id": "test_reference_networks.ReferenceNetworkTests.test_all_three_nonzero_constrained_domains",
-      "status": "unmapped",
-      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+      "status": "verified",
+      "contract": "Full original H,T,MX,echo,CZ,MX source and magic target:128 draws across compilers/samplers preserve biased physical mass,affine correction,deterministic second record,nonzero constrained RHS and exacttarget error; all prepared resource/map factories stay fixed. Rust domain layouts are observed explicitly rather than claiming Native2/2/4 coordinate labels.",
+      "rust_tests": [
+        {
+          "package": "rmagna",
+          "target": "fixed_reference_contracts",
+          "test": "exact_source_nonzero_constrained_domains_reuse_fixed_factories_and_preserve_biased_weights",
+          "source_sha256": "24952b063dc6840114e931373f6340113c304cbf71d93854824b5864d81b2a85"
+        }
+      ]
     },
     {
       "id": "test_reference_networks.ReferenceNetworkTests.test_cancelled_external_symbols_do_not_require_third_parent",
-      "status": "unmapped",
-      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+      "status": "verified",
+      "contract": "Full cancelled AND/XOR source:explicit RequiredForTask canonical-XOR dependency analysis removes decoder calls and the sampling parent before routing to linear_affine; Declared default preserves callback side effects. Only two terminal roles remain; sparse IDs,guards,selection and recovery namespace dependencies remain live.",
+      "rust_tests": [
+        {
+          "package": "rmagna",
+          "target": "fixed_reference_contracts",
+          "test": "explicit_controller_elision_removes_cancelled_symbols_before_routing_and_preserves_default_effects",
+          "source_sha256": "24952b063dc6840114e931373f6340113c304cbf71d93854824b5864d81b2a85"
+        },
+        {
+          "package": "rmagna",
+          "target": "fixed_reference_contracts",
+          "test": "required_controller_dependencies_keep_sparse_call_ids_guards_selection_and_recovery_namespaces",
+          "source_sha256": "24952b063dc6840114e931373f6340113c304cbf71d93854824b5864d81b2a85"
+        }
+      ]
     },
     {
       "id": "test_reference_networks.ReferenceNetworkTests.test_exact_mass_reuse_skips_terminal_sampling_query",
-      "status": "unmapped",
-      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+      "status": "verified",
+      "contract": "Both original exact-history prefixes:completed physical masses are reused without a terminal sampling requery.128 complete compiler/sampler/16seed task draws preserve literal masses,actual two-call transcripts,next RNG state and I/X/Y/Z moments; one final source assignment serves six terminal queries and16actualtargetplan reuses perconfiguration. Independent resolve counts distinguish confirmed-mass from reused final-query views.",
+      "rust_tests": [
+        {
+          "package": "rmagna",
+          "target": "fixed_reference_contracts",
+          "test": "completed_exact_histories_reuse_actual_physical_mass_and_preserve_every_callback_and_word",
+          "source_sha256": "24952b063dc6840114e931373f6340113c304cbf71d93854824b5864d81b2a85"
+        },
+        {
+          "package": "rmagna",
+          "target": "fixed_reference_contracts",
+          "test": "completed_source_assignment_feeds_acceptance_target_and_all_paulis_once",
+          "source_sha256": "24952b063dc6840114e931373f6340113c304cbf71d93854824b5864d81b2a85"
+        }
+      ]
     },
     {
       "id": "test_reference_networks.ReferenceNetworkTests.test_number_of_parents_does_not_follow_prefix_count",
-      "status": "unmapped",
-      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+      "status": "verified",
+      "contract": "Complete original1/3/7AND-layer circuits across96compiler/sampler/preparation/target cells and768draws:one immutable source and one target owner retain fixed program/Gaussian/weak-slot inventories during sampling; P/D/M caches obey explicit quotas,one labelled parent and no hot factories under fixed modes. Actual exact-marginal geometries4/8/16 are documented rather than relabelled as Native3parents;2048LRU probes bound live and expired slots/capacity.",
+      "rust_tests": [
+        {
+          "package": "rmagna",
+          "target": "fixed_reference_contracts",
+          "test": "prepared_feedback_layers_reuse_actual_factories_and_match_independent_basis_targets",
+          "source_sha256": "24952b063dc6840114e931373f6340113c304cbf71d93854824b5864d81b2a85"
+        },
+        {
+          "package": "rmagna",
+          "target": "fixed_reference_contracts",
+          "test": "automatic_lru_bounds_expired_geometry_slots_and_capacity_over_distinct_layouts",
+          "source_sha256": "24952b063dc6840114e931373f6340113c304cbf71d93854824b5864d81b2a85"
+        }
+      ]
     },
     {
       "id": "test_reference_networks.ReferenceNetworkTests.test_shared_coordinates_preserve_parity_feedback_and_actual_offsets",
-      "status": "unmapped",
-      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+      "status": "verified",
+      "contract": "Complete original parity-feedback source:both compilers and samplers,all8manual report-offset combinations,2048manual/declared-law draws preserve exact causal support,masses,terminal acceptance/error and actual echo inputs without hot query factories. Manual actions have0/1physical noise mass; separately declared channels have1/8,not an altered original fixture.",
+      "rust_tests": [
+        {
+          "package": "rmagna",
+          "target": "fixed_reference_contracts",
+          "test": "original_parity_feedback_uses_all_eight_manual_report_offsets_without_reconstructing_query_families",
+          "source_sha256": "24952b063dc6840114e931373f6340113c304cbf71d93854824b5864d81b2a85"
+        }
+      ]
     },
     {
       "id": "test_reference_networks.ReferenceNetworkTests.test_three_bit_selection_order",
-      "status": "unmapped",
-      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+      "status": "verified",
+      "contract": "Complete original nonlinear AND selection: 512 draws and 4 exact enumerations cover all input pairs, actual callback order and rejected histories, literal A=3/4, E=1/4 and conditional success=2/3. Prepared query factories remain fixed; the capped support proposal retains its explicit resource limits.",
+      "rust_tests": [
+        {
+          "package": "rmagna",
+          "target": "fixed_reference_contracts",
+          "test": "original_three_bit_selection_has_literal_joint_masses_and_exact_three_quarter_one_quarter_totals",
+          "source_sha256": "24952b063dc6840114e931373f6340113c304cbf71d93854824b5864d81b2a85"
+        }
+      ]
     },
     {
       "id": "test_reference_reuse.ReferenceReuseTests.test_compiler_continuation_generators",
-      "status": "unmapped",
-      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+      "status": "verified",
+      "contract": "Full pinned native/reference_reuse.cpp: 8 source variants and 504 generators per compiler produce 1008 exact purified states, 504 raw coordinate/omega comparisons and 576 MZ temporal/correlation checks. Frozen suffix transport shares source/reference owners, retains zero duplicate query-prefix positions and preserves both output orders. Another 192 mixed-compiler T/CS/CCZ/cancelled-axis/new-wire/global-phase cases, 384 mixed prepared event masses, 96 warm mass queries and foreign/budget refusals validate the independent Rust continuation.",
+      "rust_tests": [
+        {
+          "package": "rmagna",
+          "target": "fixed_reference_contracts",
+          "test": "full_original_continuation_generators_match_fresh_compilation_and_output_orders",
+          "source_sha256": "24952b063dc6840114e931373f6340113c304cbf71d93854824b5864d81b2a85"
+        },
+        {
+          "package": "rmagna",
+          "target": "fixed_reference_contracts",
+          "test": "continuations_keep_mixed_compiler_magic_axes_growth_and_global_phases",
+          "source_sha256": "24952b063dc6840114e931373f6340113c304cbf71d93854824b5864d81b2a85"
+        },
+        {
+          "package": "rmagna",
+          "target": "fixed_reference_contracts",
+          "test": "prepared_continuations_reuse_frozen_source_frames_and_phase_maps",
+          "source_sha256": "24952b063dc6840114e931373f6340113c304cbf71d93854824b5864d81b2a85"
+        }
+      ]
     },
     {
       "id": "test_runtime_ownership.RuntimeOwnershipTests.test_cache_bound_and_changed_event_structure",
-      "status": "unmapped",
-      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+      "status": "verified",
+      "contract": "The explicit owner-bound ScalarQueryCache defaults to 32 entries: 40 event structures produce 8 actual LRU evictions. Changed RHS/effect values remain dynamic and malformed warm RHS fails; foreign owners and new resource budgets cannot reuse old plans. Automatic instrument-family quotas are separate, with measured weak-slot and capacity bounds.",
+      "rust_tests": [
+        {
+          "package": "rmagna",
+          "target": "fixed_reference_contracts",
+          "test": "explicit_scalar_plan_lru_caps_forty_event_structures_at_thirty_two_and_validates_warm_calls",
+          "source_sha256": "24952b063dc6840114e931373f6340113c304cbf71d93854824b5864d81b2a85"
+        },
+        {
+          "package": "rmagna",
+          "target": "fixed_reference_contracts",
+          "test": "automatic_lru_bounds_expired_geometry_slots_and_capacity_over_distinct_layouts",
+          "source_sha256": "24952b063dc6840114e931373f6340113c304cbf71d93854824b5864d81b2a85"
+        }
+      ]
     },
     {
       "id": "test_runtime_ownership.RuntimeOwnershipTests.test_execution_and_noise_schedule_have_independent_owner_lifetimes",
@@ -3738,8 +3978,28 @@
     },
     {
       "id": "test_runtime_ownership.RuntimeOwnershipTests.test_structure_reuse_changed_rhs_faults_effects_and_uncached",
-      "status": "unmapped",
-      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+      "status": "verified",
+      "contract": "Owner-bound scalar plans preserve all changed RHS/fault/effect values and uncached numeric controls. Different effects create independent closures while sharing only compatible Gaussian geometry. Invalid warm RHS and noncommuting queries still fail; independent dense complex three-wire/64-Pauli phase oracles catch unsafe event aliasing.",
+      "rust_tests": [
+        {
+          "package": "rmagna",
+          "target": "fixed_reference_contracts",
+          "test": "explicit_scalar_plan_lru_caps_forty_event_structures_at_thirty_two_and_validates_warm_calls",
+          "source_sha256": "24952b063dc6840114e931373f6340113c304cbf71d93854824b5864d81b2a85"
+        },
+        {
+          "package": "rmagna",
+          "target": "fixed_reference_contracts",
+          "test": "shared_symbolic_geometry_preserves_all_pauli_rhs_fault_and_zero_pairing_values",
+          "source_sha256": "24952b063dc6840114e931373f6340113c304cbf71d93854824b5864d81b2a85"
+        },
+        {
+          "package": "rmagna",
+          "target": "fixed_reference_contracts",
+          "test": "frozen_lru_plans_preserve_dense_faulted_batches_and_live_outside_eviction_for_threads",
+          "source_sha256": "24952b063dc6840114e931373f6340113c304cbf71d93854824b5864d81b2a85"
+        }
+      ]
     },
     {
       "id": "test_selection_syntax.SelectionSyntaxTests.test_complemented_detector_requires_a_one",
@@ -3834,8 +4094,16 @@
     },
     {
       "id": "test_shared_query_preparation.SharedQueryPreparationTests.test_effect_offsets_events_and_faults_match_independent_branch_sums",
-      "status": "unmapped",
-      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+      "status": "verified",
+      "contract": "Complete original H-all/T/S/CCZ/MX/H/T/MZ/DISCARD source: 768 event/retained-label/Pauli/fault cells and 96 isolated source plans match literal fixed-record branch sums, including zero pairings. Forty-eight prepared plans share three actual Gaussian geometries without hot factories. Non-Hermitian and malformed RHS refusals remain explicit.",
+      "rust_tests": [
+        {
+          "package": "rmagna",
+          "target": "fixed_reference_contracts",
+          "test": "full_shared_effect_event_and_fault_fixture_matches_every_independent_fixed_record_sum",
+          "source_sha256": "24952b063dc6840114e931373f6340113c304cbf71d93854824b5864d81b2a85"
+        }
+      ]
     },
     {
       "id": "test_simulator_optimization.OptimizationTests.test_batched_inverse_same_free_coordinate_convention",
@@ -3865,8 +4133,40 @@
     },
     {
       "id": "test_simulator_optimization.OptimizationTests.test_compact_key_noise_reports_weights_and_limits",
-      "status": "unmapped",
-      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+      "status": "verified",
+      "contract": "OriginalProbabilityCache uses complete compiled-wavefunction/event keys and exact encoded key/scalar payload accounting under entry/byte LRU limits. True/report/fault inputs and actual same-version callback emissions remain dynamic; old snapshots survive changes, and new source/budget or refused results cannot hit warm values. Mutable Python IR is replaced by an explicit immutable Rust session, without an automatic mutable-graph claim.",
+      "rust_tests": [
+        {
+          "package": "rmagna",
+          "target": "fixed_reference_contracts",
+          "test": "probability_value_cache_keeps_true_fault_report_and_proposal_inputs_separate",
+          "source_sha256": "24952b063dc6840114e931373f6340113c304cbf71d93854824b5864d81b2a85"
+        },
+        {
+          "package": "rmagna",
+          "target": "fixed_reference_contracts",
+          "test": "probability_value_cache_evicts_real_entries_by_both_count_and_encoded_bytes",
+          "source_sha256": "24952b063dc6840114e931373f6340113c304cbf71d93854824b5864d81b2a85"
+        },
+        {
+          "package": "rmagna",
+          "target": "fixed_reference_contracts",
+          "test": "probability_value_cache_recollects_real_emissions_and_does_not_own_callback_sources",
+          "source_sha256": "24952b063dc6840114e931373f6340113c304cbf71d93854824b5864d81b2a85"
+        },
+        {
+          "package": "rmagna",
+          "target": "fixed_reference_contracts",
+          "test": "a_new_tighter_source_budget_is_not_bypassed_by_a_warm_probability_value",
+          "source_sha256": "24952b063dc6840114e931373f6340113c304cbf71d93854824b5864d81b2a85"
+        },
+        {
+          "package": "rmagna",
+          "target": "fixed_reference_contracts",
+          "test": "fresh_callback_phase_tables_invalidate_value_entries_without_version_changes",
+          "source_sha256": "24952b063dc6840114e931373f6340113c304cbf71d93854824b5864d81b2a85"
+        }
+      ]
     },
     {
       "id": "test_simulator_optimization.OptimizationTests.test_control_callbacks_always_execute_and_new_gate_table_is_used",
@@ -4478,8 +4778,28 @@
     },
     {
       "id": "test_unified_simulator.UnifiedTests.test_zero_limits_cache_and_proposal_statistics",
-      "status": "unmapped",
-      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+      "status": "verified",
+      "contract": "A one-entry physical-value LRU caches zero/nonzero draws, evicts and isolates editable exports. Proposal probabilities 1/3 and 1/4 share physical entries but yield weights 3 and 4; two zero draws remain in the three-proposal mean=1 and ESS=1. Missing/nonbinary records and zero full-support proposals fail before lookup; tighter resources still fail. Batch failures retain completed-prefix statistics and mark the complete estimate as incomplete.",
+      "rust_tests": [
+        {
+          "package": "rmagna",
+          "target": "fixed_reference_contracts",
+          "test": "probability_value_cache_keeps_true_fault_report_and_proposal_inputs_separate",
+          "source_sha256": "24952b063dc6840114e931373f6340113c304cbf71d93854824b5864d81b2a85"
+        },
+        {
+          "package": "rmagna",
+          "target": "fixed_reference_contracts",
+          "test": "a_new_tighter_source_budget_is_not_bypassed_by_a_warm_probability_value",
+          "source_sha256": "24952b063dc6840114e931373f6340113c304cbf71d93854824b5864d81b2a85"
+        },
+        {
+          "package": "rmagna",
+          "target": "original_file_batches_and_reuse",
+          "test": "original_failure_retains_only_completed_prefix",
+          "source_sha256": "bc116d8beb73d01dc957363fd1329ae18ba19dc7c2d8d179b0c05a5e891495b0"
+        }
+      ]
     },
     {
       "id": "test_user_interface.CommandLineTests.test_budget_failure_is_a_failed_command_not_invalid_input",

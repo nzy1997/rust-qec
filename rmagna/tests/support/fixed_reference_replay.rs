@@ -74,8 +74,8 @@ DETECTOR rec[-5] rec[-4]\nPOSTSELECT det[6]\n",
         if magic { "T 0 2\n" } else { "" }
     )
 }
-#[test]
-fn complete_incremental_history_stream_matches_preoptimization_baselines_and_real_work_budgets() {
+pub fn complete_incremental_history_stream_matches_preoptimization_baselines_and_real_work_budgets()
+{
     struct Files(std::path::PathBuf);
     impl Drop for Files {
         fn drop(&mut self) {
@@ -128,6 +128,12 @@ fn complete_incremental_history_stream_matches_preoptimization_baselines_and_rea
                             events.lock().unwrap().is_empty(),
                             "preparation executed a real callback"
                         );
+                        let storage_before = evaluator.reference_storage_statistics().unwrap();
+                        assert_eq!(
+                            storage_before.source.is_some(),
+                            strategy == CausalStrategy::FixedTemplate
+                        );
+                        assert!(storage_before.target.is_some());
                         let meter = ExecutionMeter::new(ExecutionLimits {
                             max_queries: if budgeted { 10_000 } else { u64::MAX },
                             ..Default::default()
@@ -185,6 +191,11 @@ fn complete_incremental_history_stream_matches_preoptimization_baselines_and_rea
                             rows.push((physics(&draw), transcript, next));
                             draws += 1;
                         }
+                        assert_eq!(
+                            evaluator.reference_storage_statistics().unwrap(),
+                            storage_before,
+                            "full 32-seed stream leaves every retained program/Gaussian and live/expired weak-slot capacity fixed"
+                        );
                         assert_eq!(seen_outputs.len(), 2);
                         let key = format!("{compiler:?}/{magic}/{sampler:?}/{strategy:?}");
                         let digest =

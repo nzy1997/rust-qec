@@ -3,7 +3,7 @@ SPDX-License-Identifier: MPL-2.0
 The original circuit schedules and finite query cases in
 fixed_reference_contracts.rs, support/fixed_reference_replay.rs and
 support/fixed_reference_networks.rs, support/fixed_reference_tasks.rs and
-support/automatic_file_lru.rs are
+support/automatic_file_lru.rs and support/continuation_cases.rs are
 adapted from itpyi/magna,
 revision 56847478c840395735146ef1e1ccdc3d8aedc10f:
 
@@ -11,6 +11,8 @@ tests/core/test_file_reuse.py
 tests/core/test_incremental_history.py
 tests/core/test_query_reuse.py
 tests/core/test_reference_networks.py
+tests/core/test_reference_reuse.py
+tests/native/reference_reuse.cpp
 tests/core/test_runtime_ownership.py
 tests/core/test_shared_query_preparation.py
 tests/core/test_simulator_optimization.py

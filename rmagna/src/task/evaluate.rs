@@ -81,6 +81,14 @@ pub struct TaskQueryWorkStatistics {
     pub target: Option<crate::unitary::QueryWorkStatistics>,
 }
 
+/// Quiescent inventories of the two independently compiled source/target
+/// owners. Query-cache resources have their own per-family statistics/limits.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, serde::Serialize)]
+pub struct TaskReferenceStorageStatistics {
+    pub source: Option<crate::unitary::ReferenceStorageStatistics>,
+    pub target: Option<crate::unitary::ReferenceStorageStatistics>,
+}
+
 pub struct TaskEvaluator {
     task: ValidatedTask,
     target: Option<Target>,
@@ -137,6 +145,27 @@ fn error(field: &str, e: impl fmt::Display) -> TaskError {
     TaskError::new(field, e.to_string())
 }
 impl TaskEvaluator {
+    pub fn reference_storage_statistics(
+        &self,
+    ) -> Result<TaskReferenceStorageStatistics, TaskError> {
+        let source = match &self.execution {
+            Execution::Linear { instrument, .. } => Some(
+                instrument
+                    .reference_storage_statistics()
+                    .map_err(|e| error("reference_storage", e))?,
+            ),
+            Execution::Causal(program) => program
+                .reference_storage_statistics()
+                .map_err(|e| error("reference_storage", e))?,
+        };
+        let target = self
+            .target
+            .as_ref()
+            .map(|target| target.unitary.reference_storage_statistics())
+            .transpose()
+            .map_err(|e| error("reference_storage", e))?;
+        Ok(TaskReferenceStorageStatistics { source, target })
+    }
     pub fn query_work_statistics(&self) -> TaskQueryWorkStatistics {
         TaskQueryWorkStatistics {
             source: match &self.execution {
@@ -147,6 +176,15 @@ impl TaskEvaluator {
                 .target
                 .as_ref()
                 .map(|target| target.unitary.query_work_statistics()),
+        }
+    }
+
+    /// Successful source assignments on the retained reference. Terminal query
+    /// families share one draw-local view; cold transient programs are excluded.
+    pub fn source_insertion_assignments(&self) -> Option<u64> {
+        match &self.execution {
+            Execution::Linear { instrument, .. } => Some(instrument.insertion_assignments()),
+            Execution::Causal(program) => program.insertion_assignments(),
         }
     }
 
@@ -647,11 +685,21 @@ impl TaskEvaluator {
         let a = &self.options.scalars;
         let f = &self.options.fields;
         let max_terms = self.options.runtime.sampling.max_terms;
-        let acceptance_query = observe(meter, OperationKind::Query, || {
-            input
-                .instrument
-                .acceptance(input.faults, max_terms, a)
-                .map_err(|e| error("acceptance", e))
+        let (assignment, acceptance_query) = observe(meter, OperationKind::Query, || {
+            let assignment = if let Some(assigned) =
+                input.history.and_then(ResolvedHistory::terminal_assignment)
+            {
+                assigned
+            } else {
+                input
+                    .instrument
+                    .assigned(input.faults, a)
+                    .map_err(|e| error("acceptance", e))?
+            };
+            let value = assignment
+                .acceptance(max_terms, a)
+                .map_err(|e| error("acceptance", e))?;
+            Ok::<_, TaskError>((assignment, value))
         })?;
         let acceptance_resources = ContractionResources::from(&acceptance_query);
         let raw_acceptance = acceptance_query.value;
@@ -664,8 +712,7 @@ impl TaskEvaluator {
             .map_err(|e| error("acceptance", e))?;
         let target_query = if let Some(target) = &self.target {
             Some(observe(meter, OperationKind::Query, || {
-                input
-                    .instrument
+                assignment
                     .target_density_weight(
                         &self.task.outputs,
                         &target.unitary,
@@ -674,7 +721,6 @@ impl TaskEvaluator {
                             event_rows: &target.rows,
                             outcomes: &target.outcomes,
                         },
-                        input.faults,
                         max_terms,
                         a,
                     )
@@ -724,9 +770,8 @@ impl TaskEvaluator {
             let zeros =
                 BitVector::zeros(parities.len()).map_err(|e| error("error_observables", e))?;
             let success = observe(meter, OperationKind::Query, || {
-                input
-                    .instrument
-                    .accepted_probability(&parities, &zeros, input.faults, max_terms, a)
+                assignment
+                    .accepted_probability(&parities, &zeros, max_terms, a)
                     .map_err(|e| error("error_observables", e))
             })?
             .value;
@@ -750,9 +795,8 @@ impl TaskEvaluator {
         let mut raw_moments = Vec::new();
         for word in &self.task.observables {
             let raw = observe(meter, OperationKind::Query, || {
-                input
-                    .instrument
-                    .pauli_moment(&self.task.outputs, word, input.faults, max_terms, a)
+                assignment
+                    .pauli_moment(&self.task.outputs, word, max_terms, a)
                     .map_err(|e| error("observables", e))
             })?
             .value;

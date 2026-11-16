@@ -685,3 +685,9 @@ fn original_fixed_preparation_is_reused_for_new_original_faults() {
 
 #[path = "support/automatic_file_lru.rs"]
 mod automatic_file_lru;
+
+#[test]
+fn original_dynamic_file_samples_use_automatic_eviction_without_memoizing_callbacks_or_changing_rng()
+ {
+    automatic_file_lru::original_dynamic_file_samples_use_automatic_eviction_without_memoizing_callbacks_or_changing_rng();
+}

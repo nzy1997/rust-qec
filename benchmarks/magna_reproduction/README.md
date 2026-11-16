@@ -7,15 +7,15 @@ implement a simulator or claim reproduction of the paper's precision curves.
 
 ## Current coverage
 
-The source-bound ledger currently has 263 verified, 2 partial and 87 unmapped
+The source-bound ledger currently has 340 verified, 7 partial and 5 unmapped
 original methods, with zero architecture-specific core exclusions. It requires
-288 distinct Rust witnesses from 290 declarations across 106 targets. Strict
+393 distinct Rust witnesses from 440 declarations across 115 targets. Strict
 complete parity intentionally exits 2. The detailed per-change sections below
 retain their historical inventory snapshots; `coverage.json` is authoritative.
 
 ## Outstanding requirements and the first paper pilot
 
-`remaining-contracts.json` catalogs all 89 outstanding original methods without
+`remaining-contracts.json` catalogs all 12 outstanding original methods without
 promoting their parity status. It records the complete source-bound method,
 readable assertions and loops, module helper/import context, Rust owners and
 the linked issue DAG. The full pinned source manifest binds transitive helpers,
@@ -3854,11 +3854,102 @@ affine setup required 92,856,620 signature work. TQD prescribed and affine setup
 required 319,792,620 and 5,647,905,090 respectively, against the unchanged
 67,108,864 cap. These results are a bounded pilot, not paper performance curves.
 
-This R09 core delivery leaves the issue open and the parity ledger unchanged.
-The remaining delivery must qualify the complete constrained-domain, redundant
-label, parity/selection and protocol-to-target continuation/storage contracts.
-New cache/probe and factory observations do not by themselves establish all 25
-assigned source methods or constant Native internal parent counts.
+That historical R09 core delivery left the issue open and its ledger unchanged.
+The later fixed-reference qualification adds the complete source task domains,
+compiler continuation, numeric assignment reuse and retained-structure inventory.
+
+### Fixed references, continuation and retained structure (R09)
+
+`cargo test --locked -p rmagna --test fixed_reference_contracts -- --show-output`
+executes the source-bound task, cache, quantum-query and continuation witnesses.
+The full pinned `reference_reuse.cpp` fixture has eight source variants and 504
+Pauli generators. Rust checks all 504 for each compiler (1,008 complete purified
+states), including measurement/reset timing and both output permutations. The
+parity-copy compiler also compares every raw frame coordinate and scalar phase;
+shared-layer coordinates use exact physical-state equality across the different
+coordinate conventions. Another 192 cases cross source/suffix compilers, T/CS/CCZ,
+cancelled axes, new physical wires and nontrivial global phases; their 384
+prepared event masses reuse the same scalar geometry, phase maps and resources.
+
+`CompiledUnitary::prepare_continuation` captures the immutable source and compiles
+only the supplied suffix from its raw Gaussian reference. Source assignments
+retain an owned compact raw frame and the pre-reduction phase. Frozen endpoint
+X/Z transports and phase-axis embeddings carry those assignments into a typed
+`ContinuedUnitary`; source gates and fault locations are not replayed. The query
+wrapper shares the suffix Gaussian and retains zero original gate positions.
+The actual three program owners (source, suffix and query wrapper) are reported;
+these are independent of Native's private three-parent implementation. The API
+admits coherent width, suffix gates, raw paths, endpoint tables and a conservative
+geometry-word model. That model excludes scalar limbs, allocator overhead,
+existing source storage and separately prepared queries; it is not an RSS cap.
+The current source token and every supplied query's dimensions/budgets remain
+validated. Preparing from an already assigned view still captures its immutable
+original source, rather than silently baking in its fault assignment.
+
+Task execution shares one final numeric source assignment across acceptance,
+target overlap and all Pauli moments. A completion mass query hands its view to
+terminal evaluation; a history with an already confirmed exact mass constructs
+one terminal view. Neither view enters a persistent value or callback cache.
+The target path evaluates the existing prepared paired-density closure against
+that source view and its independently compiled target: it does not rebuild a
+concatenated source/target circuit or retain another source transport table.
+The separate continuation API proves actual Clifford-suffix transport; the task
+path uses its paired closure representation. Caller-retained `ResolvedHistory`
+objects can each own one numeric view, outside the bounded evaluator caches.
+
+`ReferenceStorageStatistics` inventories actual original positions, lowered
+gates, raw/query Gaussian widths and distinct Gaussian owners, plus all weak
+geometry slots, live entries and allocated slot capacity. The 1/3/7-layer
+fixtures keep that complete inventory fixed during sampling. With native exact
+marginals, the actual P/D/M layout counts are 3/1/0, 7/1/0 and 15/1/0; their
+live shared scalar geometries are 4, 8 and 16. Thus Rust does not claim three
+scalar resources independent of circuit layout. One source and one target
+compiled program hold bounded family caches: at most the configured P+D+M
+entries (defaults 64+16+64), one fixed phase resource per entry and at most one
+labelled-support parent. Dimensions are bounded by admitted circuit/history
+sizes; phase resources retain their own explicit rank, term and geometry
+policies. Weak interning holds no strong resources, prunes expired slots on
+preparation and never owns query caches. A 2,048-query one-entry LRU probe with
+255 distinct event parities retains one resource, at most two weak slots and
+four allocated weak-slot capacity. In-flight plans, separately retained Arcs,
+external user plans and numeric draw workspaces are separate scopes; no total
+process-memory or Native object-count equivalence is claimed.
+
+Complete additional fixtures include 128 eager/lazy fault/report/event/Pauli
+cells with an independent Bloch oracle, the original protocol/recovery/target
+preparation, both irrational event masses and retained record entries, and 128
+completed-history draws sharing one final assignment across six scalar queries.
+Rust recovery modules number selected outputs from zero, so the source fixture
+explicitly maps Native's selected wire1 to module wire0; the now-traced source
+wire0 is an auxiliary slot. This preserves the reported inputs and output
+masses. A target-normalization failure is counted as one failed Rust preparation
+query and zero attempted draws, rather than Native's private query counter zero.
+The existing 12 dense-feedback/compiler cells additionally report fixed complete
+storage inventories through 12,288 draws, with no hot scalar/support factories.
+
+The `evaluate_task` receipt now includes `reference_inventory` at all four work
+stages: source assignment counts and actual source/target structure/weak-slot
+inventories. Current-source `--require-query-work` checks require this inventory,
+validate dimensions, capacities, stable program structure, monotonic assignment
+counts and agreement with live geometry observations. Historical receipts remain
+bound to their historical runner. The inventory reports growth and evictions;
+it does not itself certify warm-zero behavior or throughput.
+
+The current eight-task pilot is bound to compiled-input digest
+`d7ba312d84db463e212f3abf3097245bd2022a3b96b4d196317d67ee14f98108`
+and `evaluate_task` binary SHA-256
+`924003dbb99b0804ed5054293b143eca64c687e2c09569187059da1a82e5c421`.
+It was captured from the uncommitted working tree based on `829abcae7bd4f1acdd4b731fa79753db900c14ae`;
+the source digest, rather than a claim of a clean commit, identifies its inputs.
+The same six tasks complete and the two original signature-work refusals remain.
+For BH2-T/BH2-S/BH10-T/color3/rp2-d3, source assignment counts are 0 after
+compilation, 1 after the first query, 3 after two replays and 11 after eight pilot
+draws. DK reports 0/2/6/22, including its history assignment. All six retain the
+same full source/target structure, weak-slot counts and allocated capacity from
+the first draw through the pilot, and add zero observed scalar/support factories.
+The current B02 proposal check also passes the unchanged finite proposal/runtime
+contract, including 768 real decoder invocations. These remain bounded pilot and
+finite proposal results; B03-B06 own the paper campaign and publication evidence.
 
 ### Prepared exact noise and raw grouped weights (R10)
 

@@ -1,5 +1,7 @@
 // SPDX-License-Identifier: MPL-2.0
 //! Fixed-reference core contracts; complete source qualification continues in R09.
+#[path = "support/continuation_cases.rs"]
+mod continuation_cases;
 use rmagna::{
     circuit::{ParseOptions, parse_circuit},
     gf2::BitVector,
@@ -449,6 +451,7 @@ fn prepared_feedback_layers_reuse_actual_factories_and_match_independent_basis_t
                         assert_eq!(prepared.result, Ok(()));
                         assert_eq!(calls.load(Ordering::Relaxed), 0);
                         let before = e.query_work_statistics();
+                        let storage_before = e.reference_storage_statistics().unwrap();
                         let before_source = before.source.unwrap();
                         let meter = ExecutionMeter::default();
                         let mut rng = SplitMix64::new(21);
@@ -478,6 +481,51 @@ fn prepared_feedback_layers_reuse_actual_factories_and_match_independent_basis_t
                             assert_eq!(result.network_compilations, 0);
                         }
                         let after = e.query_work_statistics();
+                        let storage_after = e.reference_storage_statistics().unwrap();
+                        assert_eq!(
+                            storage_after, storage_before,
+                            "all retained program positions, Gaussian widths, weak slots and allocated slot capacity stay fixed"
+                        );
+                        let probability = e.prepared_probability_statistics().unwrap().unwrap();
+                        let density = e.prepared_density_statistics().unwrap().unwrap();
+                        let moments = e.prepared_moment_statistics().unwrap().unwrap();
+                        let entries = probability.cached_queries
+                            + density.cached_queries
+                            + moments.cached_queries;
+                        assert!(
+                            probability.cached_queries
+                                <= options.runtime.compile.max_prepared_probabilities
+                        );
+                        assert!(
+                            density.cached_queries
+                                <= options.runtime.compile.max_prepared_densities
+                        );
+                        assert!(
+                            moments.cached_queries <= options.runtime.compile.max_prepared_moments
+                        );
+                        for family in [probability, density, moments] {
+                            assert!(family.fixed_resources <= family.cached_queries);
+                        }
+                        let retained = storage_after.source.unwrap();
+                        assert!(retained.unique_reference_boundaries <= 2);
+                        assert!(retained.live_geometries <= entries);
+                        assert!(retained.geometry_weak_slots <= entries + 1);
+                        if sampler == HistorySampler::ExactMarginal
+                            && matches!(mode, QueryPreparation::Native(_))
+                            && !magic
+                        {
+                            println!(
+                                "layers={layers} quiescent source={retained:?}; P/D/M={}/{}/{} fixed={}/{}/{} support={:?}; target={:?}",
+                                probability.cached_queries,
+                                density.cached_queries,
+                                moments.cached_queries,
+                                probability.fixed_resources,
+                                density.fixed_resources,
+                                moments.fixed_resources,
+                                e.prepared_support_statistics().unwrap(),
+                                storage_after.target
+                            );
+                        }
                         let after_source = after.source.unwrap();
                         if sampler == HistorySampler::AffineSupport
                             && matches!(mode, QueryPreparation::Trace)
@@ -980,8 +1028,60 @@ fn probability_value_cache_keeps_true_fault_report_and_proposal_inputs_separate(
     let changed = cache.compile(&replaced, assignment).unwrap();
     assert!(!changed.cache_hit());
     assert!(changed.certificate().probability().is_zero());
+    let mut single = OriginalProbabilityCache::new(1, 1 << 20);
+    let input = OriginalAssignment {
+        true_values: vec![("m".into(), false)],
+        ..Default::default()
+    };
+    let first = single.compile(&plan, input.clone()).unwrap();
+    let mut editable_export = first.certificate().to_json();
+    editable_export["probability"]["coefficients"][0] = serde_json::json!("999");
+    assert_eq!(*first.certificate().probability(), ExactScalar::one());
+    let again = single.compile(&plan, input).unwrap();
+    assert!(again.cache_hit());
+    assert_eq!(*again.certificate().probability(), ExactScalar::one());
+    for _ in 0..2 {
+        let zero = single
+            .compile(
+                &plan,
+                OriginalAssignment {
+                    true_values: vec![("m".into(), true)],
+                    ..Default::default()
+                },
+            )
+            .unwrap();
+        assert!(zero.certificate().probability().is_zero());
+        assert_eq!(single.len(), 1);
+    }
+    assert_eq!(single.statistics().evictions, 1);
+    let before = single.statistics();
+    assert!(
+        single
+            .compile(&plan, OriginalAssignment::default())
+            .is_err()
+    );
+    assert!(
+        single
+            .compile(
+                &plan,
+                OriginalRecordAssignment {
+                    records: vec![("m".into(), serde_json::json!(2))],
+                    ..Default::default()
+                }
+            )
+            .is_err()
+    );
+    assert_eq!(single.statistics(), before);
+    assert!(
+        OriginalIndependentRecordProposal::new(
+            &plan,
+            &std::collections::BTreeMap::from([("m".into(), "0".parse().unwrap())]),
+            Default::default()
+        )
+        .is_err()
+    );
     println!(
-        "physical value LRU:true/report/fault changes,owned zero/nonzero values,invalid capture,explicit newsource;proposal1/3and1/4share physical entry andgive weights3and4;cachedzero drawsretain3proposal mean1andESS1"
+        "physical value LRU:true/report/fault changes,owned zero/nonzero values,invalid capture,explicit newsource;proposal1/3and1/4share physical entry andgive weights3and4;cachedzero drawsretain3proposal mean1andESS1;one-entry evictions,editable export isolation,missing/nonbinary record and zero-full-support proposal refusals"
     );
 }
 
@@ -2337,3 +2437,229 @@ mod networks;
 
 #[path = "support/fixed_reference_tasks.rs"]
 mod source_tasks;
+
+#[test]
+fn prepared_continuations_reuse_frozen_source_frames_and_phase_maps() {
+    continuation_cases::warm_templates();
+}
+
+#[test]
+fn full_original_continuation_generators_match_fresh_compilation_and_output_orders() {
+    continuation_cases::all_source_generators();
+}
+
+#[test]
+fn continuations_keep_mixed_compiler_magic_axes_growth_and_global_phases() {
+    continuation_cases::mixed_magic_compilers();
+}
+
+#[test]
+fn complete_incremental_history_stream_matches_preoptimization_baselines_and_real_work_budgets() {
+    replay::complete_incremental_history_stream_matches_preoptimization_baselines_and_real_work_budgets();
+}
+
+#[test]
+fn full_shared_effect_event_and_fault_fixture_matches_every_independent_fixed_record_sum() {
+    networks::full_shared_effect_event_and_fault_fixture_matches_every_independent_fixed_record_sum(
+    );
+}
+
+#[test]
+fn original_ccz_destructive_trace_reuses_all_fault_rhs_effects_and_threaded_batches() {
+    networks::original_ccz_destructive_trace_reuses_all_fault_rhs_effects_and_threaded_batches();
+}
+
+#[test]
+fn exact_source_nonzero_constrained_domains_reuse_fixed_factories_and_preserve_biased_weights() {
+    source_tasks::exact_source_nonzero_constrained_domains_reuse_fixed_factories_and_preserve_biased_weights();
+}
+
+#[test]
+fn original_three_bit_selection_has_literal_joint_masses_and_exact_three_quarter_one_quarter_totals()
+ {
+    source_tasks::original_three_bit_selection_has_literal_joint_masses_and_exact_three_quarter_one_quarter_totals();
+}
+
+#[test]
+fn twelve_redundant_decoded_labels_enumerate_two_histories_under_one_independent_bit() {
+    source_tasks::twelve_redundant_decoded_labels_enumerate_two_histories_under_one_independent_bit(
+    );
+}
+
+#[test]
+fn original_affine_tasks_have_only_terminal_roles_and_batch_target_reuse_preserves_the_word_stream()
+{
+    source_tasks::original_affine_tasks_have_only_terminal_roles_and_batch_target_reuse_preserves_the_word_stream();
+}
+
+#[test]
+fn completed_source_assignment_feeds_acceptance_target_and_all_paulis_once() {
+    source_tasks::completed_source_assignment_feeds_acceptance_target_and_all_paulis_once();
+}
+
+#[test]
+fn original_eager_lazy_fault_report_event_and_pauli_cells() {
+    source_tasks::original_eager_lazy_fault_report_event_and_pauli_cells();
+}
+
+#[test]
+fn original_protocol_recovery_prepares_before_callbacks_and_captures_preparation_failure() {
+    source_tasks::original_protocol_recovery_prepares_before_callbacks_and_captures_preparation_failure();
+}
+
+#[test]
+fn automatic_lru_bounds_expired_geometry_slots_and_capacity_over_distinct_layouts() {
+    use rmagna::{
+        circuit::{BitAtom, BitExpr},
+        instrument::{QueryCachePolicy, QueryPreparation, compile_affine},
+    };
+    let a = ScalarArithmetic::default();
+    let circuit =
+        parse_circuit("H 0 1 2 3 4 5 6 7\nM 0 1 2 3 4 5 6 7", &Default::default()).unwrap();
+    for compiler in [
+        rmagna::unitary::CompilerStrategy::ParityCopies,
+        rmagna::unitary::CompilerStrategy::SharedCommutingLayer,
+    ] {
+        let instrument = compile_affine(
+            &circuit,
+            &CompileOptions {
+                query_cache_policy: QueryCachePolicy::Lru,
+                max_prepared_probabilities: 1,
+                probability_preparation: QueryPreparation::Native(Default::default()),
+                compiler_strategy: compiler,
+                ..Default::default()
+            },
+            &a,
+        )
+        .unwrap();
+        for code in 1..=1024 {
+            let mask = 1 + (code - 1) % 255;
+            let parity = BitExpr {
+                constant: false,
+                terms: (0..8)
+                    .filter(|q| mask & (1 << q) != 0)
+                    .map(BitAtom::Record)
+                    .collect(),
+            };
+            let result = instrument
+                .reported_probability(&[parity], &bits(1, code & 1), &[], 256, &a)
+                .unwrap();
+            assert_eq!(result.value, a.omega(0, -2).unwrap());
+            let plans = instrument.prepared_probability_statistics().unwrap();
+            assert_eq!(plans.cached_queries, 1);
+            assert_eq!(plans.fixed_resources, 1);
+            assert_eq!(plans.cache_evictions, code - 1);
+            let retained = instrument.reference_storage_statistics().unwrap();
+            assert_eq!(retained.live_geometries, 1);
+            assert!(retained.geometry_weak_slots <= 2, "{retained:?}");
+            assert!(retained.geometry_slot_capacity <= 4, "{retained:?}");
+        }
+    }
+    println!(
+        "2048 true LRU layout changes:255 distinct event parities, every exact mass1/2,one retained resource,at most2 weak slots and4 allocated slot capacity; both compilers"
+    );
+}
+
+#[test]
+fn original_prepared_record_entries_transport_both_irrational_event_masses() {
+    use rmagna::{clifford::CliffordCircuit, instrument::*};
+    let a = ScalarArithmetic::default();
+    let instrument = OriginalInstrument::new(
+        vec![0],
+        vec![0],
+        CliffordCircuit::computational(bits(1, 0)).unwrap(),
+        vec![
+            original_op("h0", OriginalGate::H(0)),
+            original_op(
+                "t",
+                OriginalGate::Phase {
+                    wires: vec![0],
+                    turns: 1,
+                },
+            ),
+            original_op("h1", OriginalGate::H(0)),
+            original_op("m", original_z("m", 0)),
+        ],
+        vec![],
+        OriginalLimits::default(),
+        &a,
+    )
+    .unwrap();
+    let rows = [OriginalRecordParity {
+        records: vec!["m".into()],
+        inverted: false,
+    }];
+    let options = OriginalNetworkOptions {
+        max_terms: 256,
+        ..Default::default()
+    };
+    let mut cases = 0;
+    for compiler in [
+        rmagna::unitary::CompilerStrategy::ParityCopies,
+        rmagna::unitary::CompilerStrategy::SharedCommutingLayer,
+    ] {
+        let trace = instrument.compile_trace(compiler, &a).unwrap();
+        let event = trace
+            .prepare_network_probability(&rows, &options, &a)
+            .unwrap();
+        let view = trace.with_assignment(&Default::default(), &a).unwrap();
+        let entries = view
+            .prepare_record_probabilities(&rows, &options, &a)
+            .unwrap();
+        assert!(event.resource().num_terms() > 0);
+        assert!(entries.phase_resource().num_terms() > 0);
+        let before = trace.query_work_statistics();
+        for _ in 0..8 {
+            let tensor = entries.evaluate(&a).unwrap();
+            for bit in 0..2 {
+                let value = tensor
+                    .terms()
+                    .iter()
+                    .try_fold(ExactScalar::zero(), |sum, term| {
+                        a.add(
+                            &sum,
+                            &term
+                                .prepare()
+                                .unwrap()
+                                .amplitude(&bits(1, bit), &a)
+                                .unwrap(),
+                        )
+                    })
+                    .unwrap();
+                assert_eq!(value, probability(bit == 0));
+            }
+            for flip in [false, true] {
+                let view = trace
+                    .with_assignment(
+                        &OriginalTraceAssignment {
+                            report_flips: if flip { vec!["m".into()] } else { vec![] },
+                            ..Default::default()
+                        },
+                        &a,
+                    )
+                    .unwrap();
+                for bit in 0..2 {
+                    assert_eq!(
+                        event.evaluate(&view, &bits(1, bit), &a).unwrap().value,
+                        probability((bit != 0) == flip)
+                    );
+                    cases += 1;
+                }
+            }
+        }
+        assert_eq!(
+            preparations(trace.query_work_statistics()),
+            preparations(before)
+        );
+    }
+    assert_eq!(cases, 64);
+    println!(
+        "64 original H,T,H,M event/RHS/report-flip queries plus16retained tensor evaluations: exact(2+/-sqrt2)/4 and no new scalar/labelled maps/resources"
+    );
+}
+
+#[test]
+fn original_parity_feedback_uses_all_eight_manual_report_offsets_without_reconstructing_query_families()
+ {
+    source_tasks::original_parity_feedback_uses_all_eight_manual_report_offsets_without_reconstructing_query_families();
+}

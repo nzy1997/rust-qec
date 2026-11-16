@@ -1,6 +1,24 @@
 //! Factory observations and live symbolic-map retention.
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 
+/// Retained structure for one captured program, observed without running a
+/// query. Geometry slots include expired weak entries and allocated capacity.
+/// This is a structural inventory, not allocator bytes or process RSS. Callers
+/// holding independent plans/continuations must account for those separately.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, serde::Serialize)]
+pub struct ReferenceStorageStatistics {
+    pub physical_width: usize,
+    pub raw_boundary_width: usize,
+    pub query_boundary_width: usize,
+    pub unique_reference_boundaries: usize,
+    pub raw_phase_variables: usize,
+    pub original_positions: usize,
+    pub expanded_clifford_gates: usize,
+    pub geometry_weak_slots: usize,
+    pub geometry_slot_capacity: usize,
+    pub live_geometries: usize,
+}
+
 /// Work observed for one immutable insertion-program owner and all its views.
 /// Factory/evaluation counts are monotonic; live geometry retention is separate.
 /// Direct unprepared expansion and bare phase operations are outside this scope.
@@ -32,6 +50,7 @@ pub struct QueryWorkStatistics {
 }
 #[derive(Default)]
 pub(super) struct QueryWorkCounters {
+    pub assignments: AtomicU64,
     pub affine_closures: AtomicU64,
     pub geometry_preparations: AtomicU64,
     pub geometry_reuses: AtomicU64,

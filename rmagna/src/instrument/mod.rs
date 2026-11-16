@@ -272,6 +272,9 @@ pub struct ExactMasses {
     pub error: ExactScalar,
 }
 
+mod assigned;
+pub(crate) use assigned::AssignedInstrument;
+
 /// Compile the all-zero physical input. For an explicit normalized initial
 /// state, use `compile_affine_stabilizer`.
 pub fn compile_affine(
@@ -451,6 +454,26 @@ impl CompiledInstrument {
     /// shared by this program's views.
     pub fn query_work_statistics(&self) -> crate::unitary::QueryWorkStatistics {
         self.unitary.query_work_statistics()
+    }
+    /// Successful numeric fault assignments on the shared source program.
+    pub fn insertion_assignments(&self) -> u64 {
+        self.unitary.insertion_assignments()
+    }
+    pub fn reference_storage_statistics(
+        &self,
+    ) -> Result<crate::unitary::ReferenceStorageStatistics, InstrumentError> {
+        Ok(self.unitary.reference_storage_statistics()?)
+    }
+
+    pub(crate) fn assigned(
+        &self,
+        faults: &[FaultSelection],
+        arithmetic: &ScalarArithmetic,
+    ) -> Result<AssignedInstrument<'_>, InstrumentError> {
+        Ok(AssignedInstrument::new(
+            self,
+            Arc::new(self.inserted(faults, arithmetic)?),
+        ))
     }
     pub fn compilation(&self) -> &crate::unitary::CompilationDiagnostics {
         self.unitary.compilation()
@@ -723,25 +746,7 @@ impl CompiledInstrument {
         max_terms: usize,
         arithmetic: &ScalarArithmetic,
     ) -> Result<NetworkValue, InstrumentError> {
-        if parities.len() != outcomes.width() {
-            return Err(UnitaryError::DimensionMismatch.into());
-        }
-        let mut rows = self.event_rows.as_ref().clone();
-        let count = rows
-            .len()
-            .checked_add(parities.len())
-            .ok_or(UnitaryError::DimensionOverflow)?;
-        let mut rhs = BitVector::zeros(count)?;
-        for j in 0..self.event_rows.len() {
-            rhs.set(j, self.outcomes.get(j)?)?;
-        }
-        for (j, parity) in parities.iter().enumerate() {
-            rows.push(self.parity_row(parity)?);
-            rhs.set(
-                self.event_rows.len() + j,
-                outcomes.get(j)? ^ parity.constant,
-            )?;
-        }
+        let (rows, rhs) = self.accepted_equations(parities, outcomes)?;
         self.probability(&rows, &rhs, faults, max_terms, arithmetic)
     }
     pub fn target_density_weight(
@@ -882,15 +887,7 @@ impl CompiledInstrument {
         max_terms: usize,
         arithmetic: &ScalarArithmetic,
     ) -> Result<NetworkValue, InstrumentError> {
-        if outcomes.width() != parities.len() {
-            return Err(InstrumentError::Unitary(UnitaryError::DimensionMismatch));
-        }
-        let mut rows = Vec::new();
-        let mut rhs = outcomes.clone();
-        for (i, parity) in parities.iter().enumerate() {
-            rows.push(self.parity_row(parity)?);
-            rhs.set(i, rhs.get(i)? ^ parity.constant)?;
-        }
+        let (rows, rhs) = self.reported_equations(parities, outcomes)?;
         self.probability(&rows, &rhs, faults, max_terms, arithmetic)
     }
     fn parity_row(&self, expression: &BitExpr) -> Result<BitVector, InstrumentError> {
