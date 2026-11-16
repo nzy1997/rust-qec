@@ -1437,8 +1437,16 @@
     },
     {
       "id": "test_file_reuse.FileReuseTests.test_prepared_noise_weights_and_batch_partition",
-      "status": "unmapped",
-      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+      "status": "verified",
+      "contract": "Complete original 63-site arbitrary100-digit category/factor fixture;128seeds,47/81partitions,single/full identity,input replacement,exact raw products,zero/one categories and malformed-law rejection. SplitMix64 and exact physical-law sampling explicitly replace Native/Python streams.",
+      "rust_tests": [
+        {
+          "package": "rmagna",
+          "target": "prepared_noise_batches",
+          "test": "full_arbitrary_category_fixture_retains_128_seeds_partitions_inputs_and_exact_declared_factors",
+          "source_sha256": "848b73da9889b900d73d0f329d2ecce5dbef1c9d5181f1cc78b3151bd83752ec"
+        }
+      ]
     },
     {
       "id": "test_file_reuse.FileReuseTests.test_prepared_scalar_queries_equal_uncached_queries_including_report_flips",
@@ -3092,8 +3100,16 @@
     },
     {
       "id": "test_packed_noise.PackedNoiseTests.test_large_weight_group_without_count_table",
-      "status": "unmapped",
-      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+      "status": "verified",
+      "contract": "All513original identical1/100channels and101/100 versus1/2factors;8actual draws use no count table and exact integer-power raw products. Shared bit-plane occurrence uses exact rational residual correction.",
+      "rust_tests": [
+        {
+          "package": "rmagna",
+          "target": "prepared_noise_batches",
+          "test": "full_513_group_reuses_exact_occurrence_model_and_avoids_weight_count_table",
+          "source_sha256": "848b73da9889b900d73d0f329d2ecce5dbef1c9d5181f1cc78b3151bd83752ec"
+        }
+      ]
     },
     {
       "id": "test_packed_noise.PackedNoiseTests.test_marginals_and_joint_law_across_lanes_and_blocks",
@@ -3110,8 +3126,16 @@
     },
     {
       "id": "test_packed_noise.PackedNoiseTests.test_sparse_actions_weights_and_partitioning",
-      "status": "unmapped",
-      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+      "status": "verified",
+      "contract": "Complete139interleaved-site/action/factor fixture with64seeds,23/41partitions,partial final block,report names and ordered Y/X/Z factors;weighted/plain choices and entropy agree,physical probabilities and raw integer products are independently checked.",
+      "rust_tests": [
+        {
+          "package": "rmagna",
+          "target": "prepared_noise_batches",
+          "test": "full_139_site_sparse_actions_weights_and_seed_partitions_use_real_prepared_groups",
+          "source_sha256": "848b73da9889b900d73d0f329d2ecce5dbef1c9d5181f1cc78b3151bd83752ec"
+        }
+      ]
     },
     {
       "id": "test_pauli_feedback_reuse.PauliFeedbackReuseTests.test_all_paulis_mixed_affine_guards_and_original_faults_share_one_plan",
@@ -4672,13 +4696,29 @@
     },
     {
       "id": "test_weight_fast_paths.WeightFastPathTests.test_count_weights_match_independent_products_across_group_sizes",
-      "status": "unmapped",
-      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+      "status": "verified",
+      "contract": "All original group sizes1/2/17/308/512/513,9mixed categories and6endpoints with9seeds each under actual packed and scalar drivers;108draws match literal unreduced integer products and physical probabilities;513uses the declared count-table fallback.",
+      "rust_tests": [
+        {
+          "package": "rmagna",
+          "target": "prepared_noise_batches",
+          "test": "all_original_group_sizes_use_actual_packed_and_scalar_choices_with_literal_product_oracles",
+          "source_sha256": "848b73da9889b900d73d0f329d2ecce5dbef1c9d5181f1cc78b3151bd83752ec"
+        }
+      ]
     },
     {
       "id": "test_weight_fast_paths.WeightFastPathTests.test_grouped_factors_preserve_choices_and_unreduced_weights",
-      "status": "unmapped",
-      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+      "status": "verified",
+      "contract": "All316original category/factor entries and15seeds retain identical weighted/plain choices,actions,physical probability and entropy;literal products skip unit3/3and preserve raw zero numerators with full unreduced denominators.",
+      "rust_tests": [
+        {
+          "package": "rmagna",
+          "target": "prepared_noise_batches",
+          "test": "original_316_site_grouped_factors_keep_actual_plain_choices_and_skip_unreduced_units",
+          "source_sha256": "848b73da9889b900d73d0f329d2ecce5dbef1c9d5181f1cc78b3151bd83752ec"
+        }
+      ]
     },
     {
       "id": "test_weight_fast_paths.WeightFastPathTests.test_large_rational_rounding_and_extreme_exponents",

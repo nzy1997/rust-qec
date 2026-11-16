@@ -7018,3 +7018,75 @@ probability 1/8. Literal support sets, joint masses, acceptance and error agree;
 actual query-family factories remain unchanged across all eight assignments.
 `SuppliedActionEvaluator` now exposes read-only query-work observations and
 sampling-family preparation for its retained assignment.
+
+## Prepared seeded noise batches
+
+`noise::PreparedNoiseSchedule` owns nonidentity category probabilities, one
+`SparseNoiseAction` per alternative, and a pair of raw factors per site
+`(identity, nonidentity)`. `unweighted` supplies unit factors. `draw`,
+`draw_seeded_many` and `draw_scalar_seeded` expose an exact packed driver and
+its scalar-law ablation. A seed has the same result in a full batch, a partition
+or a single-element batch; weighted and unweighted plans preserve choices and
+entropy. Packed and scalar algorithms have separate seeded conventions.
+
+Equal occurrence totals share stable 64-lane groups. Conditional alternative
+models are interned by their complete ordered normalized probabilities. The
+existing finite bit-plane primitive supplies the main path. For `p = n/d`,
+write `n * 2^64 = K*d + R`. A lane accepts when its conceptual uniform word is
+below `K`, rejects above `K`, and uses an exact scalar Bernoulli `R/d` only at
+equality. Equal-prefix lanes finish all needed comparison bits even when the
+finite primitive stops at the last nonzero cutoff bit. This preserves tiny
+positive probabilities and complements near one. Zero/one occurrence endpoints
+and deterministic alternatives consume no unnecessary entropy.
+
+`PreparedNoiseDraw` owns ordered optional choices, selected action descriptors,
+exact physical probability, declared raw weight and observed entropy/bit-plane/
+residual counts. Multi-Pauli factors retain input order; duplicate operation or
+record names are not deduplicated. Returned data can be modified independently
+of future draws and concurrent readers. This explicit seeded service describes
+unguarded laws; causal guard resolution belongs to the task runtime. It does
+not change the existing `TaskEvaluator::samples` entropy convention.
+
+`RawNoiseFactor` stores a nonnegative numerator and positive denominator without
+reduction. `from_ratio` rejects signed-negative inputs and zero denominators.
+`PreparedNoiseWeights` groups equal identity/error factor pairs. Defaults retain
+count tables through 512 sites; larger groups use exact integer powers. Input
+unit values, including unreduced `3/3`, are skipped. Cross-factor cancellation
+is preserved in the payload (`2/3 * 3/2` remains `6/6`), as are zero numerators
+and their full denominator products. These caller-declared products do not
+establish an unbiased physical/proposal likelihood ratio by themselves.
+
+Preparation limits bound site/action/factor/name counts, common denominator
+bits, raw factor/product bits, count-table integer payload and conservative
+compiled-model payload. Model bounds precede owner/table construction. Batch
+count, total site cells and complete conservative output payload are admitted
+before result allocation or entropy. Integer payload uses minimal unsigned
+magnitude bytes; zero has empty magnitude. Container/allocator spare capacity,
+allocator headers, preparation/evaluation scratch and process RSS remain separate
+from these declared payloads. Entropy exhaustion can consume a word prefix and
+returns an error without a draw.
+
+```rust
+use rmagna::noise::{PreparedNoiseSchedule, PreparedNoiseOptions, SparseNoiseAction};
+let laws = vec![vec!["1/100".parse().unwrap()]; 3];
+let actions = (0..3).map(|j| vec![SparseNoiseAction::ReportFlip {
+    record: format!("m{j}"),
+}]).collect::<Vec<_>>();
+let plan = PreparedNoiseSchedule::unweighted(&laws, &actions, PreparedNoiseOptions::default()).unwrap();
+let draws = plan.draw_seeded_many(&[11, 22]).unwrap();
+assert_eq!(draws.len(), 2);
+assert_eq!(plan.statistics().packed_groups, 1);
+```
+
+The owning `prepared_noise_batches` target includes all five pinned R10 methods:
+139 interleaved sites and a partial block (64 seeds, 23/41 partitions), a 63-site
+100-digit category fixture (128 seeds, 47/81 partitions), 513-site table fallback,
+all group sizes 1/2/17/308/512/513 with actual packed/scalar choices, and the
+316-site weighted/plain unit-factor fixture. Literal integer products and exact
+physical laws check 850 real source-fixture draw evaluations. Additional checks
+cover 4,096 joint-law draws across lanes/blocks, forced rational boundaries through
+lane 63, near-zero/near-one laws, entropy-free resource admission,
+returned snapshots and concurrent reuse. Dyadic occurrence work is observed at
+at most six planes for 131 sites versus 131 scalar words; this is an entropy-work
+ablation, not a throughput speedup claim. Native/Python bit-stream identity and
+finite64 probability truncation are not the Rust contract.

@@ -1,0 +1,22 @@
+SPDX-License-Identifier: MPL-2.0
+
+The complete circuit-independent category/action/factor fixtures in
+../prepared_noise_batches.rs are adapted from itpyi/magna revision
+56847478c840395735146ef1e1ccdc3d8aedc10f:
+
+- tests/core/test_file_reuse.py: FileReuseTests.test_prepared_noise_weights_and_batch_partition
+- tests/core/test_packed_noise.py: PackedNoiseTests.test_sparse_actions_weights_and_partitioning
+- tests/core/test_packed_noise.py: PackedNoiseTests.test_large_weight_group_without_count_table
+- tests/core/test_weight_fast_paths.py: WeightFastPathTests.test_count_weights_match_independent_products_across_group_sizes
+- tests/core/test_weight_fast_paths.py: WeightFastPathTests.test_grouped_factors_preserve_choices_and_unreduced_weights
+
+The joint-law driver check also retains the independent six-sigma contract from
+tests/core/test_packed_noise.py: test_marginals_and_joint_law_across_lanes_and_blocks.
+The full MPL-2.0 license is in original_many_record_input.LICENSE beside this file.
+
+Rust's SplitMix64, owned typed actions, exact arbitrary-rational physical law,
+explicit resource admission, signed raw-factor constructor and forced rational
+cutoff-boundary assertions are independent adaptations. No Python/Native seeded
+stream, private object/allocator layout, or finite64 probability approximation
+is claimed. Raw products retain numerator/denominator without reduction, while
+input factors equal to one (including 3/3) are skipped as in the reference.
