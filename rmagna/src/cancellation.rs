@@ -23,6 +23,7 @@ pub enum SafePoint {
     Fiber,
     SignatureWork,
     DecoderWait,
+    HistoryCommit,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
