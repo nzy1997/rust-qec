@@ -150,7 +150,8 @@ fn preparation_json_with_nondefault_caps_matches_owned_file_api_and_saved_output
             .unwrap()
     );
     assert_eq!(actual["kind"], "preparation");
-    assert_eq!(actual["sampling_preparation"]["counts"]["created"], 2);
+    // Fixed policies now preflight the support parent as well as scalar plans.
+    assert_eq!(actual["sampling_preparation"]["counts"]["created"], 3);
     assert_eq!(actual["execution_costs"]["query"]["attempted"], 0);
     let mut c = FilePreparationOptions::default();
     c.queries.max_requests = 12;

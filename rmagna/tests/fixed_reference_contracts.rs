@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MPL-2.0
-//! Initial R09 probes, not the complete25-method reproduction witness yet.
+//! Fixed-reference core contracts; complete source qualification continues in R09.
 use rmagna::{
     circuit::{ParseOptions, parse_circuit},
     gf2::BitVector,

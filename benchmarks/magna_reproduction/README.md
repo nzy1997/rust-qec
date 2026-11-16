@@ -3839,3 +3839,23 @@ from new required metrics; it never supplies zero observations for missing data.
 The original 67,108,864-work pilot bound remains unchanged, including any logical
 distillation or TQD admission refusals. Eight noisy draws do not establish paper
 throughput or cross-language equality of sample means.
+
+The R09 core-delivery pilot was captured at Rust commit
+`5dd34a3dfd0d525f685511c4c4f86aac18dae097`, with compiled-input digest
+`58995264dba6e73e9223bb7279bf3c214677310aa0527b7170ffdffdb7a89daf`.
+All eight selected tasks were retained: BH2-T, BH2-S, BH10-T, color3, rp2-d3
+and DK completed; logical-distillation and TQD3 retained configured admission
+refusals. Both replays and eight noisy draws added zero observed scalar or
+labelled-support factories for each successful task. BH/color/rp2 tasks retained
+two scalar resources, and DK retained three scalar resources plus one labelled
+support parent. These are actual Rust representation costs, separate from
+Native private parent counts. Prescribed logical-distillation still succeeded;
+affine setup required 92,856,620 signature work. TQD prescribed and affine setup
+required 319,792,620 and 5,647,905,090 respectively, against the unchanged
+67,108,864 cap. These results are a bounded pilot, not paper performance curves.
+
+This R09 core delivery leaves the issue open and the parity ledger unchanged.
+The remaining delivery must qualify the complete constrained-domain, redundant
+label, parity/selection and protocol-to-target continuation/storage contracts.
+New cache/probe and factory observations do not by themselves establish all 25
+assigned source methods or constant Native internal parent counts.

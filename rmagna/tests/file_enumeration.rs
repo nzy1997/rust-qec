@@ -258,7 +258,7 @@ fn nonlinear_file_integration_preserves_all_histories_and_actual_cold_replays() 
         assert_eq!(raw.histories, 16);
         assert_eq!(calls.load(Ordering::SeqCst), 16);
         count(report.execution_costs().decoder, (16, 16, 0));
-        count(report.execution_costs().query, (80, 80, 0));
+        count(report.execution_costs().query, (64, 64, 0));
         let compilations = if strategy == CausalStrategy::FixedTemplate {
             1
         } else {

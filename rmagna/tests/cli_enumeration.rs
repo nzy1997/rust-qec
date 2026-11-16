@@ -547,7 +547,9 @@ fn nonlinear_external_decoders_enumerate_all_physical_histories_and_caps() {
         assert_eq!(value["result"]["histories"], 4);
         assert_eq!(value["result"]["masses"]["accepted"]["value"], 0.5);
         assert_eq!(value["result"]["masses"]["error"]["value"], 1.0 / 6.0);
-        assert_eq!(value["execution_costs"]["query"]["succeeded"], 20);
+        // Four complete histories reuse their confirmed physical mass; the
+        // four duplicate terminal mass queries are absent.
+        assert_eq!(value["execution_costs"]["query"]["succeeded"], 16);
         assert_eq!(value["execution_costs"]["decoder"]["succeeded"], 4);
         assert_eq!(
             value["controller_process"]["manifest"]["native_backend"],

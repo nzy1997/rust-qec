@@ -81,9 +81,10 @@ fn both_causal_strategies_and_history_samplers_count_logical_queries() {
                 assert_eq!(result.status, RunStatus::Complete);
                 let groups = if records { 2 } else { 1 };
                 // Exact: two marginals for the controller, optionally three
-                // for duplicate records, then final history and acceptance.
+                // for duplicate records, then acceptance. The completed physical
+                // joint mass no longer needs a duplicate terminal query.
                 let queries = if sampler == HistorySampler::ExactMarginal {
-                    if records { 7 } else { 4 }
+                    if records { 6 } else { 3 }
                 } else {
                     2
                 };
@@ -233,12 +234,9 @@ fn failing_empty_input_callbacks_keep_work_from_uncommitted_attempts() {
                 assert_eq!(result.failed, 1);
                 let n = allowed as u64;
                 check(result.execution_costs.decoder, (n + 1, n, 1));
-                let queries = 2 * n
-                    + if sampler == HistorySampler::ExactMarginal {
-                        n + 1
-                    } else {
-                        0
-                    };
+                // Completed empty groups provide their actual joint mass;
+                // the failed callback's fresh condition query still counts.
+                let queries = 2 * n + u64::from(sampler == HistorySampler::ExactMarginal);
                 check(result.execution_costs.query, (queries, queries, 0));
                 let support = if sampler == HistorySampler::AffineSupport {
                     n + 1
@@ -347,7 +345,7 @@ fn guarded_proposals_wrong_output_shapes_and_zero_target_validation_keep_cost_sc
             );
             assert_eq!(ordinary.state(), observed.state());
             let queries = if sampler == HistorySampler::ExactMarginal {
-                6
+                5
             } else {
                 2
             };
