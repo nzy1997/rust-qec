@@ -43,6 +43,12 @@ pub struct SamplingPreparationReport {
     pub options: SamplingPreparationOptions,
     pub result: Result<(), TaskError>,
     pub counts: FamilyPreparationCounts,
+    /// Source-owner cache evictions observed during this preparation call.
+    /// Concurrent requests can contribute; any eviction prevents claiming that
+    /// every requested family is still retained. Counts saturate at usize::MAX;
+    /// a saturated observation conservatively prevents a retention claim.
+    /// This is not a memory estimate.
+    pub cache_evictions: usize,
     pub by_kind: BTreeMap<&'static str, FamilyPreparationCounts>,
     pub history_rows: usize,
     pub layout_rows: usize,
@@ -52,7 +58,7 @@ impl SamplingPreparationReport {
     /// All planned requests completed and none was disabled by a cold policy.
     /// Trace plans can still defer phase-resource construction until evaluation.
     pub fn all_families_retained(&self) -> bool {
-        self.result.is_ok() && self.counts.cold == 0
+        self.result.is_ok() && self.counts.cold == 0 && self.cache_evictions == 0
     }
 }
 enum Request {
@@ -144,14 +150,44 @@ impl TaskEvaluator {
             options,
             result: Ok(()),
             counts: Default::default(),
+            cache_evictions: 0,
             by_kind: BTreeMap::new(),
             history_rows: 0,
             layout_rows: 0,
             elapsed_seconds: 0.0,
         };
-        report.result = self.prepare_sampling_stage(options, meter, &mut report);
+        let before = self.automatic_cache_evictions();
+        report.result = match before {
+            Ok(_) => self.prepare_sampling_stage(options, meter, &mut report),
+            Err(ref error) => Err(error.clone()),
+        };
+        match (before, self.automatic_cache_evictions()) {
+            (Ok(before), Ok(after)) => {
+                report.cache_evictions = if after == usize::MAX {
+                    usize::MAX
+                } else {
+                    after.saturating_sub(before)
+                };
+            }
+            (_, Err(error)) if report.result.is_ok() => report.result = Err(error),
+            _ => {}
+        }
         report.elapsed_seconds = start.elapsed().as_secs_f64();
         report
+    }
+    fn automatic_cache_evictions(&self) -> Result<usize, TaskError> {
+        let mut total = 0usize;
+        for statistics in [
+            self.prepared_probability_statistics()?,
+            self.prepared_density_statistics()?,
+            self.prepared_moment_statistics()?,
+        ]
+        .into_iter()
+        .flatten()
+        {
+            total = total.saturating_add(statistics.cache_evictions);
+        }
+        Ok(total)
     }
     fn prepare_sampling_stage(
         &self,

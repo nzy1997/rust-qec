@@ -730,3 +730,98 @@ fn moment_preparation_options_cache_limits_and_fingerprints_are_observable() {
     assert_eq!(invalid["compilation"]["status"], "preparation_failed");
     assert_eq!(invalid["execution_costs"]["query"]["attempted"], 0);
 }
+
+#[test]
+fn automatic_lru_cli_is_explicit_fingerprinted_and_reports_evictions_without_changing_estimates() {
+    let files = Files::new();
+    files.put("circuit.magna", "H 0\nT 0\nH 0");
+    files.put(
+        "task.json",
+        r#"{"outputs":[0],"observables":[[0,1],[1,0],[1,1]]}"#,
+    );
+    let args = [
+        "run",
+        "circuit.magna",
+        "--task",
+        "task.json",
+        "--shots",
+        "3",
+        "--moment-preparation",
+        "fixed",
+        "--max-prepared-moments",
+        "1",
+        "--json",
+    ];
+    let default = files.json(&args, 1);
+    assert_eq!(default["completed"], 0);
+    assert!(
+        default["options"]["compile"]
+            .get("query_cache_policy")
+            .is_none()
+    );
+    let mut quota = args.to_vec();
+    quota.extend(["--query-cache-policy", "quota"]);
+    let explicit = files.json(&quota, 1);
+    assert_eq!(default["fingerprints"], explicit["fingerprints"]);
+    let mut lru = args.to_vec();
+    lru.extend(["--query-cache-policy", "lru"]);
+    let actual = files.json(&lru, 0);
+    assert_eq!(actual["completed"], 3);
+    assert_eq!(actual["options"]["compile"]["query_cache_policy"], "lru");
+    assert_ne!(
+        actual["fingerprints"]["options"],
+        default["fingerprints"]["options"]
+    );
+    assert_eq!(
+        actual["compilation"]["retained_caches"]["moment"]["cached_queries"],
+        1
+    );
+    assert_eq!(
+        actual["compilation"]["retained_caches"]["moment"]["cache_evictions"],
+        8
+    );
+    let mut normal = args.to_vec();
+    let limit = normal
+        .iter()
+        .position(|x| *x == "--max-prepared-moments")
+        .unwrap()
+        + 1;
+    normal[limit] = "3";
+    let reference = files.json(&normal, 0);
+    assert_eq!(actual["estimates"], reference["estimates"]);
+    assert_eq!(actual["standard_errors"], reference["standard_errors"]);
+    assert!(
+        reference["compilation"]["retained_caches"]["moment"]
+            .get("cache_evictions")
+            .is_none()
+    );
+    // Preparation succeeds without claiming all three families fit capacity one.
+    let prep = files.json(
+        &[
+            "prepare",
+            "circuit.magna",
+            "--task",
+            "task.json",
+            "--moment-preparation",
+            "fixed",
+            "--max-prepared-moments",
+            "1",
+            "--query-cache-policy",
+            "lru",
+            "--json",
+        ],
+        0,
+    );
+    assert_eq!(prep["sampling_preparation"]["cache_evictions"], 2);
+    assert_eq!(prep["sampling_preparation"]["all_families_retained"], false);
+    let mut invalid = args.to_vec();
+    invalid.extend(["--query-cache-policy", "clock"]);
+    let out = files.run(&invalid);
+    assert!(!out.status.success());
+    assert!(
+        serde_json::from_slice::<Value>(&out.stdout).unwrap()["error"]
+            .as_str()
+            .unwrap()
+            .contains("query-cache-policy")
+    );
+}

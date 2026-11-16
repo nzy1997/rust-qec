@@ -1,4 +1,5 @@
 //! Bounded immutable Pauli/event families shared by instrument branches.
+use super::query_cache::{VecPlans, admit_new};
 use super::*;
 use crate::unitary::PreparedPauliMoment;
 use std::sync::Mutex;
@@ -11,10 +12,15 @@ struct Entry {
 pub(super) struct MomentQueries {
     mode: QueryPreparation,
     limit: usize,
-    entries: Mutex<Vec<Entry>>,
+    entries: Mutex<VecPlans<Entry>>,
+    policy: QueryCachePolicy,
 }
 impl MomentQueries {
-    pub(super) fn new(mode: QueryPreparation, limit: usize) -> Result<Self, InstrumentError> {
+    pub(super) fn new(
+        mode: QueryPreparation,
+        limit: usize,
+        policy: QueryCachePolicy,
+    ) -> Result<Self, InstrumentError> {
         if !matches!(mode, QueryPreparation::Cold) && limit == 0 {
             return Err(InstrumentError::ResourceLimit {
                 option: "max_prepared_moments",
@@ -25,7 +31,8 @@ impl MomentQueries {
         Ok(Self {
             mode,
             limit,
-            entries: Mutex::new(Vec::new()),
+            entries: Mutex::new(VecPlans::default()),
+            policy,
         })
     }
     pub(super) fn statistics(&self) -> Result<PreparedQueryStatistics, InstrumentError> {
@@ -33,12 +40,14 @@ impl MomentQueries {
             .entries
             .lock()
             .map_err(|_| InstrumentError::PreparedQueryCacheUnavailable)?;
-        Ok(PreparedQueryStatistics::from_resources(
+        let mut statistics = PreparedQueryStatistics::from_resources(
             entries.len(),
             entries
-                .iter()
+                .values()
                 .filter_map(|entry| entry.plan.fixed_phase_resource()),
-        ))
+        );
+        statistics.cache_evictions = entries.evictions;
+        Ok(statistics)
     }
     pub(super) fn evaluate(
         &self,
@@ -96,16 +105,16 @@ impl MomentQueries {
                 .entries
                 .lock()
                 .map_err(|_| InstrumentError::PreparedQueryCacheUnavailable)?;
-            if let Some(entry) = entries.iter().find(|e| e.word == *word && e.rows == rows) {
+            if let Some(entry) = entries.get_by(|e| e.word == *word && e.rows == rows, self.policy)
+            {
                 (Arc::clone(&entry.plan), QueryPreparationOutcome::Reused)
             } else {
-                if entries.len() >= self.limit {
-                    return Err(InstrumentError::ResourceLimit {
-                        option: "max_prepared_moments",
-                        limit: self.limit,
-                        required: entries.len().saturating_add(1),
-                    });
-                }
+                admit_new(
+                    entries.len(),
+                    self.limit,
+                    self.policy,
+                    "max_prepared_moments",
+                )?;
                 let plan = match self.mode {
                     QueryPreparation::Native(options) => state
                         .prepare_pauli_moment(word, rows, arithmetic)?
@@ -133,11 +142,15 @@ impl MomentQueries {
                     QueryPreparation::Cold => unreachable!("cold moments returned above"),
                 };
                 let plan = Arc::new(plan);
-                entries.push(Entry {
-                    word: word.clone(),
-                    rows: rows.to_vec(),
-                    plan: Arc::clone(&plan),
-                });
+                entries.push(
+                    Entry {
+                        word: word.clone(),
+                        rows: rows.to_vec(),
+                        plan: Arc::clone(&plan),
+                    },
+                    self.limit,
+                    self.policy,
+                );
                 (plan, QueryPreparationOutcome::Created)
             }
         };
@@ -161,7 +174,7 @@ mod tests {
             QueryPreparation::FixedFibers(Default::default()),
             QueryPreparation::FixedCatalogue(Default::default()),
         ] {
-            let queries = MomentQueries::new(mode, 1).unwrap();
+            let queries = MomentQueries::new(mode, 1, QueryCachePolicy::Quota).unwrap();
             assert_eq!(
                 queries
                     .prepare(&state, &word, std::slice::from_ref(&row), 0, &a)
@@ -188,6 +201,7 @@ mod tests {
                 queries.statistics().unwrap(),
                 PreparedQueryStatistics {
                     cached_queries: 1,
+                    cache_evictions: 0,
                     fixed_resources: 0,
                     catalogue_resources: 0,
                     native_routes: Default::default(),

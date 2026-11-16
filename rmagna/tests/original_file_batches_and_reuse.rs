@@ -682,3 +682,6 @@ fn original_fixed_preparation_is_reused_for_new_original_faults() {
         assert_eq!(report.raw_result().execution_costs.compilation.succeeded, 0);
     }
 }
+
+#[path = "support/automatic_file_lru.rs"]
+mod automatic_file_lru;

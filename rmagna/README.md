@@ -6961,5 +6961,60 @@ callbacks. Four affine task configurations check exactly the two planned
 terminal roles and no sampling-support request, including a magic target.
 Sixteen batched and sixteen individual draws per configuration preserve every
 evaluation field and the caller RNG state, with 32 actual target-frame reuses.
-These are source qualification results; automatic runtime LRU integration and
-remaining continuation/storage contracts remain separate R09 work.
+These are source qualification results; remaining continuation/storage contracts
+remain separate R09 work.
+
+## Automatic runtime query-cache retention
+
+`CompileOptions::query_cache_policy` selects strict `QueryCachePolicy::Quota`
+(the unchanged default) or opt-in `QueryCachePolicy::Lru`. The CLI exposes
+`--query-cache-policy quota|lru`. LRU uses the existing
+`max_prepared_probabilities`, `max_prepared_densities` and
+`max_prepared_moments` as separate retained-entry capacities. A successfully
+constructed new layout replaces the least recently requested layout in its
+family; failed construction leaves the previous entry usable. Outcome values,
+faults and resolved callback values remain fresh numeric inputs, with warm
+shape checks before lookup. No controller or draw is memoized. The policy is
+bound to the immutable compiled owner and resolved configuration fingerprint.
+
+Enabled retained families require positive capacities under both policies;
+Cold families can have capacity zero and remain unretained. This differs from
+zero-capacity ephemeral preparation in the explicit `ScalarQueryCache` service.
+The automatic policy bounds retained entries, not total bytes, temporary new
+construction alongside an old entry, in-flight evaluations or caller-held
+plans. Preparation and eviction are serialized per family; evaluation releases
+that lock. Support parents remain separately bounded, and this interface does
+not copy Native's one combined private plan-cache capacity.
+
+`PreparedQueryStatistics::cache_evictions` counts successful evictions with
+saturating arithmetic. Retained resource ranks/terms describe current entries;
+monotonic query-work counters still include evicted and failed construction.
+JSON adds nonzero `cache_evictions` while preserving existing zero-eviction
+receipts. A sampling-preparation report can finish successfully after eviction,
+but `all_families_retained()` is false whenever it observes eviction (including
+saturation). Concurrent requests can contribute to that conservative observation.
+
+The complete original callback/guarded-noise file fixture now runs through these
+automatic services, without a post-hoc explicit cache. Across both compilers,
+both history samplers and Trace/fibers/catalogue/Native policies, 1,920 draws
+check exact evaluations, actual callback inputs, file statistics and final
+caller RNG state. Capacity one actually evicts probability layouts for exact
+marginal sampling; this affine fixture needs only one probability layout.
+A separate three-Pauli task forces automatic moment eviction under both
+samplers, preserves 240 paired draw evaluations, and reports successful
+preparation without claiming full retention. Additional checks cover failed
+construction for all three families, warm malformed RHS recency, concurrent
+numeric evaluation during eviction, zero-capacity admission and CLI fingerprints.
+
+The original parity-feedback fixture runs both history samplers, both compilers,
+eight manual report-flip combinations and 32 seeds (1,024 draws). The existing
+supplied-action interface retains the original zero-noise circuit: a nonempty
+manual flip assignment has physical probability zero while its conditional
+quantum contribution remains defined with supplied likelihood one. A further
+1,024 draws use one persistent owner per compiler/sampler with three explicitly
+declared fair readout channels. Every evaluation field, actual callback and
+caller RNG state agrees after accounting for the separately declared physical
+probability 1/8. Literal support sets, joint masses, acceptance and error agree;
+actual query-family factories remain unchanged across all eight assignments.
+`SuppliedActionEvaluator` now exposes read-only query-work observations and
+sampling-family preparation for its retained assignment.

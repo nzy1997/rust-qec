@@ -1,4 +1,5 @@
 //! Bounded density-overlap plans distinguished by layouts and program identity.
+use super::query_cache::{VecPlans, admit_new};
 use super::*;
 use crate::unitary::{DensityBoundary, DensityLayout, PreparedDensityOverlap};
 use std::sync::Mutex;
@@ -29,11 +30,16 @@ impl Entry {
 pub(super) struct DensityQueries {
     mode: QueryPreparation,
     limit: usize,
-    entries: Mutex<Vec<Entry>>,
+    entries: Mutex<VecPlans<Entry>>,
+    policy: QueryCachePolicy,
     reused_evaluations: AtomicU64,
 }
 impl DensityQueries {
-    pub(super) fn new(mode: QueryPreparation, limit: usize) -> Result<Self, InstrumentError> {
+    pub(super) fn new(
+        mode: QueryPreparation,
+        limit: usize,
+        policy: QueryCachePolicy,
+    ) -> Result<Self, InstrumentError> {
         if !matches!(mode, QueryPreparation::Cold) && limit == 0 {
             return Err(InstrumentError::ResourceLimit {
                 option: "max_prepared_densities",
@@ -44,7 +50,8 @@ impl DensityQueries {
         Ok(Self {
             mode,
             limit,
-            entries: Mutex::new(Vec::new()),
+            entries: Mutex::new(VecPlans::default()),
+            policy,
             reused_evaluations: AtomicU64::new(0),
         })
     }
@@ -53,12 +60,14 @@ impl DensityQueries {
             .entries
             .lock()
             .map_err(|_| InstrumentError::PreparedQueryCacheUnavailable)?;
-        Ok(PreparedQueryStatistics::from_resources(
+        let mut statistics = PreparedQueryStatistics::from_resources(
             entries.len(),
             entries
-                .iter()
+                .values()
                 .filter_map(|entry| entry.plan.fixed_phase_resource()),
-        ))
+        );
+        statistics.cache_evictions = entries.evictions;
+        Ok(statistics)
     }
     pub(super) fn reused_evaluations(&self) -> u64 {
         self.reused_evaluations.load(Ordering::Relaxed)
@@ -140,19 +149,17 @@ impl DensityQueries {
                 .entries
                 .lock()
                 .map_err(|_| InstrumentError::PreparedQueryCacheUnavailable)?;
-            if let Some(entry) = entries
-                .iter()
-                .find(|e| e.matches(left, &boundary, right, &target))
+            if let Some(entry) =
+                entries.get_by(|e| e.matches(left, &boundary, right, &target), self.policy)
             {
                 (Arc::clone(&entry.plan), QueryPreparationOutcome::Reused)
             } else {
-                if entries.len() >= self.limit {
-                    return Err(InstrumentError::ResourceLimit {
-                        option: "max_prepared_densities",
-                        limit: self.limit,
-                        required: entries.len().saturating_add(1),
-                    });
-                }
+                admit_new(
+                    entries.len(),
+                    self.limit,
+                    self.policy,
+                    "max_prepared_densities",
+                )?;
                 let plan = match self.mode {
                     QueryPreparation::Native(options) => left
                         .prepare_density_overlap(boundary, right, target, arithmetic)?
@@ -180,13 +187,17 @@ impl DensityQueries {
                     QueryPreparation::Cold => unreachable!("cold density queries returned above"),
                 };
                 let plan = Arc::new(plan);
-                entries.push(Entry {
-                    left_outputs: boundary.outputs.to_vec(),
-                    right_outputs: target.outputs.to_vec(),
-                    left_rows: boundary.event_rows.to_vec(),
-                    right_rows: target.event_rows.to_vec(),
-                    plan: Arc::clone(&plan),
-                });
+                entries.push(
+                    Entry {
+                        left_outputs: boundary.outputs.to_vec(),
+                        right_outputs: target.outputs.to_vec(),
+                        left_rows: boundary.event_rows.to_vec(),
+                        right_rows: target.event_rows.to_vec(),
+                        plan: Arc::clone(&plan),
+                    },
+                    self.limit,
+                    self.policy,
+                );
                 (plan, QueryPreparationOutcome::Created)
             }
         };

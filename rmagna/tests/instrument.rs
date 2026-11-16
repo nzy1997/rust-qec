@@ -1256,6 +1256,7 @@ fn target_density_cache_keys_both_ordered_output_layouts_and_reuses_each_plan() 
                     protocol.prepared_density_statistics().unwrap(),
                     PreparedQueryStatistics {
                         cached_queries,
+                        cache_evictions: 0,
                         catalogue_resources: 0,
                         native_routes: Default::default(),
                         native_transports: Default::default(),
@@ -1274,6 +1275,7 @@ fn target_density_cache_keys_both_ordered_output_layouts_and_reuses_each_plan() 
                 cold.prepared_density_statistics().unwrap(),
                 PreparedQueryStatistics {
                     cached_queries: 0,
+                    cache_evictions: 0,
                     fixed_resources: 0,
                     catalogue_resources: 0,
                     native_routes: Default::default(),

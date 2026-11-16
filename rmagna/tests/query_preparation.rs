@@ -736,3 +736,6 @@ fn catalogue_cache_failures_keep_empty_slots_and_tighter_reused_caps_still_apply
         0
     );
 }
+
+#[path = "support/automatic_query_lru.rs"]
+mod automatic_query_lru;
