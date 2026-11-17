@@ -30,8 +30,9 @@ struct Model {
     closing_sites: usize,
     offset: u64,
     complete_patterns: usize,
-    transcripts: Vec<(Vec<(u64, u64)>, Vec<usize>, String)>,
+    transcripts: Vec<Transcript>,
 }
+type Transcript = (Vec<(u64, u64)>, Vec<usize>, String);
 
 fn sampler(signatures: &[Vec<u64>], offset: u64, closing: Option<usize>, p: &str) -> Sampler {
     let circuit = parse_circuit("X_ERROR(1/8) 0", &ParseOptions::default()).unwrap();
@@ -175,7 +176,7 @@ fn physical_ranges_retain_exact_endpoints_and_bounded_rejection_entropy() {
             .contains("max_entropy_words")
     );
     assert_eq!(random.used, 4);
-    assert!(sampler.draw_ranges(|bound| Ok(bound)).is_err());
+    assert!(sampler.draw_ranges(Ok).is_err());
     for (p, count) in [("0", 0), ("1", 4)] {
         let sampler = self::sampler(&signatures, 0, None, p);
         let mut random = Words {

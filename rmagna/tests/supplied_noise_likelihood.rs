@@ -207,6 +207,10 @@ fn supplied_causal_factors_preserve_report_flip_correlation_postselection_and_re
                 &ControllerRegistry::default(),
                 options,
             );
+            let refused = evaluator
+                .linear_prescribed_contributions(&faults)
+                .unwrap_err();
+            assert_eq!(refused.field, "runtime");
             let mut seen = [false; 2];
             for seed in 0..32 {
                 let mut weighted_rng = SplitMix64::new(seed);

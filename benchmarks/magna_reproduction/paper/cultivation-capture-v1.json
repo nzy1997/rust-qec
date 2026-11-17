@@ -1,0 +1,14 @@
+{
+  "capture_commit": "778e70c10f29e23c8b030ffd67496cf91dad1ded",
+  "runner_sha256": {
+    "bh_benchmark.py": "37c4600d191a29e85d16a02fd37dd4d81ec258f9758f693aee2c1238325fbdf1",
+    "cultivation_benchmark.py": "22504e6b712a00c1ef9c30eaee5ada9df33d1e1787c17dd1c0832fb26b5ed651",
+    "cultivation_reference.py": "c50eb809cd6afd5f1d51f1f2efc74a150b74afbfd4375596015fb13ab518c651",
+    "cultivation_statistics.py": "bfbed51f1f482172abe60054628074b7563441d24a3860dd8ec5e905604c898e",
+    "paper_benchmark.py": "61941b7e6f367fdfc474a6d686d7a9e5b25708cdf6c18c8df4007c641e03e423",
+    "paper_probe_identity.py": "f320e65d81f1d123f9cec3b2e5e939e11923a6d7cf754ebea30ebe5eef950a26",
+    "reference.py": "0a4c22d19ae1cad5bf7956fb77a997ceeb8b78c3740aef4185e4ab4da7b70d7d"
+  },
+  "rust_source_sha256": "eefae2103cbd07d66bbbad9ff6d4f395dcbf542b996ad971d419c0a8616713c7",
+  "schema": "rmagna.cultivation-capture-source.v1"
+}

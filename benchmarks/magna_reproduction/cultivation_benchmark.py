@@ -293,10 +293,15 @@ def runner_identity():
 
 
 def verify_identity(plan, out, receipt, pinned):
+    old_source = read_json(HERE/'paper/cultivation-capture-v1.json')
+    known_runner = (receipt['runner_sha256'] == runner_identity()
+                    or (old_source['schema'] == 'rmagna.cultivation-capture-source.v1'
+                        and receipt['rust_source_sha256'] == old_source['rust_source_sha256']
+                        and receipt['runner_sha256'] == old_source['runner_sha256']))
     require(receipt['schema'] == 'rmagna.paper-cultivation-capture.v1'
             and receipt['manifest_sha256'] == digest_json(plan)
             and receipt['inputs'] == input_identity(plan,out/'inputs',pinned)
-            and receipt['runner_sha256'] == runner_identity()
+            and known_runner
             and receipt['rust_source_sha256'] == source_identity(ROOT)
             and receipt['rust_source_inputs'] == source_inputs(ROOT)
             and sha(receipt['rust_binary_sha256']), 'cultivation capture identity changed')
@@ -315,7 +320,8 @@ def capture(args, plan):
     if args.resume:
         receipt = read_json(out/'receipt.json')
         verify_identity(plan,out,receipt,pinned)
-        require(receipt['rust_binary_sha256'] == reference.digest(executable)
+        require(receipt['runner_sha256'] == runner_identity()
+                and receipt['rust_binary_sha256'] == reference.digest(executable)
                 and receipt['precision_workers'] == args.jobs, 'cultivation resume executable or workers changed')
     else:
         out.mkdir(parents=True,exist_ok=False)

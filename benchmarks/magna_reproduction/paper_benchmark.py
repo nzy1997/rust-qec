@@ -439,8 +439,14 @@ def main(argv=None):
                       else bh_benchmark.check_capture(manifest, args.results))
         elif manifest.get("schema") == "rmagna.paper-cultivation-plan.v1":
             import cultivation_benchmark
-            result = (cultivation_benchmark.capture(args, manifest) if args.command == "run"
-                      else cultivation_benchmark.check_capture(manifest, args.results))
+            if args.command == "run":
+                result = cultivation_benchmark.capture(args, manifest)
+            else:
+                result = cultivation_benchmark.check_capture(manifest, args.results)
+                if manifest["scope"] == "figure4-table2":
+                    import cultivation_peers
+                    matched = cultivation_peers.check(args.results / "matched-peers")
+                    result["matched_timing_batches"] = matched["executed_batches"]
         else:
             if args.command == "run":
                 require(args.python is not None, "pilot run requires --python with the protected Native environment")

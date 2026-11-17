@@ -4109,3 +4109,79 @@ has a checksum, compiled-input digest and exact checkpoint; `regenerated.json`
 contains separate timing medians/ranges and analytical precision comparisons.
 These are BH-specific results only; cultivation, distillation, code-switching and
 TQD campaigns remain separate roadmap work.
+
+### B04 cultivation precision and timing
+
+```sh
+cargo build --locked --release -p rmagna --example paper_cultivation_run
+python3 benchmarks/magna_reproduction/paper_benchmark.py run \
+  --manifest benchmarks/magna_reproduction/paper/cultivation-pilot.json \
+  --upstream "$MAGNA_UPSTREAM" --rust-example "$MAGNA_CULTIVATION_RUNNER" \
+  --out "$MAGNA_CULTIVATION_PILOT"
+python3 benchmarks/magna_reproduction/paper_benchmark.py run \
+  --manifest benchmarks/magna_reproduction/paper/cultivation.json \
+  --upstream "$MAGNA_UPSTREAM" --rust-example "$MAGNA_CULTIVATION_RUNNER" \
+  --archive "$MAGNA_PAPER_ARCHIVE" --out "$MAGNA_CULTIVATION_RESULTS" \
+  --jobs "$MAGNA_PRECISION_WORKERS"
+python3 benchmarks/magna_reproduction/paper_benchmark.py check \
+  --manifest benchmarks/magna_reproduction/paper/cultivation.json \
+  --results "$MAGNA_CULTIVATION_RESULTS"
+```
+
+The full plan uses four pinned public T circuits and their complete task and
+target files. Its 20 physical acceptance batches have 2^24 draws each and its
+20 independent accepted-failure batches have 2^22 draws at d3, 2^27 at Color5
+and 2^26 at RP2 d5. The 1,384,120,320 precision draws exclude the 12 single-thread
+timing batches and the warmups. `--resume` validates every completed range before
+issuing missing ranges. A failed or timed-out range remains in its raw receipt.
+Freeze a copy of the optimized producer before replacing a shared Cargo target.
+
+At each physical rate the sampler sets the total probability at every original
+noise category, including explicit readout errors. It preserves the equal
+conditional channel probabilities in these four inputs. Failure batches use
+`q=p+3/N` and the exact 19/20 closing mixture on the last occupied site, or the
+last two occupied sites at RP2 d5. The full-support branch remains available.
+Reverse Pauli propagation derives the selected signs and drops proposal constraints
+that anticommute at a T rotation. All observed contributions are evaluated on
+the original full T circuits. An exact histogram stores the unit-weight joint
+acceptance and error masses together with a sufficient description of P/Q.
+
+The report recomputes conditional error by dividing the closing batch's weighted
+mean joint error by the physical batch's mean acceptance. Its delta variance
+includes both independent means. No positive error observation gives an
+unresolved conditional estimate. Timing reports sampling per attempted draw with
+query preparation separate. Time to the observed precision reports worker
+elapsed seconds and the attained relative standard error. Parallel worker seconds
+sum elapsed intervals and can exceed campaign wall time.
+
+Place the verified matched replay in the full results directory as `matched-peers`
+before running the full `check` command. The deposited 20-point curves and 20 Table II records are checked against their
+archive member hashes. The historical kernel, inputs, host, throughput scopes
+and Tsim failures retain their original identities. The matched public-input
+replay is separate. It uses Rust, pinned upstream Magna, Clifft 0.11.0, SymFT
+`c89b9851` and PPVM `7b2e1bcb` on one host, with three batches of 1,024 attempts
+per backend and family. The PPVM RP2 d5 batches use 128 attempts and the published
+`1e-10` coefficient threshold. The sampled backends implement the same signed
+postselection and terminal target measurement. The report keeps integrated and
+Born-sampled output scopes visible and checks agreement on acceptance at the
+timing sample size. These short batches have limited rare-error resolution.
+
+```sh
+python3 benchmarks/magna_reproduction/cultivation_peers.py run \
+  --upstream "$MAGNA_UPSTREAM" --rust-example "$MAGNA_CULTIVATION_RUNNER" \
+  --python "$MAGNA_PEER_PYTHON" --backends magna clifft symft ppvm \
+  --symft-archive "$SYMFT_PINNED_ARCHIVE" --ppvm-executable "$PPVM_CULTIVATION_RUNNER" \
+  --out "$MAGNA_CULTIVATION_RESULTS/matched-peers"
+python3 benchmarks/magna_reproduction/cultivation_peers.py check \
+  --results "$MAGNA_CULTIVATION_RESULTS/matched-peers"
+```
+
+Use the pinned peer packages on the peer Python search path. The PPVM standalone
+driver is `peers/ppvm_cultivation.rs`. Its Cargo adapter uses the pinned source's
+`ppvm-stim`, `ppvm-pauli-sum` and `ppvm-tableau` crates, plus `serde` and
+`serde_json`, with versions projected from that source's lockfile. Build with
+`PPVM_CULTIVATION_SOURCE_COMMIT` set to the full pinned commit. The PPVM adapter
+conjugates unsupported inverted measurements by a noiseless anticommuting Pauli
+on each side. This preserves the projected qubit and the sign of the report
+seen by feedback and detector scoring. A retry can retain the failed raw attempt
+and reuse completed counterpart timings with `--reuse` and `--retry-failed`.
