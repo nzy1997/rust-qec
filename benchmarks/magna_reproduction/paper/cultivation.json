@@ -1,0 +1,212 @@
+{
+  "schema": "rmagna.paper-cultivation-plan.v1",
+  "scope": "figure4-table2",
+  "reference_sha256": "c49203a586f5a451e3183b435793df693dd486857356aed8826df5dc723e5454",
+  "upstream_commit": "56847478c840395735146ef1e1ccdc3d8aedc10f",
+  "paper": "2610.22315v1",
+  "archive_sha256": "73de3979469d3cd39975ac5976303a71bd921eca7a29bd7de6119f7acc84b3f6",
+  "historical_kernel": "853fa2369817e1be65a710b42ff80606e219e464",
+  "families": {
+    "color3": {
+      "task": "color3",
+      "original_sites": 518,
+      "safe": 16,
+      "unsafe_t": 4,
+      "channels": 2444,
+      "closing_sites": 1,
+      "target": "readout-ideal.magna",
+      "grid": [
+        {
+          "p": "1/2000",
+          "acceptance_seed": 2026100900,
+          "failure_seed": 2026100902,
+          "acceptance_shots": 16777216,
+          "failure_shots": 4194304
+        },
+        {
+          "p": "1/1000",
+          "acceptance_seed": 2026100910,
+          "failure_seed": 2026100912,
+          "acceptance_shots": 16777216,
+          "failure_shots": 4194304
+        },
+        {
+          "p": "1/500",
+          "acceptance_seed": 2026100920,
+          "failure_seed": 2026100922,
+          "acceptance_shots": 16777216,
+          "failure_shots": 4194304
+        },
+        {
+          "p": "3/1000",
+          "acceptance_seed": 2026100930,
+          "failure_seed": 2026100932,
+          "acceptance_shots": 16777216,
+          "failure_shots": 4194304
+        },
+        {
+          "p": "1/200",
+          "acceptance_seed": 2026100940,
+          "failure_seed": 2026100942,
+          "acceptance_shots": 16777216,
+          "failure_shots": 4194304
+        }
+      ]
+    },
+    "color5": {
+      "task": "color5",
+      "original_sites": 3564,
+      "safe": 93,
+      "unsafe_t": 14,
+      "channels": 15994,
+      "closing_sites": 1,
+      "target": "readout-ideal.magna",
+      "grid": [
+        {
+          "p": "1/2000",
+          "acceptance_seed": 2026101200,
+          "failure_seed": 2026101202,
+          "acceptance_shots": 16777216,
+          "failure_shots": 134217728
+        },
+        {
+          "p": "3/4000",
+          "acceptance_seed": 2026101210,
+          "failure_seed": 2026101212,
+          "acceptance_shots": 16777216,
+          "failure_shots": 134217728
+        },
+        {
+          "p": "1/1000",
+          "acceptance_seed": 2026101220,
+          "failure_seed": 2026101222,
+          "acceptance_shots": 16777216,
+          "failure_shots": 134217728
+        },
+        {
+          "p": "3/2000",
+          "acceptance_seed": 2026101230,
+          "failure_seed": 2026101232,
+          "acceptance_shots": 16777216,
+          "failure_shots": 134217728
+        },
+        {
+          "p": "1/500",
+          "acceptance_seed": 2026101240,
+          "failure_seed": 2026101242,
+          "acceptance_shots": 16777216,
+          "failure_shots": 134217728
+        }
+      ]
+    },
+    "rp2-d3-T": {
+      "task": "rp2-d3",
+      "original_sites": 678,
+      "safe": 34,
+      "unsafe_t": 10,
+      "channels": 3624,
+      "closing_sites": 1,
+      "target": "target.magna",
+      "grid": [
+        {
+          "p": "1/2000",
+          "acceptance_seed": 2026101000,
+          "failure_seed": 2026101002,
+          "acceptance_shots": 16777216,
+          "failure_shots": 4194304
+        },
+        {
+          "p": "1/1000",
+          "acceptance_seed": 2026101010,
+          "failure_seed": 2026101012,
+          "acceptance_shots": 16777216,
+          "failure_shots": 4194304
+        },
+        {
+          "p": "1/500",
+          "acceptance_seed": 2026101020,
+          "failure_seed": 2026101022,
+          "acceptance_shots": 16777216,
+          "failure_shots": 4194304
+        },
+        {
+          "p": "3/1000",
+          "acceptance_seed": 2026101030,
+          "failure_seed": 2026101032,
+          "acceptance_shots": 16777216,
+          "failure_shots": 4194304
+        },
+        {
+          "p": "1/200",
+          "acceptance_seed": 2026101040,
+          "failure_seed": 2026101042,
+          "acceptance_shots": 16777216,
+          "failure_shots": 4194304
+        }
+      ]
+    },
+    "rp2-d5-T": {
+      "task": "rp2-d5",
+      "original_sites": 2405,
+      "safe": 102,
+      "unsafe_t": 30,
+      "channels": 12973,
+      "closing_sites": 2,
+      "target": "target.magna",
+      "grid": [
+        {
+          "p": "1/2000",
+          "acceptance_seed": 2026101300,
+          "failure_seed": 2026101502,
+          "acceptance_shots": 16777216,
+          "failure_shots": 67108864
+        },
+        {
+          "p": "3/4000",
+          "acceptance_seed": 2026101310,
+          "failure_seed": 2026101512,
+          "acceptance_shots": 16777216,
+          "failure_shots": 67108864
+        },
+        {
+          "p": "1/1000",
+          "acceptance_seed": 2026101320,
+          "failure_seed": 2026101522,
+          "acceptance_shots": 16777216,
+          "failure_shots": 67108864
+        },
+        {
+          "p": "3/2000",
+          "acceptance_seed": 2026101330,
+          "failure_seed": 2026101532,
+          "acceptance_shots": 16777216,
+          "failure_shots": 67108864
+        },
+        {
+          "p": "1/500",
+          "acceptance_seed": 2026101340,
+          "failure_seed": 2026101542,
+          "acceptance_shots": 16777216,
+          "failure_shots": 67108864
+        }
+      ]
+    }
+  },
+  "output_contract": "unit_prescribed_full_T_joint_acceptance_error_with_external_P_over_Q",
+  "rng_protocol": "splitmix64-addressed-u32-seed-u32-index-v1",
+  "chunk_size": 1048576,
+  "timeout_seconds": 1800,
+  "max_signature_work": 17179869184,
+  "max_entropy_words": 1048576,
+  "max_histogram_entries": 32768,
+  "timing": {
+    "p": "1/1000",
+    "seed_base": 2026100101,
+    "shots": 1024,
+    "repetitions": 3,
+    "threads": 1,
+    "excluded_warmup_draws": 1
+  },
+  "proposal": "uniform total p at every original site; q=p+3/N; tail mixture alpha=19/20",
+  "uncertainty": "independent physical acceptance and closing accepted-failure streams"
+}

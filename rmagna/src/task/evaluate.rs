@@ -105,6 +105,17 @@ pub struct ContractionResources {
     pub quotient_rank: usize,
     pub terms: usize,
 }
+
+/// Integrated, unweighted contributions for one explicitly assigned linear task.
+/// The caller owns the law that produced the assignment.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct LinearPrescribedContributions {
+    pub acceptance_resources: ContractionResources,
+    pub target_resources: Option<ContractionResources>,
+    pub accepted: ExactField,
+    pub error: ExactField,
+    pub moments: Vec<ExactField>,
+}
 impl From<&crate::unitary::NetworkValue> for ContractionResources {
     fn from(value: &crate::unitary::NetworkValue) -> Self {
         Self {
@@ -582,6 +593,41 @@ impl TaskEvaluator {
         random: &mut impl RandomSource,
     ) -> Result<TaskEvaluation, TaskError> {
         self.sample_with_faults(faults, BigRational::one(), random)
+    }
+
+    /// Evaluate linear task contributions for a prescribed fault assignment.
+    /// This computes the same unit-weight joint masses as `sample_prescribed`
+    /// on linear tasks, without evaluating the original categorical probability.
+    /// Fault indices and duplicates are still checked by the assignment path.
+    /// Tasks that require causal history sampling must use the sampling API.
+    pub fn linear_prescribed_contributions(
+        &self,
+        faults: &[FaultSelection],
+    ) -> Result<LinearPrescribedContributions, TaskError> {
+        let Execution::Linear { instrument, .. } = &self.execution else {
+            return Err(error(
+                "runtime",
+                "linear prescribed contributions require a linear task",
+            ));
+        };
+        let unit = BigRational::one();
+        // The private evaluation result uses the supplied probability only as
+        // metadata. This endpoint returns contributions and omits that metadata.
+        let result = self.evaluate(EvaluationInput {
+            instrument,
+            faults,
+            history_mass: &ExactScalar::one(),
+            noise_probability: &unit,
+            likelihood: &unit,
+            history: None,
+        })?;
+        Ok(LinearPrescribedContributions {
+            acceptance_resources: result.acceptance_resources,
+            target_resources: result.target_resources,
+            accepted: result.accepted,
+            error: result.error,
+            moments: result.moments,
+        })
     }
 
     /// Sample the history for caller-supplied categorical faults and apply a
