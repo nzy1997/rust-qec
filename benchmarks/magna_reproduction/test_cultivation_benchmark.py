@@ -97,7 +97,7 @@ POSTSELECT det[1] !det[0]
         case = dict(id='physical-0', family='example')
         expected = {(case['id'],'ppvm'):case}
         with TemporaryDirectory() as scratch:
-            root = Path(scratch)
+            root = Path(scratch).resolve()
             previous = root/'previous-attempts'
             previous.mkdir()
             file = previous/'attempt.json'
@@ -115,6 +115,51 @@ POSTSELECT det[1] !det[0]
             file.unlink()
             with self.assertRaisesRegex(ValueError,'inventory differs'):
                 peers.previous_failure_inventory(root,receipt,expected)
+
+    def test_peer_reuse_checks_active_failed_batches_before_retry(self):
+        case = dict(id='physical-0', family='example')
+        wanted = {(case['id'],backend):case for backend in ('rust','ppvm')}
+        with TemporaryDirectory() as scratch:
+            root = Path(scratch).resolve()
+            batches = root/'batches'
+            batches.mkdir()
+            rows = []
+            for backend,status in [('rust','complete'),('ppvm','failed')]:
+                path = batches/f'{backend}.json'
+                stage = dict(case=case,backend=backend,status=status)
+                benchmark.atomic(path,stage)
+                rows.append(dict(stage,path=path.name,sha256=benchmark.reference.digest(path)))
+            receipt = dict(schema=peers.SCHEMA,backends=['ppvm'],cells=rows)
+            self.assertEqual(set(peers.active_batch_inventory(root,receipt,wanted)),set(wanted))
+            with self.assertRaisesRegex(ValueError,'active matched batch inventory differs'):
+                peers.active_batch_inventory(root,dict(receipt,cells=rows[:1]),wanted)
+            (batches/'ppvm.json').unlink()
+            with self.assertRaisesRegex(ValueError,'inventory dropped a declared cell'):
+                peers.active_batch_inventory(root,dict(receipt,cells=rows[:1]),wanted)
+
+    def test_peer_reuse_history_requires_failed_attempts_from_every_parent(self):
+        case = dict(id='physical-0',family='example')
+        failed = dict(case=case,backend='ppvm',status='failed',sha256='a'*64)
+        identity = dict(host=dict(system='Linux-test',machine='x86_64',fingerprint='b'*64),
+                        output_contract=peers.OUTPUT_CONTRACT)
+        with TemporaryDirectory() as scratch:
+            root = Path(scratch).resolve()
+            history = root/'reuse-history'
+            history.mkdir()
+            parent = dict(identity,schema=peers.SCHEMA,reuse_parent_sha256=None,
+                          cells=[failed],previous_failures=[])
+            path = history/'parent.json'
+            benchmark.atomic(path,parent)
+            digest = benchmark.reference.digest(path)
+            saved = path.rename(history/f'{digest}.json')
+            child = dict(parent,reuse_parent_sha256=digest,cells=[],previous_failures=[failed])
+            self.assertEqual(peers.reuse_history(root,child),{digest:saved})
+            with self.assertRaisesRegex(ValueError,'dropped an inherited failed attempt'):
+                peers.reuse_history(root,dict(child,previous_failures=[]))
+            with self.assertRaisesRegex(ValueError,'host or output contract changed'):
+                peers.reuse_history(root,dict(child,host=dict(identity['host'],fingerprint='c'*64)))
+            with self.assertRaisesRegex(ValueError,'history inventory differs'):
+                peers.reuse_history(root,dict(child,reuse_parent_sha256=None))
 
     def test_native_peer_compares_counts_and_integrated_scores(self):
         case = dict(seed=3,shots=8)

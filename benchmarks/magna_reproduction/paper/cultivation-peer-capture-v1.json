@@ -2,6 +2,7 @@
   "schema": "rmagna.cultivation-matched-peer-provenance.v1",
   "receipt_sha256": "db1ff6915c86e6437d7be21e24ecb4061408d0f09b671beb8fa1b58931354552",
   "prior_receipt_sha256": "729523dfbab564d1a26946e7ad7406ba4dcaf73c2be3ffea0e5d11c8d2d59559",
+  "host_fingerprint": "855f61b156ceab48d164210ca4bdb94929072a341ce12f842ee7af4e96d4db65",
   "symft_build": {
     "upstream_commit": "c89b98514a919240b8afa53a271e08d926d3c987",
     "archive_sha256": "30e9b25cfcbb4f04dce204bb9c3d72f5b924de56225f5dd5f47e606dd4e3fe01",

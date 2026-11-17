@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Replay cultivation timing cells on a common host with pinned peer runtimes."""
 import argparse
+from collections import Counter
 from fractions import Fraction
 import hashlib
 import importlib.metadata
@@ -37,8 +38,26 @@ OUTPUT_CONTRACT = 'joint acceptance and target failure per attempted draw'
 RETAINED_CAPTURE = Path(__file__).parent/'paper/cultivation-peer-capture-v1.json'
 
 
+def host_fingerprint():
+    if sys.platform=='darwin':
+        details = subprocess.check_output(
+            ['/usr/sbin/ioreg','-rd1','-c','IOPlatformExpertDevice'], text=True)
+        value = re.search(r'"IOPlatformUUID"\s*=\s*"([0-9a-fA-F-]+)"',details)
+        require(value is not None, 'missing macOS platform UUID for matched timing')
+        identity = value[1].lower()
+    else:
+        path = next((path for path in (Path('/etc/machine-id'),Path('/var/lib/dbus/machine-id'))
+                     if path.is_file()),None)
+        require(path is not None, 'matched timing requires a machine identifier')
+        identity = path.read_text().strip()
+        require(re.fullmatch(r'[0-9a-f]{32}',identity) is not None, 'invalid machine identifier for matched timing')
+        identity += ':'+platform.node()
+    return hashlib.sha256(f'{sys.platform}:{identity}'.encode()).hexdigest()
+
+
 def timing_identity():
-    return dict(host=dict(system=f'{platform.system()}-{platform.release()}', machine=platform.machine()),
+    return dict(host=dict(system=f'{platform.system()}-{platform.release()}', machine=platform.machine(),
+                          fingerprint=host_fingerprint()),
                 output_contract=OUTPUT_CONTRACT)
 
 
@@ -47,13 +66,13 @@ def check_timing_identity(actual, expected):
             'matched timing host or output contract changed')
 
 
-def legacy_capture(root, receipt):
+def legacy_capture(receipt_path, receipt):
     if receipt.get('schema') != LEGACY_SCHEMA:
         require(receipt.get('schema') == SCHEMA, 'unsupported matched timing receipt')
         return None
     pinned = read_json(RETAINED_CAPTURE)
     require(pinned['schema']=='rmagna.cultivation-matched-peer-provenance.v1'
-            and reference.digest(root/'receipt.json') in (pinned['receipt_sha256'],pinned['prior_receipt_sha256']),
+            and reference.digest(receipt_path) in (pinned['receipt_sha256'],pinned['prior_receipt_sha256']),
             'retained legacy matched timing receipt changed')
     return pinned
 
@@ -64,10 +83,10 @@ def timing_cases(plan):
             for backend in ('rust', *BACKENDS)}
 
 
-def previous_failure_inventory(root, receipt, wanted):
+def previous_failure_inventory(root, receipt, wanted, *, legacy=False):
     directory = root/'previous-attempts'
     require(not directory.is_symlink(), 'invalid previous timing attempts directory')
-    rows = receipt.get('previous_failures')
+    rows = receipt.get('previous_failures', [] if legacy else None)
     require(isinstance(rows,list), 'missing previous timing attempts')
     paths = [row['path'] for row in rows]
     actual = {path.name for path in directory.iterdir()} if directory.exists() else set()
@@ -81,6 +100,67 @@ def previous_failure_inventory(root, receipt, wanted):
                 and stage['status']==row['status'] and row['status'] in ('failed','timeout'),
                 'prior peer failure was changed or promoted')
     return rows
+
+
+def active_batch_inventory(root, receipt, wanted):
+    directory = root/'batches'
+    require(directory.is_dir() and not directory.is_symlink(), 'invalid matched batch directory')
+    rows = receipt['cells']
+    paths = [row['path'] for row in rows]
+    actual = {path.name for path in directory.iterdir()}
+    require(len(paths)==len(set(paths)) and set(paths)==actual, 'active matched batch inventory differs')
+    cells = {}
+    for row in rows:
+        key = row['case']['id'],row['backend']
+        require(key in wanted and key not in cells and row['case']==wanted[key],
+                'wrong or duplicate matched timing cell')
+        path = reference.relative_file(directory,row['path'])
+        require(reference.digest(path)==row['sha256'], 'matched cell bytes changed')
+        stage = read_json(path)
+        require(stage['case']==row['case'] and stage.get('backend','rust')==row['backend']
+                and stage['status']==row['status'] and row['status'] in ('complete','failed','timeout'),
+                'matched timing cell status or address changed')
+        cells[key] = (row,path,stage)
+    if receipt.get('schema')==SCHEMA:
+        backends = receipt['backends']
+        require(isinstance(backends,list) and len(backends)==len(set(backends))
+                and set(backends)<=set(BACKENDS), 'invalid matched backend coverage')
+        expected = {key for key in wanted if key[1] in {'rust', *backends}}
+        require(set(cells)==expected, 'matched batch inventory dropped a declared cell')
+    return cells
+
+
+def failure_counts(receipt, *, legacy=False):
+    previous = receipt.get('previous_failures', [] if legacy else None)
+    return Counter((row['case']['id'],row['backend'],row['status'],row['sha256'])
+                   for row in (*previous,*receipt['cells'])
+                   if row['status']!='complete')
+
+
+def reuse_history(root, receipt):
+    directory = root/'reuse-history'
+    require(not directory.is_symlink(), 'invalid matched reuse history directory')
+    digest = receipt['reuse_parent_sha256']
+    paths = {}
+    retained = failure_counts(receipt)
+    while digest is not None:
+        require(benchmark.sha(digest) and digest not in paths, 'invalid or cyclic matched reuse parent')
+        path = reference.relative_file(directory,digest+'.json')
+        require(reference.digest(path)==digest, 'matched reuse parent receipt changed')
+        parent = read_json(path)
+        legacy = legacy_capture(path,parent)
+        require(retained >= failure_counts(parent,legacy=legacy is not None),
+                'matched reuse dropped an inherited failed attempt')
+        if legacy:
+            require(receipt['host']['fingerprint']==legacy['host_fingerprint'],
+                    'legacy matched reuse host changed')
+        else:
+            check_timing_identity(parent,receipt)
+        paths[digest] = path
+        digest = None if legacy else parent['reuse_parent_sha256']
+    actual = {path.name for path in directory.iterdir()} if directory.exists() else set()
+    require(actual=={path.name for path in paths.values()}, 'matched reuse history inventory differs')
+    return paths
 
 
 def native_acceptance(payload, case):
@@ -354,7 +434,7 @@ def run(args):
     (result_root/'batches').mkdir()
     reference.verify_source(upstream,pinned)
     identity = timing_identity()
-    receipt = dict(schema=SCHEMA, threads=1, **identity,
+    receipt = dict(schema=SCHEMA, threads=1, reuse_parent_sha256=None, backends=args.backends, **identity,
                    rust_source_sha256=benchmark.source_identity(benchmark.ROOT),rust_binary_sha256=reference.digest(binary),
                    inputs=benchmark.input_identity(plan,result_root/'inputs',pinned,copy_from=upstream),
                    bounds=dict(timeout_seconds=args.timeout_seconds, rss_limit_bytes=64 << 30),
@@ -367,8 +447,9 @@ def run(args):
     old_results, previous_failures = {}, []
     retained_legacy = saved_symft_build = None
     if args.reuse is not None:
-        existing = read_json(args.reuse/'receipt.json')
-        retained_legacy = legacy_capture(args.reuse,existing)
+        existing_path = args.reuse/'receipt.json'
+        existing = read_json(existing_path)
+        retained_legacy = legacy_capture(existing_path,existing)
         for key in ('threads','rust_source_sha256','rust_binary_sha256','inputs','timing_protocol','output_contract'):
             require(existing[key]==receipt[key], 'timing reuse identity changed: '+key)
         # The archived v1 host used Python's presentation string. CPython 3.14
@@ -376,12 +457,22 @@ def run(args):
         expected_host = (dict(system=platform.platform().removesuffix('-Mach-O'),machine=platform.machine())
                          if retained_legacy else identity['host'])
         require(existing['host']==expected_host, 'timing reuse identity changed: host')
-        for row in previous_failure_inventory(args.reuse,existing,wanted):
+        if retained_legacy:
+            require(identity['host']['fingerprint']==retained_legacy['host_fingerprint'],
+                    'legacy matched reuse host changed')
+        old_results = active_batch_inventory(args.reuse,existing,wanted)
+        ancestors = {} if retained_legacy else reuse_history(args.reuse,existing)
+        for row in previous_failure_inventory(args.reuse,existing,wanted,legacy=retained_legacy is not None):
             previous = result_root/'previous-attempts'
             previous.mkdir(exist_ok=True)
             shutil.copyfile(args.reuse/'previous-attempts'/row['path'],previous/row['path'])
             previous_failures.append(row)
-        old_results = {(row['case']['id'],row['backend']):row for row in existing['cells']}
+        parent = reference.digest(existing_path)
+        receipt['reuse_parent_sha256'] = parent
+        history = result_root/'reuse-history'
+        history.mkdir()
+        for digest,path in {**ancestors,parent:existing_path}.items():
+            shutil.copyfile(path,history/(digest+'.json'))
         saved_symft_build = retained_legacy['symft_build'] if retained_legacy else existing.get('symft_build')
     if 'symft' in args.backends:
         if args.symft_archive is not None or args.symft_extension_sha256 is not None:
@@ -394,31 +485,44 @@ def run(args):
             saved_symft_build = declared
         require(saved_symft_build is not None, 'SymFT timing requires a pinned-source build identity')
         receipt['symft_build'] = saved_symft_build
-    if 'ppvm' in args.backends and not any(row[1]=='ppvm' for row in old_results):
+    if 'ppvm' in args.backends and any(
+        key not in old_results or (args.retry_failed and old_results[key][0]['status']!='complete')
+        for key in wanted if key[1]=='ppvm'
+    ):
         require(args.ppvm_executable is not None, 'PPVM timing requires its pinned executable')
     env = dict(os.environ, **THREADS, PYTHONDONTWRITEBYTECODE='1')
     results = []
+    stage_identity = dict(identity,reuse_parent_sha256=receipt['reuse_parent_sha256'])
+
+    def preserve_failure(row,path):
+        previous = result_root/'previous-attempts'
+        previous.mkdir(exist_ok=True)
+        name = f'{path.stem}-attempt-{len(previous_failures)}.json'
+        require(not (previous/name).exists(), 'duplicate previous attempt path')
+        shutil.copyfile(path,previous/name)
+        previous_failures.append(dict(row,path=name))
+
+    selected = {'rust', *args.backends}
+    for (_,backend),(row,path,_) in old_results.items():
+        if backend not in selected and row['status']!='complete':
+            preserve_failure(row,path)
 
     def retained(case, backend):
-        row = old_results.get((case['id'],backend))
-        if row is None:
+        entry = old_results.get((case['id'],backend))
+        if entry is None:
             return None
-        require(row['case']==case, 'reused peer batch configuration changed')
-        path = reference.relative_file(args.reuse/'batches',row['path'])
-        require(reference.digest(path)==row['sha256'], 'reused peer timing bytes changed')
+        row,path,stage = entry
         if args.retry_failed and row['status'] != 'complete':
-            previous = result_root/'previous-attempts'
-            previous.mkdir(exist_ok=True)
-            name = f'{path.stem}-attempt-{len(previous_failures)}.json'
-            require(not (previous/name).exists(), 'duplicate previous attempt path')
-            shutil.copyfile(path,previous/name)
-            previous_failures.append(dict(row,path=name))
+            preserve_failure(row,path)
             return None
         destination = result_root/'batches'/path.name
-        if retained_legacy:
-            stage = read_json(path)
-            stage.update(identity)
-            if backend!='rust' and stage['status']=='complete':
+        if stage['status']=='complete':
+            if not retained_legacy:
+                check_timing_identity(stage,identity)
+                require(stage['reuse_parent_sha256']==existing['reuse_parent_sha256'],
+                        'reused timing stage lost its source receipt')
+            stage.update(stage_identity)
+            if retained_legacy and backend!='rust':
                 stage['output'].update(identity)
             benchmark.atomic(destination,stage)
             return dict(row,sha256=reference.digest(destination))
@@ -432,7 +536,7 @@ def run(args):
         if row is None:
             status = benchmark.run_stage(case,plan,result_root,binary,receipt)
             batch = benchmark.read_stage(result_root,case)
-            batch.update(identity)
+            batch.update(stage_identity)
             benchmark.atomic(benchmark.stage_path(result_root,case),batch)
             row = dict(case=case,backend='rust',status=status,path=benchmark.stage_path(result_root,case).name,
                        sha256=reference.digest(benchmark.stage_path(result_root,case)))
@@ -456,7 +560,7 @@ def run(args):
                 command.extend(['--ppvm-executable',args.ppvm_executable.resolve(strict=True)])
             if backend == 'symft':
                 command.extend(['--symft-extension-sha256',saved_symft_build['extension_sha256']])
-            stage = dict(case=peer_case,backend=backend,status='failed',**identity)
+            stage = dict(case=peer_case,backend=backend,status='failed',**stage_identity)
             try:
                 stage.update(bounded_worker(command,env,args.timeout_seconds))
                 if stage.get('returncode') == 0:
@@ -481,7 +585,9 @@ def run(args):
     require(reference.digest(binary) == receipt['rust_binary_sha256'], 'matched timing executable changed')
     receipt['cells'] = results
     receipt['previous_failures'] = previous_failures
+    active_batch_inventory(result_root,receipt,wanted)
     previous_failure_inventory(result_root,receipt,wanted)
+    reuse_history(result_root,receipt)
     summary = {}
     for family in benchmark.FAMILIES:
         summary[family] = {}
@@ -501,9 +607,11 @@ def check(root):
     pinned = reference.load_manifest()
     plan = benchmark.manifest(pinned)
     receipt = read_json(root/'receipt.json')
-    legacy = legacy_capture(root,receipt)
-    require(isinstance(receipt.get('host'),dict) and set(receipt['host'])=={'system','machine'}
+    legacy = legacy_capture(root/'receipt.json',receipt)
+    host_fields = {'system','machine'} if legacy else {'system','machine','fingerprint'}
+    require(isinstance(receipt.get('host'),dict) and set(receipt['host'])==host_fields
             and all(isinstance(value,str) and value.strip() for value in receipt['host'].values())
+            and (legacy or benchmark.sha(receipt['host']['fingerprint']))
             and receipt.get('output_contract')==OUTPUT_CONTRACT
             and receipt['inputs'] == benchmark.input_identity(plan,root/'inputs',pinned)
             and receipt['rust_source_sha256'] == benchmark.source_identity(benchmark.ROOT)
@@ -511,17 +619,17 @@ def check(root):
                 threads=1,excluded_warmup_draws=1,shots=1024,repetitions=3), 'matched timing identity or protocol changed')
     symft_build = legacy['symft_build'] if legacy else receipt['symft_build']
     wanted = timing_cases(plan)
-    previous_failure_inventory(root,receipt,wanted)
-    seen, data, builds = set(), {}, {}
-    for row in receipt['cells']:
-        key = row['case']['id'],row['backend']
-        require(key in wanted and key not in seen and row['case'] == wanted[key], 'wrong or duplicate matched timing cell')
-        seen.add(key)
-        path = reference.relative_file(root/'batches',row['path'])
-        require(reference.digest(path)==row['sha256'], 'matched cell bytes changed')
-        stage = read_json(path)
+    previous_failure_inventory(root,receipt,wanted,legacy=legacy is not None)
+    cells = active_batch_inventory(root,receipt,wanted)
+    require(set(cells)==set(wanted), 'matched timing report dropped a failed or missing cell')
+    if not legacy:
+        reuse_history(root,receipt)
+    data, builds = {}, {}
+    for key,(row,_,stage) in cells.items():
         if not legacy:
             check_timing_identity(stage,receipt)
+            require(stage['reuse_parent_sha256']==receipt['reuse_parent_sha256'],
+                    'matched timing stage lost its source receipt')
         require(row['status']==stage['status']=='complete' and stage['returncode']==0,
                 'matched backend failed or missed a timing cell: '+str(key))
         case = wanted[key]
@@ -571,7 +679,6 @@ def check(root):
         require(0 <= acceptance <= 1 and benchmark.valid_seconds(seconds) and seconds > 0
                 and row['seconds_per_draw']==seconds/case['shots'], 'matched timing/acceptance changed')
         data.setdefault((case['family'],backend),[]).append((acceptance,case['shots'],seconds/case['shots']))
-    require(seen == set(wanted), 'matched timing report dropped a failed or missing cell')
     summary = {}
     for family in benchmark.FAMILIES:
         summary[family] = {}
@@ -589,7 +696,7 @@ def check(root):
             a, b = baseline['acceptance'],peer['acceptance']
             variance=a*(1-a)/baseline['shots']+b*(1-b)/peer['shots']
             require(abs(a-b) <= 6*math.sqrt(variance)+0.005, 'peer acceptance differs on matched input: '+family+' '+backend)
-    return dict(status='PASS', executed_batches=len(seen), builds=builds, summary=summary)
+    return dict(status='PASS', executed_batches=len(cells), builds=builds, summary=summary)
 
 
 def main():

@@ -4182,7 +4182,10 @@ Use the pinned peer packages on the peer Python search path. Obtain
 build. The worker verifies this digest on the loaded extension. The original
 matched capture uses a pinned receipt that binds its host, score contract,
 build and all six previously failed attempts. New measurements record the host
-and score contract in each timing stage and retain previous attempts across reuse.
+fingerprint and score contract in each timing stage. Reuse checks the complete
+source batch inventory and the current machine fingerprint. The derived receipt
+retains its source receipts by SHA-256 and accounts for their failed attempts,
+including those retried or omitted from the selected backends.
 The PPVM standalone
 driver is `peers/ppvm_cultivation.rs`. Its Cargo adapter uses the pinned source's
 `ppvm-stim`, `ppvm-pauli-sum` and `ppvm-tableau` crates, plus `serde` and
