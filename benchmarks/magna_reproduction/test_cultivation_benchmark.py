@@ -124,7 +124,7 @@ POSTSELECT det[1] !det[0]
             batches = root/'batches'
             batches.mkdir()
             rows = []
-            for backend,status in [('rust','complete'),('ppvm','failed')]:
+            for backend,status in [('rust','invalid'),('ppvm','failed')]:
                 path = batches/f'{backend}.json'
                 stage = dict(case=case,backend=backend,status=status)
                 benchmark.atomic(path,stage)

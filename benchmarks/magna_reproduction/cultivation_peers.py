@@ -32,6 +32,7 @@ SYMFT_COMMIT = 'c89b98514a919240b8afa53a271e08d926d3c987'
 SYMFT_ARCHIVE = '30e9b25cfcbb4f04dce204bb9c3d72f5b924de56225f5dd5f47e606dd4e3fe01'
 PPVM_COMMIT = '7b2e1bcbca06bcf28a57ef600b80273d6a337842'
 BACKENDS = ('magna','clifft','symft','ppvm')
+FAILURE_STATUSES = ('failed','timeout','invalid')
 LEGACY_SCHEMA = 'rmagna.cultivation-matched-peer-timing.v1'
 SCHEMA = 'rmagna.cultivation-matched-peer-timing.v2'
 OUTPUT_CONTRACT = 'joint acceptance and target failure per attempted draw'
@@ -97,7 +98,7 @@ def previous_failure_inventory(root, receipt, wanted, *, legacy=False):
         stage = read_json(path)
         require(reference.digest(path)==row['sha256'] and key in wanted
                 and row['case']==stage['case']==wanted[key] and row['backend']==stage.get('backend','rust')
-                and stage['status']==row['status'] and row['status'] in ('failed','timeout'),
+                and stage['status']==row['status'] and row['status'] in FAILURE_STATUSES,
                 'prior peer failure was changed or promoted')
     return rows
 
@@ -118,7 +119,7 @@ def active_batch_inventory(root, receipt, wanted):
         require(reference.digest(path)==row['sha256'], 'matched cell bytes changed')
         stage = read_json(path)
         require(stage['case']==row['case'] and stage.get('backend','rust')==row['backend']
-                and stage['status']==row['status'] and row['status'] in ('complete','failed','timeout'),
+                and stage['status']==row['status'] and row['status'] in ('complete', *FAILURE_STATUSES),
                 'matched timing cell status or address changed')
         cells[key] = (row,path,stage)
     if receipt.get('schema')==SCHEMA:
