@@ -4285,6 +4285,10 @@ each campaign with its original offline verifier. It needs the standard
 library, Python 3.12 or later with tar extraction filters, and Git. Plotting is
 a separate step using Matplotlib. The regenerated CSV files carry the measured
 curves, uncertainties, timing rows and cultivation representation counts.
+The code-switching plot labels the deposited Daguerre–Kim tomography fit
+and Table I point separately from the simulator's target-overlap estimates.
+The logical-distillation plot retains the published leading-order guide.
+Open triangles mark unresolved points at the plot boundary.
 The cultivation comparison labels each backend's count and keeps deposited
 sampling and same-host matched sampling in separate panels. The JSON keeps
 the exact covariance, workload and build identities, failed attempts,

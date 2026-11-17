@@ -8,7 +8,9 @@ import unittest
 from unittest.mock import patch
 
 import paper_evidence as evidence
-from paper_evidence_report import cultivation_efficiency, cultivation_representation, decoder_timings, paired_timing
+from paper_evidence_report import (
+    code_switching_tomography, cultivation_efficiency, cultivation_representation, decoder_timings, paired_timing,
+)
 from remaining_contracts import reference
 
 
@@ -141,6 +143,17 @@ class PaperEvidenceTests(unittest.TestCase):
         rust.pop()
         with self.assertRaisesRegex(ValueError, "representation observations"):
             list(cultivation_representation(checked))
+
+    def test_code_switching_keeps_tomography_point_and_polynomial_separate(self):
+        reference = dict(table_I=dict(p=0.001, conditional_error=0.000046, conditional_error_se=0.000016),
+                         plotted_fit_range=[0.001, 0.01], equation_23_error_fit={"2": 25.5, "3": -1266.7})
+        table, *fit = code_switching_tomography({"code_switching_resources": {"reference": reference}})
+        self.assertEqual((table["p"], table["estimate"], table["standard_error"], table["origin"]),
+                         ("1/1000", 0.000046, 0.000016, "tomography_table"))
+        self.assertEqual(len(fit), 101)
+        self.assertEqual((fit[0]["p"], fit[-1]["p"]), ("1/1000", "1/100"))
+        self.assertEqual(fit[-1]["estimate"], 0.0012833)
+        self.assertTrue(all(row["origin"] == "tomography_fit" and row["standard_error"] is None for row in fit))
 
 
 if __name__ == "__main__":

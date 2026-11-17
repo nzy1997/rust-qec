@@ -3,6 +3,7 @@
 import argparse
 from collections import defaultdict
 from fractions import Fraction
+from math import isnan, nan
 from pathlib import Path
 
 from remaining_contracts import read_json
@@ -24,10 +25,13 @@ METRICS = {
     "paired_difference": ("Physical minus author infidelity", "linear"),
 }
 ORIGINS = {
-    "rust": ("Rust", "o"),
-    "analytic": ("Exact", None),
-    "deposit": ("Deposit", "s"),
-    "literature": ("Literature", "*"),
+    "rust": ("Rust", "o", ":"),
+    "analytic": ("Exact", None, "-"),
+    "deposit": ("Deposit", "s", ":"),
+    "literature": ("Literature", "*", ":"),
+    "leading_order": ("Leading order", None, "--"),
+    "tomography_table": ("Published tomography", "*", "none"),
+    "tomography_fit": ("Published tomography fit", None, "--"),
 }
 CULTIVATION_FAMILIES = ("color3", "rp2-d3-T", "color5", "rp2-d5-T")
 CULTIVATION_LABELS = ("Color d=3", "RP² d=3", "Color d=5", "RP² d=5")
@@ -52,28 +56,41 @@ def precision_figure(plt, rows, family_name, out, preview):
         label, scale = METRICS[metric]
         chosen = defaultdict(list)
         for row in rows:
-            if (row["metric"] == metric and row["estimate"] is not None
-                    and (scale != "log" or row["estimate"] > 0)):
+            if row["metric"] == metric:
                 chosen[row["family"], row["origin"]].append(row)
+        displayed = False
+        unresolved_label = "Unresolved"
         for (family, origin), points in sorted(chosen.items()):
             points = sorted(points, key=lambda row: Fraction(row["p"]))
-            name, marker = ORIGINS[origin]
-            axis.errorbar([float(Fraction(row["p"])) for row in points],
-                          [row["estimate"] for row in points],
-                          yerr=[row["standard_error"] or 0 for row in points],
-                          label=f"{family} · {name}", color=families[family], marker=marker, markersize=4,
-                          capsize=2, linestyle="-" if origin == "analytic" else ":", linewidth=1)
+            name, marker, style = ORIGINS[origin]
+            rates = [float(Fraction(row["p"])) for row in points]
+            values = [row["estimate"] if row["precision_resolved"] and row["estimate"] is not None
+                      and (scale != "log" or row["estimate"] > 0) else nan for row in points]
+            if any(not isnan(value) for value in values):
+                errors = [row["standard_error"] or 0 for row in points]
+                axis.errorbar(rates, values, yerr=errors if any(errors) else None,
+                              label=f"{family} · {name}", color=families[family], marker=marker, markersize=4,
+                              capsize=2, linestyle=style, linewidth=1)
+                displayed = True
+            unresolved = [rate for rate, row in zip(rates, points, strict=True) if not row["precision_resolved"]]
+            if unresolved:
+                axis.scatter(unresolved, [0.035]*len(unresolved), transform=axis.get_xaxis_transform(),
+                             marker="v", s=19, facecolors="none", edgecolors=families[family],
+                             label=unresolved_label, zorder=4)
+                displayed = True
+                unresolved_label = "_nolegend_"
         axis.set(xscale="log", yscale=scale, xlabel="Physical noise probability", ylabel=label)
-        rates = sorted({float(Fraction(row["p"])) for row in rows if row["metric"] == metric})
+        rates = sorted({float(Fraction(row["p"])) for row in rows
+                        if row["metric"] == metric and row["origin"] != "tomography_fit"})
         if rates and len(rates) <= 8:
             axis.set_xticks(rates, [f"{rate:.3g}" for rate in rates])
             axis.xaxis.set_minor_locator(NullLocator())
         if metric == "paired_difference":
             axis.axhline(0, color="0.65", linewidth=0.8)
         axis.grid(axis="y", which="major", alpha=0.25)
-        if chosen:
+        if displayed:
             axis.legend(fontsize=7, ncols=2, loc="best")
-    fig.suptitle(title + preview + "\nError bars show one standard error. The data table retains unresolved zero estimates.", fontsize=11)
+    fig.suptitle(title + preview + "\nError bars show one standard error. Open triangles mark unresolved points.", fontsize=11)
     fig.savefig(out/f"{family_name}.png", dpi=180)
     plt.close(fig)
 

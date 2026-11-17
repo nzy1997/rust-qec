@@ -24,6 +24,19 @@ def point(figure, family, p, metric, origin, estimate, standard_error=None, *, p
                 standard_error=standard_error if resolved else None, pull=pull, precision_resolved=resolved)
 
 
+def code_switching_tomography(deposit):
+    reference = deposit["code_switching_resources"]["reference"]
+    table = reference["table_I"]
+    yield point("code-switching", "dk", str(Fraction(str(table["p"]))), "conditional_error",
+                "tomography_table", table["conditional_error"], table["conditional_error_se"])
+    low, high = map(lambda rate: Fraction(str(rate)), reference["plotted_fit_range"])
+    coefficients = {int(power): Fraction(str(value)) for power, value in reference["equation_23_error_fit"].items()}
+    for index in range(101):
+        rate = low + (high-low)*index/100
+        estimate = sum(value*rate**power for power, value in coefficients.items())
+        yield point("code-switching", "dk", str(rate), "conditional_error", "tomography_fit", float(estimate))
+
+
 def precision_points(bh, cultivation, decoder, deposit):
     for row, original in zip(bh["precision"], deposit["bh_precision"], strict=True):
         case = row["case"]
@@ -66,6 +79,9 @@ def precision_points(bh, cultivation, decoder, deposit):
             yield point("figure5", "logical-distillation", row["p"], key, "deposit", old[key], old[key+"_se"])
             yield point("figure5", "logical-distillation", row["p"], key, "analytic", float(Fraction(old["exact"][key])))
         yield point("figure5", "logical-distillation", row["p"], "q_eff", "exact_enumeration", float(Fraction(row["q_eff"])))
+        rate = Fraction(row["p"])
+        yield point("figure5", "logical-distillation", row["p"], "conditional_error",
+                    "leading_order", float(60480*rate**6))
 
     for family, rows in decoder["code-switching"]["curves"].items():
         for row in rows:
@@ -76,6 +92,7 @@ def precision_points(bh, cultivation, decoder, deposit):
                             resolved=key == "acceptance" or observed["precision_resolved"])
                 yield point("code-switching", family, row["p"], key, "deposit", old[key],
                             math.sqrt(old["variance_"+key]), resolved=key == "acceptance" or old["positive"] > 0)
+    yield from code_switching_tomography(deposit)
 
     for family, rows in decoder["tqd"]["curves"].items():
         for row in rows:
