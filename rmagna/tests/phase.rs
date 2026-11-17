@@ -773,6 +773,50 @@ fn wide_clifford_extraction_preserves_odd_identities_and_packed_carries() {
 }
 
 #[test]
+fn packed_clifford_validation_checks_cubic_terms_beyond_the_first_word() {
+    let width = 131;
+    let cancelled = (0..5).flat_map(|block| {
+        (1..16_u8).map(move |mask| {
+            let axis = (0..4)
+                .filter(|&bit| (mask >> bit) & 1 != 0)
+                .map(|bit| 4 * block + bit);
+            (BitVector::from_indices(width, axis).unwrap(), 1)
+        })
+    });
+    // Each four-axis block contributes either zero or eight, so all 75
+    // distinct odd parities contribute the identity with multiple packed words.
+    let even_axis = BitVector::from_indices(width, [1, 129]).unwrap();
+    let baseline = ParityPhase::new(width, 3, cancelled.clone().chain([(even_axis, 2)])).unwrap();
+    assert_eq!(
+        baseline.terms().iter().filter(|(_, c)| c & 1 != 0).count(),
+        75
+    );
+    let (global, quadratic) = baseline.clifford().unwrap();
+    let cubic_coordinates = [65, 97, 130];
+    let cubic = (1..8_u8).map(|mask| {
+        let axis = (0..3)
+            .filter(|&bit| (mask >> bit) & 1 != 0)
+            .map(|bit| cubic_coordinates[bit]);
+        (BitVector::from_indices(width, axis).unwrap(), 1)
+    });
+    let non_clifford = ParityPhase::new(width, 0, cancelled.chain(cubic)).unwrap();
+    assert_eq!(non_clifford.clifford(), Err(PhaseError::NotClifford));
+    for active in [
+        vec![],
+        vec![1],
+        vec![129],
+        vec![1, 129],
+        vec![1, 65, 97, 130],
+    ] {
+        let value = BitVector::from_indices(width, active).unwrap();
+        assert_eq!(
+            (global + 2 * quadratic.evaluate(&value).unwrap()) & 7,
+            baseline.evaluate(&value).unwrap()
+        );
+    }
+}
+
+#[test]
 fn compressed_signature_quotients_match_full_wide_coordinate_equations() {
     let width = 129;
     let pivots = [0, 1, 64, 65, 128];

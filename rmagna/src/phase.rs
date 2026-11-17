@@ -367,54 +367,7 @@ impl ParityPhase {
 
     /// Return `omega^global * i^quadratic`. Non-Clifford phases are rejected.
     pub fn clifford(&self) -> Result<(u8, QuadraticForm), PhaseError> {
-        // Pivot coordinates restrict the odd-axis span injectively. Thus a
-        // zero trilinear signature on this smaller coordinate space is zero
-        // on the full space; no quotient basis or decomposition is changed.
-        let odd = self
-            .terms
-            .iter()
-            .filter(|(_, c)| c & 1 != 0)
-            .map(|(axis, _)| axis.clone())
-            .collect::<Vec<_>>();
-        if !odd.is_empty() {
-            let compressed;
-            let signature = if self.width > 64 {
-                let pivots = LinearFactorization::new(self.width, &odd)?
-                    .pivot_columns()
-                    .to_vec();
-                if pivots.len() < self.width {
-                    compressed = Self::new(
-                        pivots.len(),
-                        0,
-                        odd.iter()
-                            .map(|axis| {
-                                Ok((
-                                    BitVector::from_indices(
-                                        pivots.len(),
-                                        pivots.iter().enumerate().filter_map(|(j, &k)| {
-                                            axis.get(k).expect("validated coordinate").then_some(j)
-                                        }),
-                                    )?,
-                                    1,
-                                ))
-                            })
-                            .collect::<Result<Vec<_>, Gf2Error>>()?,
-                    )?;
-                    &compressed
-                } else {
-                    self
-                }
-            } else {
-                self
-            };
-            for i in 0..signature.width {
-                for j in i..signature.width {
-                    if !signature.signature_slice(i, j)?.is_zero() {
-                        return Err(PhaseError::NotClifford);
-                    }
-                }
-            }
-        }
+        self.check_clifford_signature()?;
         let mut linear = vec![0_u8; self.width];
         let mut pair = Vec::with_capacity(self.width);
         for (axis, coefficient) in &self.terms {
@@ -450,6 +403,62 @@ impl ParityPhase {
             self.constant,
             QuadraticForm::new(0, linear.into_iter().map(|c| c / 2).collect(), pair)?,
         ))
+    }
+
+    fn check_clifford_signature(&self) -> Result<(), PhaseError> {
+        let odd = self
+            .terms
+            .iter()
+            .filter(|(_, c)| c & 1 != 0)
+            .map(|(axis, _)| axis.clone())
+            .collect::<Vec<_>>();
+        if odd.is_empty() {
+            return Ok(());
+        }
+        if self.width <= 64 {
+            for i in 0..self.width {
+                for j in i..self.width {
+                    if !self.signature_slice(i, j)?.is_zero() {
+                        return Err(PhaseError::NotClifford);
+                    }
+                }
+            }
+            return Ok(());
+        }
+
+        // Pivot coordinates restrict the span of the odd axes injectively.
+        // The signature is symmetric trilinear, so triples of these coordinates
+        // with i <= j <= k determine all ambient values, including repeats.
+        // Transpose the odd axes once to put the term index in packed words.
+        // Each triple then takes the parity of one packed intersection.
+        let factor = LinearFactorization::new(self.width, &odd)?;
+        let by_coordinate = transpose_columns(self.width, &odd)?;
+        let columns = factor
+            .pivot_columns()
+            .iter()
+            .map(|&i| by_coordinate[i].words())
+            .collect::<Vec<_>>();
+        let mut intersection = vec![0_u64; odd.len().div_ceil(64)];
+        for (i, left) in columns.iter().enumerate() {
+            for (j, right) in columns.iter().enumerate().skip(i) {
+                for ((word, &a), &b) in intersection.iter_mut().zip(*left).zip(*right) {
+                    *word = a & b;
+                }
+                if intersection.iter().all(|&word| word == 0) {
+                    continue;
+                }
+                for third in &columns[j..] {
+                    let parity_word = intersection
+                        .iter()
+                        .zip(*third)
+                        .fold(0, |parity, (&a, &b)| parity ^ (a & b));
+                    if parity_word.count_ones() & 1 != 0 {
+                        return Err(PhaseError::NotClifford);
+                    }
+                }
+            }
+        }
+        Ok(())
     }
 }
 
