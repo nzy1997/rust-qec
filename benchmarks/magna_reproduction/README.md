@@ -4200,38 +4200,59 @@ on each side. This preserves the projected qubit and the sign of the report
 seen by feedback and detector scoring. A retry can retain the failed raw attempt
 and reuse completed counterpart timings with `--reuse` and `--retry-failed`.
 
-### B05 code-switching precision and timing
+### B05 decoder precision and timing
 
-Build the release example once and reuse the protected decoder environment.
+Build the three release examples in one invocation and reuse the protected
+decoder Python environment. Set `MAGNA_DECODER_RESULTS` to a new result root.
+Use the virtual environment's launcher path in `MAGNA_PYTHON`.
 
 ```sh
-cargo build --locked --release -p rmagna --example paper_decoder_run
-python3 benchmarks/magna_reproduction/paper_benchmark.py run \
-  --manifest benchmarks/magna_reproduction/paper/code-switching.json \
-  --upstream "$MAGNA_UPSTREAM" --python "$MAGNA_PYTHON" \
-  --rust-example "$MAGNA_DECODER_RUNNER" --archive "$MAGNA_PAPER_DEPOSIT" \
-  --out "$MAGNA_CODE_SWITCH_RESULTS" --jobs 8
+cargo build --locked --release -p rmagna \
+  --example paper_logical_distillation_run --example paper_decoder_run --example paper_tqd_run
+run_decoder_campaign() {
+  python3 benchmarks/magna_reproduction/paper_benchmark.py run \
+    --manifest "benchmarks/magna_reproduction/paper/$1.json" \
+    --upstream "$MAGNA_UPSTREAM" --python "$MAGNA_PYTHON" \
+    --rust-example "${CARGO_TARGET_DIR:-target}/release/examples/$2" \
+    --archive "$MAGNA_PAPER_DEPOSIT" --out "$MAGNA_DECODER_RESULTS/$1" --jobs 8
+}
+run_decoder_campaign logical-distillation paper_logical_distillation_run
+run_decoder_campaign code-switching paper_decoder_run
+run_decoder_campaign tqd paper_tqd_run
 python3 benchmarks/magna_reproduction/paper_benchmark.py check \
-  --manifest benchmarks/magna_reproduction/paper/code-switching.json \
-  --results "$MAGNA_CODE_SWITCH_RESULTS"
+  --manifest benchmarks/magna_reproduction/paper/decoder_workloads.json \
+  --results "$MAGNA_DECODER_RESULTS"
 ```
 
-The full schedule uses 21,757,952 precision draws across DK, WG-S and WG-T. The
-pilot manifest exercises every rate and each timing configuration with shorter
-precision batches. DK executes the pinned Steane CSS recovery and records the
-observed six-bit syndromes and the responses to them. The verifier checks the
-responses from the stabilizer check supports. The two WG inputs retain their
-eight ideal terminal readouts. Those readouts have zero probability under both
-noise laws.
+Logical distillation uses all 102 physical qubits and 15 input recovery stages.
+It reweights 16,384 independent draws jointly at the three Figure 5 rates and
+recomputes the exact proposal probabilities and cross-rate covariance. Its
+separate 16,384-attempt timing batch runs the full decoder serially. The timing
+and precision cohorts use separate draw addresses.
 
-Each batch stores exact joint acceptance and error masses by physical fault
-count. The verifier combines the original histograms, applies the exact
-likelihood, and recomputes the paired conditional error variance. An estimate
-with zero observed errors retains unresolved precision. The six Table I timing
-trials run serially and have one excluded warmup each. Rust sampling time includes
-fault generation and probability evaluation. Subtract the observed decoder time
-within each run before taking the median. The historical outer trial clock,
-input hashes and seed schedule remain available alongside the Rust measurements.
+Code switching uses 21,757,952 precision draws across DK, WG-S and WG-T. DK
+executes the pinned Steane CSS recovery. The verifier checks recorded six-bit
+syndromes and responses against the stabilizer check supports. The two WG
+inputs retain their eight ideal terminal readouts with zero fault probability.
+The precision batches store exact joint acceptance and error by fault count
+for likelihood reweighting and paired conditional variance.
+
+TQD covers all 18,432 physical draws at the 15 deposited size/rate points. The
+Rust decoder receives reported records through the pinned author bindings. An
+explicit readout flip at each size verifies the feedback boundary. The full
+four-logical-qubit branch has norm `5/8`. The author approximation consumes the
+same physical fault lists and runs 32 nested trials in each unflagged flux
+sector. The offline report computes the full curve, flux-matched curves and
+their paired difference. It keeps the deposited term counts `4/2/1` and the
+observed Rust resources in their respective query families.
+
+Each workload has a `-pilot.json` plan for exercising its capture and checker.
+Use separate result paths for pilots. The combined checker requires every
+full campaign. The timing trials run serially with one excluded warmup each.
+Rust sampling time includes fault generation and probability evaluation. The
+report subtracts observed decoder time within each trial before taking the
+median, and retains the historical clocks, input hashes and seeds. A precision
+estimate with zero observed errors retains unresolved precision.
 
 The result directory retains each completed range and any failed worker output.
 The same command with `--resume` reuses verified ranges on the same producer,

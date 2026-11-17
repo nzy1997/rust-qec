@@ -1,0 +1,39 @@
+{
+  "archive_sha256": "73de3979469d3cd39975ac5976303a71bd921eca7a29bd7de6119f7acc84b3f6",
+  "born_seed_offset": 100000,
+  "historical_kernel": "853fa2369817e1be65a710b42ff80606e219e464",
+  "nonidentity_class_mass": "1/5",
+  "paper": "2610.22315v1",
+  "precision": {
+    "chunk_size": 16,
+    "draws": 32,
+    "seed": 2026100631,
+    "timeout_seconds": 900
+  },
+  "proposal_rate": "1/100",
+  "rates": [
+    "1/1000",
+    "3/1000",
+    "1/100"
+  ],
+  "reference_sha256": "c49203a586f5a451e3183b435793df693dd486857356aed8826df5dc723e5454",
+  "rng_protocol": "splitmix64-addressed-u32-seed-u32-index-v1",
+  "schema": "rmagna.paper-logical-distillation-plan.v1",
+  "scope": "pilot",
+  "serial_timing": {
+    "draws": 16,
+    "excluded_warmup_draws": 1,
+    "seed": 2026100801,
+    "timeout_seconds": 14400,
+    "workers": 1
+  },
+  "target": {
+    "controls": 334,
+    "decoder_calls_per_draw": 39,
+    "input_recovery_stages": 15,
+    "outputs": 9,
+    "physical_qubits": 102,
+    "physical_records": 451
+  },
+  "upstream_commit": "56847478c840395735146ef1e1ccdc3d8aedc10f"
+}

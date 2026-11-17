@@ -451,6 +451,18 @@ def main(argv=None):
             import code_switching_benchmark
             result = (code_switching_benchmark.capture(args, manifest, run_process) if args.command == "run"
                       else code_switching_benchmark.check_capture(manifest, args.results))
+        elif manifest.get("schema") == "rmagna.paper-logical-distillation-plan.v1":
+            import logical_distillation_benchmark
+            result = (logical_distillation_benchmark.capture(args, manifest, run_process) if args.command == "run"
+                      else logical_distillation_benchmark.check_capture(manifest, args.results))
+        elif manifest.get("schema") == "rmagna.paper-tqd-plan.v1":
+            import tqd_paper_benchmark
+            result = (tqd_paper_benchmark.capture(args, manifest, run_process) if args.command == "run"
+                      else tqd_paper_benchmark.check_capture(manifest, args.results))
+        elif manifest.get("schema") == "rmagna.paper-decoder-workloads-plan.v1":
+            from decoder_workloads_benchmark import check_capture as check_decoder_workloads
+            require(args.command == "check", "Run each decoder campaign before checking the combined manifest")
+            result = check_decoder_workloads(manifest, args.results)
         else:
             if args.command == "run":
                 require(args.python is not None, "pilot run requires --python with the protected Native environment")

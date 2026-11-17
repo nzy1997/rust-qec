@@ -1,0 +1,75 @@
+{
+  "schema": "rmagna.paper-tqd-plan.v1",
+  "scope": "pilot",
+  "reference_sha256": "c49203a586f5a451e3183b435793df693dd486857356aed8826df5dc723e5454",
+  "archive_sha256": "73de3979469d3cd39975ac5976303a71bd921eca7a29bd7de6119f7acc84b3f6",
+  "paper": "2610.22315v1",
+  "upstream_commit": "56847478c840395735146ef1e1ccdc3d8aedc10f",
+  "historical_kernel": "853fa2369817e1be65a710b42ff80606e219e464",
+  "families": {
+    "tqd3": {
+      "size": 3,
+      "depth": 5,
+      "outputs": 36,
+      "physical_fault_categories": 756,
+      "grid": [
+        {
+          "p": "3/1000",
+          "seed": 202610380000,
+          "draws": 8,
+          "point": 0
+        },
+        {
+          "p": "1/50",
+          "seed": 202610420000,
+          "draws": 48,
+          "point": 4
+        }
+      ]
+    },
+    "tqd4": {
+      "size": 4,
+      "depth": 6,
+      "outputs": 64,
+      "physical_fault_categories": 1632,
+      "grid": [
+        {
+          "p": "3/1000",
+          "seed": 202610480000,
+          "draws": 2,
+          "point": 0
+        }
+      ]
+    },
+    "tqd5": {
+      "size": 5,
+      "depth": 8,
+      "outputs": 100,
+      "physical_fault_categories": 3450,
+      "grid": [
+        {
+          "p": "3/1000",
+          "seed": 202610580000,
+          "draws": 2,
+          "point": 0
+        }
+      ]
+    }
+  },
+  "chunk_size": 64,
+  "timeout_seconds": 1800,
+  "rng_protocol": "splitmix64-addressed-u40-seed-u23-index-role-v1",
+  "nested_draws": 32,
+  "timing": {
+    "seed": 2026100800,
+    "p": "1/100",
+    "shots": 2,
+    "families": [
+      "tqd3"
+    ],
+    "repetitions": 1,
+    "timeout_seconds": 3600,
+    "excluded_warmup_draws": 1,
+    "workers": 1
+  }
+}
