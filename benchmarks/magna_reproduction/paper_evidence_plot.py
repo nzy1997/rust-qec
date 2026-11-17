@@ -29,6 +29,15 @@ ORIGINS = {
     "deposit": ("Deposit", "s"),
     "literature": ("Literature", "*"),
 }
+CULTIVATION_FAMILIES = ("color3", "rp2-d3-T", "color5", "rp2-d5-T")
+CULTIVATION_LABELS = ("Color d=3", "RP² d=3", "Color d=5", "RP² d=5")
+CULTIVATION_BACKENDS = {
+    "magna": ("Magna", "terms"),
+    "symft": ("SymFT", "amplitudes"),
+    "clifft": ("Clifft", "amplitudes"),
+    "ppvm": ("PPVM", "coefficients"),
+    "rust": ("Rust", "terms"),
+}
 
 
 def precision_figure(plt, rows, family_name, out, preview):
@@ -94,6 +103,46 @@ def bh_timing_figure(plt, timing, out, preview):
     plt.close(fig)
 
 
+def cultivation_comparison_figure(plt, representation, timing, out, preview):
+    fig, axes = plt.subplots(1, 3, figsize=(13.4, 4.2), layout="constrained")
+    sizes = {(row["family"], row["backend"]): row["count"] for row in representation
+             if row["status"] in ("complete", "completed")}
+    for index, (backend, (label, quantity)) in enumerate(CULTIVATION_BACKENDS.items()):
+        offset = (index-2)*0.13
+        coordinates = [(i+offset, sizes[family, backend]) for i, family in enumerate(CULTIVATION_FAMILIES)
+                       if sizes.get((family, backend)) is not None]
+        if coordinates:
+            x, y = zip(*coordinates, strict=True)
+            axes[0].scatter(x, y, s=21, color=f"C{index}", label=f"{label} {quantity}")
+    axes[0].set(title="Representation size", ylabel="Count")
+    axes[0].legend(fontsize=7, loc="upper left")
+
+    for axis, protocol, title in zip(axes[1:], ("deposited-peer-timing", "same-host-matched-peers"),
+                                      ("Deposited sampling", "Same-host matched sampling"), strict=True):
+        selected = {(row["family"], row["backend"]): row["seconds_per_attempt"] for row in timing
+                    if row["table"] == "table2" and row["timing_protocol"] == protocol}
+        for index, (backend, (label, _)) in enumerate(CULTIVATION_BACKENDS.items()):
+            offset = (index-2)*0.13
+            coordinates = [(i+offset, 1000*selected[family, backend]) for i, family in enumerate(CULTIVATION_FAMILIES)
+                           if selected.get((family, backend)) is not None]
+            if coordinates:
+                x, y = zip(*coordinates, strict=True)
+                axis.scatter(x, y, s=21, color=f"C{index}", label=label)
+        axis.set(title=title, ylabel="Sampling per attempt (ms)")
+        axis.legend(fontsize=7, loc="upper left")
+
+    for axis in axes:
+        axis.set_xticks(range(len(CULTIVATION_FAMILIES)), CULTIVATION_LABELS, rotation=17)
+        axis.set_yscale("log")
+        axis.grid(axis="y", which="major", alpha=0.25)
+    timing_limits = [axis.get_ylim() for axis in axes[1:]]
+    for axis in axes[1:]:
+        axis.set_ylim(min(low for low, _ in timing_limits), max(high for _, high in timing_limits))
+    fig.suptitle("Cultivation resources and sampling" + preview, fontsize=11)
+    fig.savefig(out/"figure4-comparison.png", dpi=180)
+    plt.close(fig)
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--data", type=Path, required=True, help="verified regenerated.json")
@@ -108,6 +157,7 @@ def main():
     for figure in FIGURES:
         precision_figure(plt, [point for point in data["points"] if point["figure"] == figure], figure, args.out, preview)
     bh_timing_figure(plt, data["timings"], args.out, preview)
+    cultivation_comparison_figure(plt, data["cultivation_representation"], data["timings"], args.out, preview)
 
 
 if __name__ == "__main__":

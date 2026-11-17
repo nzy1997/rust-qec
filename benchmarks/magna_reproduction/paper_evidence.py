@@ -149,6 +149,7 @@ def generate(plan, raw, artifact_count):
         "regenerated.json": canonical_json(output),
         "figure-data.csv": csv_table(output["points"]),
         "timing-tables.csv": csv_table(output["timings"]),
+        "cultivation-representation.csv": csv_table(output["cultivation_representation"]),
     }
 
 

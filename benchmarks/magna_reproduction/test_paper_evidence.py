@@ -8,7 +8,7 @@ import unittest
 from unittest.mock import patch
 
 import paper_evidence as evidence
-from paper_evidence_report import cultivation_efficiency, decoder_timings, paired_timing
+from paper_evidence_report import cultivation_efficiency, cultivation_representation, decoder_timings, paired_timing
 from remaining_contracts import reference
 
 
@@ -125,6 +125,22 @@ class PaperEvidenceTests(unittest.TestCase):
         self.assertEqual(row["deposit"]["positive_failure_draws"], 6)
         self.assertEqual(row["deposit"]["relative_conditional_error_se"], 0.5)
         self.assertIsNone(row["rust"]["relative_conditional_error_se"])
+
+    def test_cultivation_representation_uses_measured_terms_and_keeps_failed_rows(self):
+        timings = [
+            dict(family="color5", backend="clifft", raw=dict(status="completed", resource=1024)),
+            dict(family="color5", backend="tsim", raw=dict(status="failed", resource=None)),
+        ]
+        rust = [dict(case=str(i), acceptance=1, target=i+1) for i in range(3)]
+        checked = dict(observed=dict(historical_comparison=dict(timings=timings)),
+                       rust_representation={"color5": rust})
+        clifft, tsim, native = cultivation_representation(checked)
+        self.assertEqual((clifft["count"], clifft["quantity"]), (1024, "peak_amplitudes"))
+        self.assertEqual((tsim["status"], tsim["count"]), ("failed", None))
+        self.assertEqual((native["count"], native["quantity"]), (3, "reference_network_terms"))
+        rust.pop()
+        with self.assertRaisesRegex(ValueError, "representation observations"):
+            list(cultivation_representation(checked))
 
 
 if __name__ == "__main__":

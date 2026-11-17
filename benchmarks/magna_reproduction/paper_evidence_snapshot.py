@@ -12,6 +12,17 @@ def identity(remaining, raw):
                 **{key: receipt[key] for key in ("cargo", "rustc", "python_environment") if key in receipt})
 
 
+def cultivation_representation(benchmark, plan, raw):
+    observed = {}
+    for case in benchmark.cases(plan):
+        if case["kind"] != "timing":
+            continue
+        resources = benchmark.read_stage(raw, case)["payload"]["resources"]
+        terms = {name: resources[name]["maximum_terms"] for name in ("acceptance", "target")}
+        observed.setdefault(case["family"], []).append(dict(case=case["id"], **terms))
+    return observed
+
+
 def main():
     source, name, manifest, directory = sys.argv[1:]
     sys.path.insert(0, source)
@@ -42,6 +53,7 @@ def main():
         result = dict(summary=summary, observed=read_json(raw/"report.json"), peers=peers,
                       historical_curve=read_json(raw/"historical"/cultivation_reference.FIGURE),
                       failed_peer_attempts=peer_receipt["previous_failures"], build=identity(remaining, raw),
+                      rust_representation=cultivation_representation(cultivation_benchmark, plan, raw),
                       peer_host=peer_receipt["host"], peer_rust_binary_sha256=peer_receipt["rust_binary_sha256"])
     elif name == "decoder-workloads":
         import decoder_workloads_benchmark

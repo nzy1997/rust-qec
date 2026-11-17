@@ -4284,9 +4284,11 @@ The checker extracts a temporary source snapshot from local Git and recomputes
 each campaign with its original offline verifier. It needs the standard
 library, Python 3.12 or later with tar extraction filters, and Git. Plotting is
 a separate step using Matplotlib. The regenerated CSV files carry the measured
-curves, uncertainties and timing rows. The JSON keeps the exact covariance,
-workload and build identities, failed attempts, measured ablations, and
-remaining parity gaps.
+curves, uncertainties, timing rows and cultivation representation counts.
+The cultivation comparison labels each backend's count and keeps deposited
+sampling and same-host matched sampling in separate panels. The JSON keeps
+the exact covariance, workload and build identities, failed attempts,
+measured ablations, and remaining parity gaps.
 
 To assemble the bundle, arrange the existing full result directories at
 `raw/bh`, `raw/cultivation`, and `raw/decoder-workloads`. Retain provenance

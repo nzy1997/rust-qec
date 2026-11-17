@@ -10,6 +10,15 @@ from statistics import median
 from remaining_contracts import require
 
 
+REPRESENTATION_UNITS = {
+    "magna": "reference_network_terms",
+    "symft": "peak_amplitudes",
+    "clifft": "peak_amplitudes",
+    "ppvm": "peak_coefficients",
+    "tsim": "deposited_tsim_resource",
+}
+
+
 def point(figure, family, p, metric, origin, estimate, standard_error=None, *, pull=None, resolved=True):
     return dict(figure=figure, family=family, p=p, metric=metric, origin=origin, estimate=estimate,
                 standard_error=standard_error if resolved else None, pull=pull, precision_resolved=resolved)
@@ -180,6 +189,23 @@ def cultivation_efficiency(cultivation):
                                                                    if old["conditional_error"] else None)))
 
 
+def cultivation_representation(cultivation):
+    for row in cultivation["observed"]["historical_comparison"]["timings"]:
+        raw = row["raw"]
+        require(raw["resource"] is None or (type(raw["resource"]) is int and raw["resource"] > 0),
+                "deposited cultivation representation count differs")
+        yield dict(family=row["family"], backend=row["backend"], origin="deposit", status=raw["status"],
+                   quantity=REPRESENTATION_UNITS[row["backend"]], count=raw["resource"])
+
+    for family, batches in cultivation["rust_representation"].items():
+        require(len(batches) == 3 and len({batch["case"] for batch in batches}) == len(batches)
+                and all(type(batch[key]) is int and batch[key] > 0 for batch in batches for key in ("acceptance", "target")),
+                "missing or invalid Rust representation observations")
+        maximum = max(batch[key] for batch in batches for key in ("acceptance", "target"))
+        yield dict(family=family, backend="rust", origin="rust", status="complete",
+                   quantity="reference_network_terms", count=maximum)
+
+
 def report(plan, checked, artifact_count, deposit, ablations):
     bh = checked["bh"]
     cultivation = checked["cultivation"]
@@ -206,6 +232,7 @@ def report(plan, checked, artifact_count, deposit, ablations):
                              **{name: row["precision_draws"] for name, row in decoder["summary"]["campaigns"].items()}),
         points=points, timings=timing, failed_peer_attempts=failures, matched_ablations=ablations,
         historical_overview=deposit["overview"], historical_table2=cultivation["observed"]["historical_comparison"]["timings"],
+        cultivation_representation=list(cultivation_representation(cultivation)),
         historical_code_switching_resources=deposit["code_switching_resources"],
         historical_tqd_terminal_table=deposit["tqd_terminal_table"],
         cultivation_time_to_observed_precision=list(cultivation_efficiency(cultivation)),
