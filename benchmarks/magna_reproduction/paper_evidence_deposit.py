@@ -12,6 +12,7 @@ from remaining_contracts import read_json, reference, require
 OVERVIEW = "data/macstudio-overview.json"
 BH_TIMING = "data/bh-k100.json"
 BH_PRECISION = "data/bh-curves.json"
+BH_PRECISION_RAW = "raw/bh-distillation/precision/summary.json"
 BH_SIZES = (2, 4, 6, 10, 20, 40, 60, 80, 100)
 
 
@@ -21,6 +22,7 @@ def runs(k):
 
 def members(pinned):
     files = pinned["paper"]["files"]
+    require(files[BH_PRECISION] == files[BH_PRECISION_RAW], "deposited BH plot and raw precision summaries differ")
     selected = [OVERVIEW, BH_TIMING, BH_PRECISION, "data/dimension-comparison.json", "data/tqd-terminal-timing.json"]
     for k in BH_SIZES:
         for variant in ("T", "S"):

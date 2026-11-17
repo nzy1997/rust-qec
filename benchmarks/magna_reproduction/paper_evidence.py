@@ -89,6 +89,8 @@ def validate_manifest(plan, *, finalized=True):
             and plan["upstream_commit"] == pinned["upstream"]["commit"],
             "evidence paper or source identity differs")
     require(plan["captures"].keys() == CAMPAIGNS.keys(), "evidence plan omits a full campaign")
+    require(re.fullmatch(r"[0-9a-f]{64}", plan["ablation_source_sha256"]) is not None,
+            "invalid ablation source hash")
     if finalized:
         require(re.fullmatch(r"[0-9a-f]{64}", plan["index_sha256"]) is not None, "invalid finalized index hash")
 
@@ -133,13 +135,16 @@ def checked_path(root, name):
 
 
 def generate(plan, raw, artifact_count):
+    from paper_evidence_ablations import check_capture as check_ablations
     import paper_evidence_deposit as deposit
     from paper_evidence_report import csv_table, report
 
     checked = {name: check_campaign(ROOT, name, plan["captures"][name], reference.relative_file(raw, name))
                for name in CAMPAIGNS}
     original = deposit.check(reference.relative_file(raw, "provenance/deposit"), reference.load_manifest(), checked["bh"])
-    output = report(plan, checked, artifact_count, original)
+    ablations = check_ablations(read_json(checked_path(raw, "provenance/ablations.json")))
+    require(ablations["rust_source_sha256"] == plan["ablation_source_sha256"], "ablation source differs from the sealed plan")
+    output = report(plan, checked, artifact_count, original, ablations)
     return output, {
         "regenerated.json": canonical_json(output),
         "figure-data.csv": csv_table(output["points"]),

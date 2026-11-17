@@ -4285,18 +4285,38 @@ each campaign with its original offline verifier. It needs the standard
 library, Python 3.12 or later with tar extraction filters, and Git. Plotting is
 a separate step using Matplotlib. The regenerated CSV files carry the measured
 curves, uncertainties and timing rows. The JSON keeps the exact covariance,
-workload and build identities, failed attempts, and remaining parity gaps.
+workload and build identities, failed attempts, measured ablations, and
+remaining parity gaps.
 
 To assemble the bundle, arrange the existing full result directories at
 `raw/bh`, `raw/cultivation`, and `raw/decoder-workloads`. Retain provenance
 receipts under `raw/provenance` and the corrected matched cultivation run
-under `raw/cultivation/matched-peers`. Pass an unsealed source plan with the
-reviewed commit, tree and campaign plan hashes to
-`paper_evidence.py --seal --manifest PLAN --results BUNDLE --archive DEPOSIT`.
+under `raw/cultivation/matched-peers`. Capture the work comparison once with
+the release example and put its source digest in `ablation_source_sha256` in
+the source plan.
+
+```sh
+cargo build --locked --release -p rmagna --example paper_ablation_run
+python3 -B benchmarks/magna_reproduction/paper_evidence_ablations.py \
+  --runner "${CARGO_TARGET_DIR:-target}/release/examples/paper_ablation_run" \
+  --results "$MAGNA_EVIDENCE_BUNDLE/raw/provenance/ablations.json"
+```
+
+The probe changes one of the template, compiler or history sampler policies
+at a time and checks exact mass for both equally probable reported histories
+of the same small circuit. Its scalar and packed comparison supplies identical
+finite thresholds and conceptual words. It counts calls to the word or plane
+provider with the bit planes already built. These measurements report work
+within the probe's fixtures.
+
+Pass an unsealed source plan with the reviewed commit, tree and campaign plan
+hashes to `paper_evidence.py --seal --manifest PLAN --results BUNDLE --archive DEPOSIT`.
 Sealing adds the hash-verified historical BH data and overview and writes the
 derived artifacts, index and finalized plan together in `sealed/`. The
 bundled curves preserve the paper's deposited values and independent Rust
 estimates with their own sample counts. Decoder clocks are subtracted per trial
 before taking the median. The paper evidence and same-host matched timings
-retain separate repeats and host identities. The broader #794 and #601
+retain separate repeats and host identities. Cultivation retains positive-error
+counts, relative standard errors and worker time for each precision point,
+separate from the sampling time table. The broader #794 and #601
 publication protocols have their own readiness checks.

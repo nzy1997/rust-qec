@@ -8,7 +8,7 @@ import unittest
 from unittest.mock import patch
 
 import paper_evidence as evidence
-from paper_evidence_report import decoder_timings, paired_timing
+from paper_evidence_report import cultivation_efficiency, decoder_timings, paired_timing
 from remaining_contracts import reference
 
 
@@ -18,6 +18,7 @@ def deposit_plan(index):
     return dict(schema=evidence.SCHEMA, paper=paper["arxiv"], archive_sha256=paper["archive_sha256"],
                 historical_kernel=paper["kernel_commit"], upstream_commit=pinned["upstream"]["commit"],
                 reference_sha256=reference.digest(evidence.HERE/"reference.json"),
+                ablation_source_sha256="0"*64,
                 captures={name: {} for name in evidence.CAMPAIGNS}, index_sha256=hashlib.sha256(index).hexdigest())
 
 
@@ -110,6 +111,20 @@ class PaperEvidenceTests(unittest.TestCase):
         timing["median_decoder_subtracted_seconds_per_attempt"] = 20 - 9
         with self.assertRaisesRegex(ValueError, "subtracted within each trial"):
             next(decoder_timings(observed))
+
+    def test_cultivation_retains_unresolved_precision_and_separate_clock_scopes(self):
+        old = dict(p=0.001, acceptance_shots=20, failure_shots=30, failure_positive=6,
+                   acceptance_seconds=1, failure_seconds=3, conditional_error=0.1, conditional_error_se=0.05)
+        current = dict(p="1/1000", acceptance_draws=20, failure_draws=30, positive_failure_draws=0,
+                       failure_ess=8, time_to_observed_precision=dict(
+                           acceptance_worker_seconds=2, failure_worker_seconds=5, relative_conditional_error_se=None))
+        observed = dict(historical_curve={"color5": {"rows": [old]}}, observed={"precision": {"color5": [current]}})
+        row, = cultivation_efficiency(observed)
+        self.assertEqual(row["rust"]["failure_worker_seconds"], 5)
+        self.assertEqual(row["deposit"]["failure_wall_seconds"], 3)
+        self.assertEqual(row["deposit"]["positive_failure_draws"], 6)
+        self.assertEqual(row["deposit"]["relative_conditional_error_se"], 0.5)
+        self.assertIsNone(row["rust"]["relative_conditional_error_se"])
 
 
 if __name__ == "__main__":

@@ -162,7 +162,25 @@ def timings(bh, cultivation, decoder, deposit):
     yield from decoder_timings(decoder)
 
 
-def report(plan, checked, artifact_count, deposit):
+def cultivation_efficiency(cultivation):
+    original = cultivation["historical_curve"]
+    for family, measured in cultivation["observed"]["precision"].items():
+        historical = {Fraction(str(row["p"])): row for row in original[family]["rows"]}
+        for row in measured:
+            old = historical[Fraction(row["p"])]
+            yield dict(family=family, p=row["p"],
+                       rust=dict(acceptance_draws=row["acceptance_draws"], failure_draws=row["failure_draws"],
+                                 positive_failure_draws=row["positive_failure_draws"],
+                                 failure_weight_ess=row["failure_ess"], **row["time_to_observed_precision"]),
+                       deposit=dict(acceptance_draws=old["acceptance_shots"], failure_draws=old["failure_shots"],
+                                    positive_failure_draws=old["failure_positive"],
+                                    acceptance_wall_seconds=old["acceptance_seconds"],
+                                    failure_wall_seconds=old["failure_seconds"],
+                                    relative_conditional_error_se=(old["conditional_error_se"]/old["conditional_error"]
+                                                                   if old["conditional_error"] else None)))
+
+
+def report(plan, checked, artifact_count, deposit, ablations):
     bh = checked["bh"]
     cultivation = checked["cultivation"]
     decoder = checked["decoder-workloads"]
@@ -186,16 +204,18 @@ def report(plan, checked, artifact_count, deposit):
         precision_draws=dict(bh=bh["independent_precision_draws"],
                              cultivation=cultivation["summary"]["independent_precision_draws"],
                              **{name: row["precision_draws"] for name, row in decoder["summary"]["campaigns"].items()}),
-        points=points, timings=timing, failed_peer_attempts=failures,
+        points=points, timings=timing, failed_peer_attempts=failures, matched_ablations=ablations,
         historical_overview=deposit["overview"], historical_table2=cultivation["observed"]["historical_comparison"]["timings"],
         historical_code_switching_resources=deposit["code_switching_resources"],
         historical_tqd_terminal_table=deposit["tqd_terminal_table"],
+        cultivation_time_to_observed_precision=list(cultivation_efficiency(cultivation)),
         readiness=dict(
             measured_scope="archived paper workloads on the pinned public inputs",
             coverage_counts=dict(Counter(coverage.values())),
             parity_complete=all(value == "verified" for value in coverage.values()),
             remaining_methods={name: value for name, value in coverage.items() if value != "verified"},
             unresolved_precision=unresolved,
+            ablation_scope="one changed factor at a time on the declared exact fixtures; work counts only",
             deposited_timing_outcomes=[row for row in timing if row["status"] == "failed"],
             related_issues=[794, 601],
             publication_protocol="paper and same-host matched repeats kept in their respective protocols",

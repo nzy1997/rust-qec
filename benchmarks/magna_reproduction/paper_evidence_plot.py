@@ -43,7 +43,8 @@ def precision_figure(plt, rows, family_name, out, preview):
         label, scale = METRICS[metric]
         chosen = defaultdict(list)
         for row in rows:
-            if row["metric"] == metric and (scale != "log" or row["estimate"] > 0):
+            if (row["metric"] == metric and row["estimate"] is not None
+                    and (scale != "log" or row["estimate"] > 0)):
                 chosen[row["family"], row["origin"]].append(row)
         for (family, origin), points in sorted(chosen.items()):
             points = sorted(points, key=lambda row: Fraction(row["p"]))
