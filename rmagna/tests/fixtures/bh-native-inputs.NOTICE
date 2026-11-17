@@ -1,0 +1,10 @@
+The complete BH2 T/S physical circuits, ideal circuits and task JSON in
+bh-native-inputs.json are from itpyi/magna, revision
+56847478c840395735146ef1e1ccdc3d8aedc10f, examples/bh2-T/ and examples/bh2-S/.
+Their exact source paths and SHA-256 identities are retained in the fixture and
+benchmarks/magna_reproduction/reference.json. The Rust runner tests and
+independent code-weight analytical oracle are additions.
+
+This Source Code Form is subject to the terms of the Mozilla Public License,
+v. 2.0. A copy is distributed in original_many_record_input.LICENSE in this
+directory. No Native extension or Python runtime is part of these fixtures.

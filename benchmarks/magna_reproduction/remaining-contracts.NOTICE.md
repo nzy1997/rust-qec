@@ -13,3 +13,12 @@ v. 2.0. The full license is distributed in
 [`original_many_record_input.LICENSE`](../../rmagna/tests/fixtures/original_many_record_input.LICENSE).
 The catalog is requirement data, not executable upstream simulator code or
 a claim of completed Rust parity.
+
+`standalone-contracts.json` additionally retains the helper identities, assertion
+locations and hashes, loop headers and local helper calls from
+`tests/native/causal.cpp` and `tests/native/foundation.cpp` at the same revision.
+The original source-file SHA-256 identities are in `reference.json` and the
+catalogue. The semantic group boundaries, candidate Rust owners, unresolved
+obligations and conservative lexical discovery/checking tools are additions.
+This catalogue has the same MPL-2.0 source attribution and license as above.
+It is a requirements decomposition, not an executable parity qualification.

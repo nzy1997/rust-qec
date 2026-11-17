@@ -8,6 +8,7 @@ INPUTS = (
     "Cargo.toml", "Cargo.lock", ".cargo", "rmagna/Cargo.toml", "rmagna/build.rs",
     "rmagna/src", "rmagna/examples/paper_proposal_probe.rs",
     "rmagna/examples/evaluate_task.rs",
+    "rmagna/examples/paper_bh_run.rs",
     "benchmarks/magna_reproduction/paper_query_work.py",
     "rmagna/tests/support/paper_proposal_probe.rs",
     "rmagna/tests/data/paper-proposal-runtime.json",
@@ -17,7 +18,7 @@ INPUTS = (
 )
 
 
-def source_identity(root):
+def source_inputs(root):
     root = Path(root).resolve(strict=True)
     files = []
     def collect(path):
@@ -37,8 +38,12 @@ def source_identity(root):
         if name == ".cargo" and not path.exists() and not path.is_symlink():
             continue
         collect(path)
+    return {path.relative_to(root).as_posix(): hashlib.sha256(path.read_bytes()).hexdigest()
+            for path in sorted(files, key=lambda p: p.relative_to(root).as_posix())}
+
+
+def source_identity(root):
     digest = hashlib.sha256()
-    for path in sorted(files, key=lambda p:p.relative_to(root).as_posix()):
-        name = path.relative_to(root).as_posix()
-        digest.update(name.encode()+b"\0"+hashlib.sha256(path.read_bytes()).hexdigest().encode()+b"\n")
+    for name, sha256 in source_inputs(root).items():
+        digest.update(name.encode()+b"\0"+sha256.encode()+b"\n")
     return digest.hexdigest()

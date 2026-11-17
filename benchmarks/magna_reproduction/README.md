@@ -2,27 +2,28 @@
 
 This harness pins the original Magna implementation and paper archive before
 an independent Rust backend is compared with them. It inventories 31 packaged
-tasks, 57 upstream test modules and every deposited paper file. It does not
-implement a simulator or claim reproduction of the paper's precision curves.
+tasks, 57 upstream test modules and every deposited paper file. Rust simulation
+is provided by `rmagna`; completed simulator and paper-curve claims require
+independent source-bound execution receipts.
 
 ## Current coverage
 
-The source-bound ledger currently has 340 verified, 7 partial and 5 unmapped
+The source-bound ledger currently has 341 verified, 7 partial and 4 unmapped
 original methods, with zero architecture-specific core exclusions. It requires
-393 distinct Rust witnesses from 440 declarations across 115 targets. Strict
+394 distinct Rust witnesses from 441 declarations across 116 targets. Strict
 complete parity intentionally exits 2. The detailed per-change sections below
 retain their historical inventory snapshots; `coverage.json` is authoritative.
 
 ## Outstanding requirements and the first paper pilot
 
-`remaining-contracts.json` catalogs all 12 outstanding original methods without
+`remaining-contracts.json` catalogs all 11 outstanding original methods without
 promoting their parity status. It records the complete source-bound method,
 readable assertions and loops, module helper/import context, Rust owners and
 the linked issue DAG. The full pinned source manifest binds transitive helpers,
 including the native C++ suites; helper lists are not a minimal call graph.
 The five categories are next-work assessments: validation first (`V`), confirmed
 corresponding-service gaps (`G`), unestablished reuse/integration contracts (`P`),
-Rust contract adaptations (`E`), and aggregate tests needing decomposition (`U`).
+Rust contract adaptations (`E`), and aggregate suites with unresolved subcontracts (`U`).
 None is an architecture exclusion or an executable parity certificate.
 The source-derived catalog summaries retain MPL-2.0 attribution in
 `remaining-contracts.NOTICE.md`; the bundled license is linked there.
@@ -4008,3 +4009,103 @@ the last is caught by forced alternative14 selection. Together R10/R11 qualify
 seven original methods (315 verified / 7 partial / 30 unmapped); full parity and
 the R09 continuation/resource work remain open. Retained compiler/list/run
 receipts bind every new witness to the final source and executed binary.
+
+### R12 standalone decomposition and public module boundaries
+
+```sh
+python3 benchmarks/magna_reproduction/remaining_contracts.py standalone \
+  --upstream "$MAGNA_UPSTREAM"
+cargo test --locked -p rmagna --test standalone_headers
+```
+
+The first command verifies the pinned source inventory, discovers every function,
+`require` assertion and loop header in `causal.cpp` and `foundation.cpp`, checks
+their complete semantic partition, then creates only three temporary consumer
+files and runs `cargo check --locked --offline`. It reuses the caller's Cargo
+cache/target and removes the temporary consumer. Python orchestrates this check;
+the four separate consumer modules import only public Rust types and have no
+Python dependency. They cover reference-network probability, affine proposals,
+file execution and file enumeration. The checked-in consumer is also the flat
+Rust compilation witness. This qualifies the original header-availability method,
+not either aggregate's numerical behavior.
+
+The source-bound decomposition has 22 helpers, 66 groups, 217 assertions and
+226 loop headers. All groups remain explicitly unresolved for aggregate semantic
+qualification. There are 47 existing-owner candidates, six groups identifying
+two missing services, four representation decisions and nine helper/oracle
+contexts. Six groups do not mean six missing algorithms. Sixteen existing Rust
+witness declarations are reused as ownership candidates, without turning their
+neighboring-method passes into aggregate coverage. `--catalogue-only` explicitly
+skips the external consumer and makes no header-compilation claim. Ordinary
+`remaining_contracts.py check` validates the retained discovery snapshot offline;
+only the standalone command re-discovers the actual pinned C++ source.
+
+- [#1319](https://github.com/nzy1997/rust-qec/issues/1319) implements value-aware
+  incremental request/observe knowledge. The existing rank-only diagnostics basis
+  and conditioned quantum sampler are distinct services.
+- [#1320](https://github.com/nzy1997/rust-qec/issues/1320) supplies complete
+  certificate snapshots with byte-budget eviction and clear semantics. Trace
+  entry quotas and probability-value bytes store different objects.
+- [#1321](https://github.com/nzy1997/rust-qec/issues/1321) qualifies the complete
+  foundation fixture, after both service issues. Word shifts, axis-prefix reuse,
+  persistent boundary-session state and target-inverse representation need explicit
+  Rust contracts and full original fixtures.
+
+Both causal/foundation aggregate methods stay `unmapped`; a fabricated promotion,
+missing entire group/helper/loop, nonexistent owner or missing follow-up fails.
+The current ledger is 341 verified / 7 partial / 4 unmapped, with 11 outstanding
+methods. R12 completes a decomposition and consumer contract, not full parity.
+
+### B03 Bravyi-Haah paper campaign
+
+```sh
+cargo build --locked --release -p rmagna --example paper_bh_run
+python3 benchmarks/magna_reproduction/paper_benchmark.py run \
+  --manifest benchmarks/magna_reproduction/paper/bh.json \
+  --upstream "$MAGNA_UPSTREAM" \
+  --rust-example "${CARGO_TARGET_DIR:-target}/release/examples/paper_bh_run" \
+  --out "$MAGNA_BH_RESULTS"
+python3 benchmarks/magna_reproduction/paper_benchmark.py check \
+  --manifest benchmarks/magna_reproduction/paper/bh.json \
+  --results "$MAGNA_BH_RESULTS"
+```
+
+The immutable v1 design contains 82 timing batches and nine independent precision
+points: 757,760 production draws, with one separate seed-zero warmup per cell.
+Timing uses k=2,4,6,10,20,40,60,80,100, both T and matched S, p=0.001, 2,048 draws
+and three repetitions, except ten at k=40,60. Precision uses the complete joint
+T target at k=2,6,10 and p=0.0001,0.0003,0.001, with 65,536 draws per point and
+the declared seeds. Both campaigns use per-input proposal q=2/(3k+8), preserving
+the exact physical/proposal likelihood. Timing and precision samples are never
+pooled. Every process runs serially; no original billion-draw campaign is rerun.
+T/S timing repetitions share a seed as paired controls; their 167,936 runner
+draw evaluations are not independent precision samples. The nine precision
+points contain 589,824 separately seeded draw evaluations.
+
+`paper_bh_run` uses the actual Rust `TaskEvaluator` and continuous `TaskStream`.
+It separates compilation, eager query preparation, excluded warmup and production
+sampling. Exact sufficient-statistic checkpoints retain joint sums, products,
+weights and RNG state. Physical circuit width is separate from compiled/reference
+width. The acceptance and complete-target families are constrained to quotient
+rank zero and one retained term. The explicitly declared 17,179,869,184 logical
+signature-work cap is a campaign policy; it is not a memory figure and does not
+rewrite the earlier default-cap pilot refusals. No particular speedup is required.
+
+The checker validates complete source/task/target bytes against the original pins,
+allowing only the declared input-noise-rate replacement. It rebuilds every mean,
+paired covariance and standard error from exact totals without simulation, and
+compares precision points with independent code-weight equations. Those equations
+use the literal encoding matrix and prove permutation symmetry before replacing
+the exponential logical sum by binomial weights. The small 14-input case is also
+checked over all 16,384 physical fault patterns; single-output fidelity differs
+from the joint target and is rejected. Published exact values and source-derived
+code fixtures retain attribution in `paper/bh.NOTICE.md`.
+
+Failed cells and partial prefixes remain failures. A missing cell, changed target,
+S proxy substituted for T, changed covariance, pooled warmup, debug executable or
+mixed source/seed/budget contract cannot certify the campaign. A same-source,
+same-executable `--resume` validates and reuses an ordered prefix. Every raw cell
+has a checksum, compiled-input digest and exact checkpoint; `regenerated.json`
+contains separate timing medians/ranges and analytical precision comparisons.
+These are BH-specific results only; cultivation, distillation, code-switching and
+TQD campaigns remain separate roadmap work.

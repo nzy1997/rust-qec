@@ -1,0 +1,4815 @@
+{
+  "schema": "rmagna.standalone-contracts.v1",
+  "sources": {
+    "causal": {
+      "source_sha256": "feaf54e6fe1648e70e68cb95b5bd1326a3375d2a338834b4f535977ed1f11837",
+      "helpers": [
+        {
+          "name": "require",
+          "line": 7,
+          "end_line": 9,
+          "source_sha256": "23fb83896414b91b12901e7544cb35be411fbf2076e74d4af0f84ef191dfbdcd",
+          "loops": [],
+          "assertions": [],
+          "helper_calls": []
+        },
+        {
+          "name": "scalar_parity",
+          "line": 10,
+          "end_line": 14,
+          "source_sha256": "3530c89a540eaa21f538c53fe16d075933601b198cee9f6838d99d5a64ba7c07",
+          "loops": [
+            {
+              "line": 12,
+              "header": "for(size_t j = 0; j < width; j++)"
+            }
+          ],
+          "assertions": [],
+          "helper_calls": []
+        },
+        {
+          "name": "same_request",
+          "line": 15,
+          "end_line": 17,
+          "source_sha256": "1661ef087851fa978efaccb843c75caa59e2514ae1d3e85367accfc9222deaea",
+          "loops": [],
+          "assertions": [],
+          "helper_calls": []
+        },
+        {
+          "name": "check_pending_semantics",
+          "line": 19,
+          "end_line": 53,
+          "source_sha256": "1e12a461f29ae27555663145f09dd4ee7a0e2cdd94d9a222c481c8e7d6e01bd5",
+          "loops": [
+            {
+              "line": 20,
+              "header": "for(size_t width : {size_t(2), size_t(63), size_t(64), size_t(65), size_t(129)})"
+            }
+          ],
+          "assertions": [
+            "check_pending_semantics/require-001",
+            "check_pending_semantics/require-002",
+            "check_pending_semantics/require-003",
+            "check_pending_semantics/require-004",
+            "check_pending_semantics/require-005",
+            "check_pending_semantics/require-006",
+            "check_pending_semantics/require-007",
+            "check_pending_semantics/require-008",
+            "check_pending_semantics/require-009",
+            "check_pending_semantics/require-010"
+          ],
+          "helper_calls": [
+            "require",
+            "same_request"
+          ]
+        },
+        {
+          "name": "check_finite_assignments",
+          "line": 55,
+          "end_line": 130,
+          "source_sha256": "71a3663f7e41aa2a4c9f34ebfc1f2b981e6934a67f370c4bdb5d55b134e01b3f",
+          "loops": [
+            {
+              "line": 59,
+              "header": "for(size_t width : {size_t(0), size_t(1), size_t(7), size_t(63), size_t(64), size_t(65), size_t(137)})"
+            },
+            {
+              "line": 61,
+              "header": "for(size_t j : {size_t(0), size_t(1), size_t(2), size_t(62), size_t(63), size_t(64), size_t(65),\n                    width ? width - 1 : 0})"
+            },
+            {
+              "line": 64,
+              "header": "for(size_t trial = 0; trial < 24; trial++)"
+            },
+            {
+              "line": 66,
+              "header": "for(size_t word = 0; word < (size_t(1) << positions.size()); word++)"
+            },
+            {
+              "line": 68,
+              "header": "for(size_t j = 0; j < positions.size(); j++)"
+            },
+            {
+              "line": 74,
+              "header": "for(size_t batch = 0; batch < 12; batch++)"
+            },
+            {
+              "line": 76,
+              "header": "for(size_t j = 0; j < 1 + batch % 7; j++)"
+            },
+            {
+              "line": 78,
+              "header": "for(auto position : positions)"
+            },
+            {
+              "line": 85,
+              "header": "for(size_t j = 0; j < expressions.size(); j++)"
+            },
+            {
+              "line": 89,
+              "header": "for(const auto& world : possible)"
+            },
+            {
+              "line": 93,
+              "header": "for(const auto& world : possible)"
+            },
+            {
+              "line": 95,
+              "header": "for(const auto& mask : request.pending)"
+            },
+            {
+              "line": 96,
+              "header": "for(size_t j = 0; j < expressions.size(); j++)"
+            },
+            {
+              "line": 106,
+              "header": "for(size_t j = 0; j < request.pending.size(); j++)"
+            },
+            {
+              "line": 111,
+              "header": "for(const auto& world : possible)"
+            },
+            {
+              "line": 124,
+              "header": "for(size_t j = 0; j < expressions.size(); j++)"
+            }
+          ],
+          "assertions": [
+            "check_finite_assignments/require-001",
+            "check_finite_assignments/require-002",
+            "check_finite_assignments/require-003",
+            "check_finite_assignments/require-004",
+            "check_finite_assignments/require-005"
+          ],
+          "helper_calls": [
+            "require",
+            "same_request",
+            "scalar_parity"
+          ]
+        },
+        {
+          "name": "check_large_request_order",
+          "line": 132,
+          "end_line": 179,
+          "source_sha256": "ab62271f3103d229d23f619ce17c7e3d3ddb33e1b6c37af9d3d7d39a5b3107f5",
+          "loops": [
+            {
+              "line": 136,
+              "header": "for(size_t width : {size_t(63), size_t(64), size_t(65), size_t(257)})"
+            },
+            {
+              "line": 137,
+              "header": "for(bool duplicates : {false, true})"
+            },
+            {
+              "line": 143,
+              "header": "for(size_t j = 0; j < width; j++)"
+            },
+            {
+              "line": 145,
+              "header": "for(size_t j = width; j-- > 0;)"
+            }
+          ],
+          "assertions": [
+            "check_large_request_order/require-001",
+            "check_large_request_order/require-002",
+            "check_large_request_order/require-003",
+            "check_large_request_order/require-004",
+            "check_large_request_order/require-005",
+            "check_large_request_order/require-006"
+          ],
+          "helper_calls": [
+            "require",
+            "same_request"
+          ]
+        },
+        {
+          "name": "check_dense_spans",
+          "line": 181,
+          "end_line": 220,
+          "source_sha256": "93d89e91a755aebcac4b6504c4ab8c35f217e3ce76b4ac15bcd79b567cccc063",
+          "loops": [
+            {
+              "line": 183,
+              "header": "for(size_t width : {size_t(0), size_t(1), size_t(63), size_t(64), size_t(65), size_t(137)})"
+            },
+            {
+              "line": 187,
+              "header": "for(size_t j = 0; j < width; j++)"
+            },
+            {
+              "line": 189,
+              "header": "for(size_t round = 0; round < 9; round++)"
+            },
+            {
+              "line": 191,
+              "header": "for(size_t j = 0; j < width; j++)"
+            },
+            {
+              "line": 197,
+              "header": "for(size_t choice = 0; choice < (size_t(1) << independent.size()); choice++)"
+            },
+            {
+              "line": 199,
+              "header": "for(size_t j = 0; j < width; j++)"
+            },
+            {
+              "line": 201,
+              "header": "for(size_t k = 0; k < independent.size(); k++)"
+            }
+          ],
+          "assertions": [
+            "check_dense_spans/require-001",
+            "check_dense_spans/require-002",
+            "check_dense_spans/require-003",
+            "check_dense_spans/require-004"
+          ],
+          "helper_calls": [
+            "require",
+            "scalar_parity"
+          ]
+        },
+        {
+          "name": "main",
+          "line": 222,
+          "end_line": 228,
+          "source_sha256": "dd6d7769c687e9c51f53651b553729750a98d66f9ce8963cc2da3cba295b38f1",
+          "loops": [],
+          "assertions": [],
+          "helper_calls": [
+            "check_dense_spans",
+            "check_finite_assignments",
+            "check_large_request_order",
+            "check_pending_semantics"
+          ]
+        }
+      ],
+      "assertions": [
+        {
+          "id": "check_pending_semantics/require-001",
+          "function": "check_pending_semantics",
+          "line": 25,
+          "end_line": 26,
+          "expression_sha256": "6903eaca51787cbf475f4f10a5ae2a4d1576825f0215bb2086a5812d65b351cc"
+        },
+        {
+          "id": "check_pending_semantics/require-002",
+          "function": "check_pending_semantics",
+          "line": 27,
+          "end_line": 30,
+          "expression_sha256": "1c16131f944c70c9b3dc933cbf6df35bc4b9bd59e035e92fe4bcac26ea36e002"
+        },
+        {
+          "id": "check_pending_semantics/require-003",
+          "function": "check_pending_semantics",
+          "line": 31,
+          "end_line": 31,
+          "expression_sha256": "04da782840898718888dbf60b89e0f4883d0fd44587e04eb1770e4a1c74cb7b9"
+        },
+        {
+          "id": "check_pending_semantics/require-004",
+          "function": "check_pending_semantics",
+          "line": 32,
+          "end_line": 32,
+          "expression_sha256": "e847553d77f27a50d172118bf08166e173f3cd8726293e3fdefbea4e531919d8"
+        },
+        {
+          "id": "check_pending_semantics/require-005",
+          "function": "check_pending_semantics",
+          "line": 34,
+          "end_line": 34,
+          "expression_sha256": "5490af876aa6f57ba63d5e3d76011da60478edd6d209fc9d0d68c0ee6908f575"
+        },
+        {
+          "id": "check_pending_semantics/require-006",
+          "function": "check_pending_semantics",
+          "line": 35,
+          "end_line": 36,
+          "expression_sha256": "be013cbbeade1773abb42db12a5902ea01c57200af82adfe77bc16e43a87e0de"
+        },
+        {
+          "id": "check_pending_semantics/require-007",
+          "function": "check_pending_semantics",
+          "line": 38,
+          "end_line": 38,
+          "expression_sha256": "0a422e1487acc3f3add95318b3ab4d0827fcb87db2c72698f5b2cf5c05a9f471"
+        },
+        {
+          "id": "check_pending_semantics/require-008",
+          "function": "check_pending_semantics",
+          "line": 39,
+          "end_line": 39,
+          "expression_sha256": "20f943767eac860d36e49b069381bbf88ea8ad57832b871dad208f6c163df3c0"
+        },
+        {
+          "id": "check_pending_semantics/require-009",
+          "function": "check_pending_semantics",
+          "line": 45,
+          "end_line": 45,
+          "expression_sha256": "528605a495fa707b60ce70e6b34371d68fb695e18f3715e49822e770d32e164b"
+        },
+        {
+          "id": "check_pending_semantics/require-010",
+          "function": "check_pending_semantics",
+          "line": 51,
+          "end_line": 51,
+          "expression_sha256": "b7e4ea611d744fc720bbd722cee173425c6c0cc914b498072ed48101f16c5f9d"
+        },
+        {
+          "id": "check_finite_assignments/require-001",
+          "function": "check_finite_assignments",
+          "line": 84,
+          "end_line": 84,
+          "expression_sha256": "afcb1312409e026449eab2e7a03bf4dc3b91da82c35739275455f66ddffb64c6"
+        },
+        {
+          "id": "check_finite_assignments/require-002",
+          "function": "check_finite_assignments",
+          "line": 90,
+          "end_line": 91,
+          "expression_sha256": "4a136e0f440d451c61be8caf8131f0f1fd623dd598a56d7da42011f7facd6a7b"
+        },
+        {
+          "id": "check_finite_assignments/require-003",
+          "function": "check_finite_assignments",
+          "line": 99,
+          "end_line": 100,
+          "expression_sha256": "b6404be8ab9bb7d3a5749e5522f70a476d1e60e66b1affd9ef4fdab49920bd5d"
+        },
+        {
+          "id": "check_finite_assignments/require-004",
+          "function": "check_finite_assignments",
+          "line": 122,
+          "end_line": 123,
+          "expression_sha256": "2e56b42d0013f06b28f8ca1279ab0cfe150b49fb3ed5d9dab8bc529b4fb2662d"
+        },
+        {
+          "id": "check_finite_assignments/require-005",
+          "function": "check_finite_assignments",
+          "line": 125,
+          "end_line": 126,
+          "expression_sha256": "30c41e80fc658dad1001b6cbf8e605dfb9ca002ac783bce5c279f195be060901"
+        },
+        {
+          "id": "check_large_request_order/require-001",
+          "function": "check_large_request_order",
+          "line": 168,
+          "end_line": 169,
+          "expression_sha256": "7c3b025ab0f6364c2649d638e3316f5c6dfc4372bc95f99f9feca7f4dffa0faf"
+        },
+        {
+          "id": "check_large_request_order/require-002",
+          "function": "check_large_request_order",
+          "line": 170,
+          "end_line": 170,
+          "expression_sha256": "08885f37d7531edfb6ec65b590519ca31f8a8d64aa4e79a2aa64c8c146d0f8b6"
+        },
+        {
+          "id": "check_large_request_order/require-003",
+          "function": "check_large_request_order",
+          "line": 171,
+          "end_line": 172,
+          "expression_sha256": "2f3541f9e66e8582dee22f747c6c562ec2502935edf56e4c3a9055fd16db45c5"
+        },
+        {
+          "id": "check_large_request_order/require-004",
+          "function": "check_large_request_order",
+          "line": 173,
+          "end_line": 174,
+          "expression_sha256": "8527f459bdc2aafca79d1c706dcb8489bc7812431b6ece6de5a45b2661c073ce"
+        },
+        {
+          "id": "check_large_request_order/require-005",
+          "function": "check_large_request_order",
+          "line": 176,
+          "end_line": 176,
+          "expression_sha256": "da0624e96f2c13412fcb38942177d7ab8fc09091f022b600b90474a9ea3ad714"
+        },
+        {
+          "id": "check_large_request_order/require-006",
+          "function": "check_large_request_order",
+          "line": 177,
+          "end_line": 177,
+          "expression_sha256": "ae22c7be4c74ac7d6e7afdb2cffc7567be37fb803e0d91cd0318b8f8efeb4898"
+        },
+        {
+          "id": "check_dense_spans/require-001",
+          "function": "check_dense_spans",
+          "line": 207,
+          "end_line": 208,
+          "expression_sha256": "822e3b65bfebc65b41efbef6d000cd172bb9debafb63b22c2dd19d163f946c9e"
+        },
+        {
+          "id": "check_dense_spans/require-002",
+          "function": "check_dense_spans",
+          "line": 209,
+          "end_line": 210,
+          "expression_sha256": "3b6723e878fc7b24d0139065297e56fcbffd399053002dce3cb3490c9d40d47c"
+        },
+        {
+          "id": "check_dense_spans/require-003",
+          "function": "check_dense_spans",
+          "line": 211,
+          "end_line": 212,
+          "expression_sha256": "faeb492f380c8ed0361218818cdb0d2374341d172b4d8d59404dd1f60039c7bd"
+        },
+        {
+          "id": "check_dense_spans/require-004",
+          "function": "check_dense_spans",
+          "line": 217,
+          "end_line": 218,
+          "expression_sha256": "6d7e40b1d0f122e9d191ebe13004d84fb35ec3315f0870ef34e56c0c5c440f46"
+        }
+      ],
+      "counts": {
+        "functions": 8,
+        "assertions": 25,
+        "loop_headers": 29
+      }
+    },
+    "foundation": {
+      "source_sha256": "e440926fc178e7803702e486798c04869d9a38803b16f0e2fea48b7106ae5341",
+      "helpers": [
+        {
+          "name": "require",
+          "line": 35,
+          "end_line": 37,
+          "source_sha256": "23fb83896414b91b12901e7544cb35be411fbf2076e74d4af0f84ef191dfbdcd",
+          "loops": [],
+          "assertions": [],
+          "helper_calls": []
+        },
+        {
+          "name": "scalar_value",
+          "line": 38,
+          "end_line": 46,
+          "source_sha256": "3e5a1df48dd48590fe2044cf31cd07c349a02259db1fe627aaea41e1450e8ef8",
+          "loops": [
+            {
+              "line": 40,
+              "header": "for(int j = 0; j < 4; j++)"
+            },
+            {
+              "line": 42,
+              "header": "for(size_t k = value.c[j].d.size(); k-- > 0;)"
+            }
+          ],
+          "assertions": [],
+          "helper_calls": []
+        },
+        {
+          "name": "dense",
+          "line": 47,
+          "end_line": 63,
+          "source_sha256": "e686b137c838e00da3e770045226ff2297a6a4d73983c92f2330fd48bf906928",
+          "loops": [
+            {
+              "line": 50,
+              "header": "for(size_t u = 0; u < (size_t(1) << k.columns.size()); u++)"
+            },
+            {
+              "line": 53,
+              "header": "for(size_t j = 0; j < k.columns.size(); j++)"
+            },
+            {
+              "line": 57,
+              "header": "for(size_t l = j + 1; l < k.columns.size(); l++)"
+            }
+          ],
+          "assertions": [],
+          "helper_calls": []
+        },
+        {
+          "name": "finite_phase_sum",
+          "line": 65,
+          "end_line": 83,
+          "source_sha256": "f6ea3e55c7385f6a374d5c42c322ce744da52e91c60ee2edbc7a0f2dc474c8b8",
+          "loops": [
+            {
+              "line": 68,
+              "header": "for(size_t word = 0; word < (size_t(1) << tensor.n); word++)"
+            },
+            {
+              "line": 72,
+              "header": "for(size_t j = 0; j < tensor.n; j++)"
+            },
+            {
+              "line": 77,
+              "header": "for(const auto& [mask, coefficient] : tensor.terms)"
+            },
+            {
+              "line": 78,
+              "header": "for(size_t j = 0; j < tensor.boundary.size(); j++)"
+            }
+          ],
+          "assertions": [],
+          "helper_calls": []
+        },
+        {
+          "name": "check_transported_phase",
+          "line": 84,
+          "end_line": 113,
+          "source_sha256": "6f6abf0100e1c3d1a9774f0d75a7501851c31f384e3acf4f5e999d21d400c9bf",
+          "loops": [
+            {
+              "line": 98,
+              "header": "for(size_t j = 0; j < accelerated.size(); j++)"
+            },
+            {
+              "line": 106,
+              "header": "for(const auto& [coefficient, state] : accelerated)"
+            },
+            {
+              "line": 108,
+              "header": "for(size_t j = 0; j < values.size(); j++)"
+            },
+            {
+              "line": 110,
+              "header": "for(size_t j = 0; j < actual.size(); j++)"
+            }
+          ],
+          "assertions": [
+            "check_transported_phase/require-001",
+            "check_transported_phase/require-002",
+            "check_transported_phase/require-003",
+            "check_transported_phase/require-004",
+            "check_transported_phase/require-005"
+          ],
+          "helper_calls": [
+            "dense",
+            "finite_phase_sum",
+            "require",
+            "scalar_value"
+          ]
+        },
+        {
+          "name": "full_axis_sector",
+          "line": 116,
+          "end_line": 151,
+          "source_sha256": "5d3b5bd2fac49644155631e25d85cd4bcc4f56b750d7d9bcc36078daf9ef4cf9",
+          "loops": [
+            {
+              "line": 119,
+              "header": "for(auto& op : stripped.operations)"
+            },
+            {
+              "line": 122,
+              "header": "for(int q : op.qubits)"
+            },
+            {
+              "line": 127,
+              "header": "for(size_t mask = 1; mask < 8; mask++)"
+            },
+            {
+              "line": 129,
+              "header": "for(size_t j = 0; j < 3; j++)"
+            },
+            {
+              "line": 140,
+              "header": "for(const auto& faults : slots)"
+            },
+            {
+              "line": 141,
+              "header": "for(const auto& a : axes)"
+            },
+            {
+              "line": 142,
+              "header": "for(const auto& b : axes)"
+            },
+            {
+              "line": 144,
+              "header": "for(const auto& a : axes)"
+            },
+            {
+              "line": 146,
+              "header": "for(size_t j = 0; j < rows.size(); j++)"
+            }
+          ],
+          "assertions": [],
+          "helper_calls": []
+        },
+        {
+          "name": "check_axis_prefix",
+          "line": 152,
+          "end_line": 212,
+          "source_sha256": "9f96d2c5249a9e399cd4fc0e380dcb9e577f27dd2eba097f05ca7eb811ac877d",
+          "loops": [
+            {
+              "line": 170,
+              "header": "for(bool noncommuting : {false, true})"
+            },
+            {
+              "line": 184,
+              "header": "for(int variation = 0; variation < 3; variation++)"
+            },
+            {
+              "line": 187,
+              "header": "for(auto& q : attached.inputs)"
+            },
+            {
+              "line": 188,
+              "header": "for(auto& op : attached.operations)"
+            },
+            {
+              "line": 189,
+              "header": "for(auto& q : op.qubits)"
+            }
+          ],
+          "assertions": [
+            "check_axis_prefix/require-001",
+            "check_axis_prefix/require-002",
+            "check_axis_prefix/require-003",
+            "check_axis_prefix/require-004"
+          ],
+          "helper_calls": [
+            "full_axis_sector",
+            "require"
+          ]
+        },
+        {
+          "name": "check_reference_coordinates",
+          "line": 213,
+          "end_line": 266,
+          "source_sha256": "1018e7f42ecce38123a7e8dbdc2cba663c22af828d4ee1262d5750114fcd87b1",
+          "loops": [
+            {
+              "line": 221,
+              "header": "for(size_t width = 0; width <= 7; width++)"
+            },
+            {
+              "line": 222,
+              "header": "for(size_t count = 0; count <= 7; count++)"
+            },
+            {
+              "line": 225,
+              "header": "for(size_t j = 0; j < count; j++)"
+            },
+            {
+              "line": 233,
+              "header": "for(size_t choice = 0; choice < (size_t(1) << count); choice++)"
+            },
+            {
+              "line": 235,
+              "header": "for(size_t j = 0; j < count; j++)"
+            },
+            {
+              "line": 239,
+              "header": "for(uint64_t word = 0; word < (uint64_t(1) << width); word++)"
+            },
+            {
+              "line": 252,
+              "header": "for(size_t j = 0; j < 67; j++)"
+            },
+            {
+              "line": 257,
+              "header": "for(size_t trial = 0; trial < 128; trial++)"
+            },
+            {
+              "line": 259,
+              "header": "for(size_t j = 0; j < basis.size(); j++)"
+            }
+          ],
+          "assertions": [
+            "check_reference_coordinates/require-001",
+            "check_reference_coordinates/require-002",
+            "check_reference_coordinates/require-003",
+            "check_reference_coordinates/require-004",
+            "check_reference_coordinates/require-005",
+            "check_reference_coordinates/require-006"
+          ],
+          "helper_calls": [
+            "require"
+          ]
+        },
+        {
+          "name": "check_packed_clifford_updates",
+          "line": 267,
+          "end_line": 321,
+          "source_sha256": "3e2cee753253db78c11a17a1140fd8bdc43b2c5207b364d3aa5310b7db4ac762",
+          "loops": [
+            {
+              "line": 268,
+              "header": "for(size_t width : {size_t(0), size_t(1), size_t(63), size_t(64), size_t(65), size_t(137)})"
+            },
+            {
+              "line": 270,
+              "header": "for(size_t j = 0; j < rows.size(); j++)"
+            },
+            {
+              "line": 271,
+              "header": "for(size_t k = 0; k < width; k++)"
+            },
+            {
+              "line": 273,
+              "header": "for(size_t trial = 0; trial < 32; trial++)"
+            },
+            {
+              "line": 275,
+              "header": "for(size_t j = 0; j < rows.size(); j++)"
+            },
+            {
+              "line": 277,
+              "header": "for(size_t k = 0; k < width; k++)"
+            },
+            {
+              "line": 279,
+              "header": "for(size_t j = 0; j < rows.size(); j++)"
+            },
+            {
+              "line": 291,
+              "header": "for(size_t n : {size_t(0), size_t(1), size_t(7), size_t(63), size_t(64), size_t(65), size_t(137)})"
+            },
+            {
+              "line": 293,
+              "header": "for(size_t j = 0; j < n; j++)"
+            },
+            {
+              "line": 295,
+              "header": "for(size_t cut : {size_t(0), size_t(1), size_t(63), size_t(64), size_t(65), size_t(140)})"
+            },
+            {
+              "line": 297,
+              "header": "for(size_t j = cut + 1; j < n; j++)"
+            },
+            {
+              "line": 302,
+              "header": "for(int coefficient : {-6, -4, -2, 0, 2, 4, 6, 8, 10})"
+            },
+            {
+              "line": 305,
+              "header": "for(size_t j = 0; j < n; j++)"
+            },
+            {
+              "line": 310,
+              "header": "for(size_t j = 0; j < n; j++)"
+            },
+            {
+              "line": 313,
+              "header": "for(size_t k = j + 1; k < n; k++)"
+            }
+          ],
+          "assertions": [
+            "check_packed_clifford_updates/require-001",
+            "check_packed_clifford_updates/require-002",
+            "check_packed_clifford_updates/require-003",
+            "check_packed_clifford_updates/require-004"
+          ],
+          "helper_calls": [
+            "require"
+          ]
+        },
+        {
+          "name": "check_quadratic_batches",
+          "line": 322,
+          "end_line": 423,
+          "source_sha256": "bbb67557569fde72922d100323b38cff8a52eb8a59bbd5da70110e3216bc947f",
+          "loops": [
+            {
+              "line": 326,
+              "header": "for(size_t n : {size_t(0), size_t(1), size_t(63), size_t(64), size_t(65), size_t(137)})"
+            },
+            {
+              "line": 327,
+              "header": "for(size_t m : {size_t(0), size_t(7), size_t(64), size_t(131)})"
+            },
+            {
+              "line": 328,
+              "header": "for(size_t density : {size_t(2), size_t(31)})"
+            },
+            {
+              "line": 330,
+              "header": "for(size_t j = 0; j < m; j++)"
+            },
+            {
+              "line": 331,
+              "header": "for(size_t k = 0; k < n; k++)"
+            },
+            {
+              "line": 343,
+              "header": "for(size_t n : {size_t(0), size_t(1), size_t(8), size_t(63), size_t(64), size_t(65), size_t(137), size_t(513),\n                size_t(1025)})"
+            },
+            {
+              "line": 345,
+              "header": "for(size_t count : {size_t(1), size_t(7), size_t(8), size_t(32)})"
+            },
+            {
+              "line": 346,
+              "header": "for(size_t density : {size_t(2), size_t(31)})"
+            },
+            {
+              "line": 350,
+              "header": "for(size_t j = 0; j < n; j++)"
+            },
+            {
+              "line": 352,
+              "header": "for(size_t k = j + 1; k < n; k++)"
+            },
+            {
+              "line": 355,
+              "header": "for(size_t t = 0; t < count; t++)"
+            },
+            {
+              "line": 357,
+              "header": "for(size_t j = 0; j < n; j++)"
+            },
+            {
+              "line": 366,
+              "header": "for(size_t trial = 0; trial < (n <= 8 ? size_t(1) << n : 32); trial++)"
+            },
+            {
+              "line": 370,
+              "header": "for(size_t j = 0; j < n; j++)"
+            },
+            {
+              "line": 374,
+              "header": "for(size_t j = 0; j < n; j++)"
+            },
+            {
+              "line": 377,
+              "header": "for(size_t k = j + 1; k < n; k++)"
+            },
+            {
+              "line": 383,
+              "header": "for(const auto& term : terms)"
+            },
+            {
+              "line": 385,
+              "header": "for(size_t j = 0; j < n; j++)"
+            },
+            {
+              "line": 394,
+              "header": "for(size_t n : {size_t(8), size_t(65), size_t(137)})"
+            },
+            {
+              "line": 398,
+              "header": "for(size_t j = 0; j < n; j++)"
+            },
+            {
+              "line": 401,
+              "header": "for(size_t k = j + 1; k < n; k++)"
+            },
+            {
+              "line": 403,
+              "header": "for(size_t k = 0; k < n; k++)"
+            },
+            {
+              "line": 411,
+              "header": "for(size_t trial = 0; trial < 64; trial++)"
+            },
+            {
+              "line": 413,
+              "header": "for(size_t j = 0; j < basis.size(); j++)"
+            }
+          ],
+          "assertions": [
+            "check_quadratic_batches/require-001",
+            "check_quadratic_batches/require-002",
+            "check_quadratic_batches/require-003",
+            "check_quadratic_batches/require-004",
+            "check_quadratic_batches/require-005"
+          ],
+          "helper_calls": [
+            "require"
+          ]
+        },
+        {
+          "name": "check_composed_feedback_frames",
+          "line": 424,
+          "end_line": 458,
+          "source_sha256": "e7e07cf2b3e12d1ad9f1ee3fd9a8a5b572d9d059869668b1f1530c5491028552",
+          "loops": [
+            {
+              "line": 441,
+              "header": "for(size_t choice = 0; choice < 729; choice++)"
+            },
+            {
+              "line": 446,
+              "header": "for(size_t j = 0; j < 6; j++)"
+            }
+          ],
+          "assertions": [
+            "check_composed_feedback_frames/require-001",
+            "check_composed_feedback_frames/require-002"
+          ],
+          "helper_calls": [
+            "require"
+          ]
+        },
+        {
+          "name": "check_reference_boundary",
+          "line": 459,
+          "end_line": 626,
+          "source_sha256": "e1d9ca8498a241a4a192743fcbffa2be48f2bba58d563cb201cd3d2a5aade217",
+          "loops": [
+            {
+              "line": 467,
+              "header": "for(const auto& kind : {\"H\", \"T\", \"H\"})"
+            },
+            {
+              "line": 487,
+              "header": "for(size_t j = 0; j < rows.size(); j++)"
+            },
+            {
+              "line": 497,
+              "header": "for(size_t a = 0; a < 4; a++)"
+            },
+            {
+              "line": 498,
+              "header": "for(size_t b = 0; b < 4; b++)"
+            },
+            {
+              "line": 507,
+              "header": "for(size_t j = 0; j < repeated.size(); j++)"
+            },
+            {
+              "line": 524,
+              "header": "for(size_t sector = 0; sector < 2; sector++)"
+            },
+            {
+              "line": 525,
+              "header": "for(size_t flip = 0; flip < 4; flip++)"
+            },
+            {
+              "line": 532,
+              "header": "for(size_t mask = 0; mask < 4; mask++)"
+            },
+            {
+              "line": 547,
+              "header": "for(size_t sector = 0; sector < 2; sector++)"
+            },
+            {
+              "line": 548,
+              "header": "for(size_t outcomes = 0; outcomes < 32; outcomes++)"
+            },
+            {
+              "line": 549,
+              "header": "for(bool direct_closed : {false, true})"
+            },
+            {
+              "line": 555,
+              "header": "for(size_t j = 0; j < observed.size(); j++)"
+            },
+            {
+              "line": 559,
+              "header": "for(size_t flip : {size_t(0), size_t(1), size_t(3), size_t(2), size_t(0), size_t(0), size_t(3)})"
+            },
+            {
+              "line": 565,
+              "header": "for(size_t word = 0; word < 2; word++)"
+            },
+            {
+              "line": 568,
+              "header": "for(size_t j = 0; j < boundary.events.size(); j++)"
+            },
+            {
+              "line": 581,
+              "header": "for(size_t sector = 0; sector < 2; sector++)"
+            },
+            {
+              "line": 582,
+              "header": "for(size_t flip = 0; flip < 4; flip++)"
+            },
+            {
+              "line": 585,
+              "header": "for(size_t event = 0; event < 5; event++)"
+            },
+            {
+              "line": 586,
+              "header": "for(int bit = 0; bit < 2; bit++)"
+            },
+            {
+              "line": 596,
+              "header": "for(const auto& [coefficient, term] : result.terms)"
+            },
+            {
+              "line": 598,
+              "header": "for(size_t j = 0; j < v.size(); j++)"
+            },
+            {
+              "line": 602,
+              "header": "for(size_t second = 0; second < 2; second++)"
+            },
+            {
+              "line": 608,
+              "header": "for(size_t j = 0; j < 4; j++)"
+            }
+          ],
+          "assertions": [
+            "check_reference_boundary/require-001",
+            "check_reference_boundary/require-002",
+            "check_reference_boundary/require-003",
+            "check_reference_boundary/require-004",
+            "check_reference_boundary/require-005",
+            "check_reference_boundary/require-006",
+            "check_reference_boundary/require-007",
+            "check_reference_boundary/require-008",
+            "check_reference_boundary/require-009",
+            "check_reference_boundary/require-010",
+            "check_reference_boundary/require-011",
+            "check_reference_boundary/require-012",
+            "check_reference_boundary/require-013",
+            "check_reference_boundary/require-014",
+            "check_reference_boundary/require-015",
+            "check_reference_boundary/require-016"
+          ],
+          "helper_calls": [
+            "dense",
+            "require",
+            "scalar_value"
+          ]
+        },
+        {
+          "name": "check_incremental_history_session",
+          "line": 627,
+          "end_line": 770,
+          "source_sha256": "12062ae6e23359ca25f9817d69a00ba888d072a1e411a447be509f53c572e4b4",
+          "loops": [
+            {
+              "line": 630,
+              "header": "for(const auto& [coefficient, term] : result.terms)"
+            },
+            {
+              "line": 632,
+              "header": "for(size_t j = 0; j < out.size(); j++)"
+            },
+            {
+              "line": 648,
+              "header": "for(size_t word = 0; word < (size_t(1) << support.columns.size()); word++)"
+            },
+            {
+              "line": 654,
+              "header": "for(bool magic : {false, true})"
+            },
+            {
+              "line": 690,
+              "header": "for(size_t sector = 0; sector < 2; sector++)"
+            },
+            {
+              "line": 714,
+              "header": "for(size_t j = 0; j < a.size(); j++)"
+            }
+          ],
+          "assertions": [
+            "check_incremental_history_session/require-001",
+            "check_incremental_history_session/require-002",
+            "check_incremental_history_session/require-003",
+            "check_incremental_history_session/require-004",
+            "check_incremental_history_session/require-005",
+            "check_incremental_history_session/require-006",
+            "check_incremental_history_session/require-007",
+            "check_incremental_history_session/require-008",
+            "check_incremental_history_session/require-009",
+            "check_incremental_history_session/require-010",
+            "check_incremental_history_session/require-011",
+            "check_incremental_history_session/require-012"
+          ],
+          "helper_calls": [
+            "dense",
+            "require",
+            "scalar_value"
+          ]
+        },
+        {
+          "name": "main",
+          "line": 771,
+          "end_line": 1821,
+          "source_sha256": "5e927dfb8c2d0f3646f55b5761ceaea579bdcdb5798b437e4d9d8274355c8495",
+          "loops": [
+            {
+              "line": 778,
+              "header": "for(size_t n : {size_t(63), size_t(64), size_t(65), size_t(129), size_t(257)})"
+            },
+            {
+              "line": 779,
+              "header": "for(int trial = 0; trial < 24; trial++)"
+            },
+            {
+              "line": 790,
+              "header": "for(size_t j = 0; j < 8; j++)"
+            },
+            {
+              "line": 792,
+              "header": "for(size_t j = 0; j < n; j++)"
+            },
+            {
+              "line": 797,
+              "header": "for(size_t j = 0; j < 8; j++)"
+            },
+            {
+              "line": 801,
+              "header": "for(size_t k = j + 1; k < 8; k++)"
+            },
+            {
+              "line": 813,
+              "header": "for(auto& a : expected)"
+            },
+            {
+              "line": 817,
+              "header": "for(const auto& result : {direct, actual})"
+            },
+            {
+              "line": 819,
+              "header": "for(size_t j = 0; j < expected.size(); j++)"
+            },
+            {
+              "line": 826,
+              "header": "for(size_t j = 0; j < a.size(); j++)"
+            },
+            {
+              "line": 835,
+              "header": "for(size_t width : {size_t(0), size_t(1), size_t(63), size_t(64), size_t(65), size_t(130), size_t(1025)})"
+            },
+            {
+              "line": 837,
+              "header": "for(size_t j = 0; j < width; j++)"
+            },
+            {
+              "line": 839,
+              "header": "for(size_t offset : {size_t(0), size_t(1), size_t(63), size_t(64), size_t(65), size_t(127), size_t(1024),\n                        size_t(2049)})"
+            },
+            {
+              "line": 842,
+              "header": "for(size_t j = 0; j < width; j++)"
+            },
+            {
+              "line": 878,
+              "header": "for(size_t n = 0; n <= 7; n++)"
+            },
+            {
+              "line": 879,
+              "header": "for(size_t width = 0; width <= 3; width++)"
+            },
+            {
+              "line": 880,
+              "header": "for(int trial = 0; trial < 16; trial++)"
+            },
+            {
+              "line": 888,
+              "header": "for(size_t j = 0; j < n; j++)"
+            },
+            {
+              "line": 894,
+              "header": "for(size_t assignment = 0; assignment < (size_t(1) << n); assignment++)"
+            },
+            {
+              "line": 897,
+              "header": "for(size_t j = 0; j < n; j++)"
+            },
+            {
+              "line": 910,
+              "header": "for(size_t j = 0; j < exact.size(); j++)"
+            },
+            {
+              "line": 921,
+              "header": "for(size_t j = 0; j < width; j++)"
+            },
+            {
+              "line": 958,
+              "header": "for(char a : std::string(\"IXYZ\"))"
+            },
+            {
+              "line": 959,
+              "header": "for(char b : std::string(\"IXYZ\"))"
+            },
+            {
+              "line": 1157,
+              "header": "for(size_t j = 0; j < 12; j++)"
+            },
+            {
+              "line": 1174,
+              "header": "while(enumeration.next(hooks))"
+            },
+            {
+              "line": 1209,
+              "header": "for(int scale : {-1, 0})"
+            },
+            {
+              "line": 1220,
+              "header": "for(int scale : {5, 6})"
+            },
+            {
+              "line": 1235,
+              "header": "for(int k = 2; k <= 36; k++)"
+            },
+            {
+              "line": 1238,
+              "header": "for(size_t j = 0; j < channels.size(); j++)"
+            },
+            {
+              "line": 1241,
+              "header": "for(int multiple = 1; multiple <= 3; multiple++)"
+            },
+            {
+              "line": 1248,
+              "header": "for(const std::optional<Rational>& scale : std::vector<std::optional<Rational>>{\n                    {}, Rational(Integer(1), Integer(2)), Rational(Integer(1)), Rational(Integer(2))})"
+            },
+            {
+              "line": 1257,
+              "header": "for(size_t j = 0; j < channels.size(); j++)"
+            },
+            {
+              "line": 1263,
+              "header": "for(int multiple = 1; multiple <= 3; multiple++)"
+            },
+            {
+              "line": 1286,
+              "header": "for(size_t choice = 0; choice < 2; choice++)"
+            },
+            {
+              "line": 1297,
+              "header": "for(uint64_t seed = 0; seed < 32; seed++)"
+            },
+            {
+              "line": 1299,
+              "header": "for(size_t j = 0; j < channels.size(); j++)"
+            },
+            {
+              "line": 1303,
+              "header": "for(bool sparse : {false, true})"
+            },
+            {
+              "line": 1346,
+              "header": "for(const auto& op : deferred.operations)"
+            },
+            {
+              "line": 1350,
+              "header": "for(const auto& [name, wire] : deferred.records)"
+            },
+            {
+              "line": 1371,
+              "header": "for(size_t j = 0; j < amplitude.rotation_axes.size(); j++)"
+            },
+            {
+              "line": 1376,
+              "header": "for(size_t location = 0; location < trace.plan.locations.size(); location++)"
+            },
+            {
+              "line": 1377,
+              "header": "for(int wire = 0; wire < 2; wire++)"
+            },
+            {
+              "line": 1378,
+              "header": "for(int pauli = 1; pauli < 4; pauli++)"
+            },
+            {
+              "line": 1426,
+              "header": "for(size_t n = 2; n <= 6; n++)"
+            },
+            {
+              "line": 1427,
+              "header": "for(size_t width : {size_t(0), size_t(1), size_t(3)})"
+            },
+            {
+              "line": 1434,
+              "header": "for(size_t j = 0; j < width; j++)"
+            },
+            {
+              "line": 1437,
+              "header": "for(size_t sample = 0; sample < 16; sample++)"
+            },
+            {
+              "line": 1439,
+              "header": "for(size_t j = 0; j < n; j++)"
+            },
+            {
+              "line": 1446,
+              "header": "for(size_t j = 0; j < width; j++)"
+            },
+            {
+              "line": 1485,
+              "header": "for(const auto& [coefficient, state] : states)"
+            },
+            {
+              "line": 1487,
+              "header": "for(size_t j = 0; j < 4; j++)"
+            },
+            {
+              "line": 1489,
+              "header": "for(size_t word = 0; word < 4; word++)"
+            },
+            {
+              "line": 1508,
+              "header": "for(int increment : {0, 2, 4, 6})"
+            },
+            {
+              "line": 1509,
+              "header": "for(int offset = 0; offset < 2; offset++)"
+            },
+            {
+              "line": 1525,
+              "header": "for(size_t mask = 1; mask < 16; mask++)"
+            },
+            {
+              "line": 1541,
+              "header": "for(size_t dimension : {size_t(2), size_t(3)})"
+            },
+            {
+              "line": 1576,
+              "header": "for(size_t n = 0; n <= 7; n++)"
+            },
+            {
+              "line": 1577,
+              "header": "for(size_t trial = 0; trial < 40; trial++)"
+            },
+            {
+              "line": 1583,
+              "header": "for(size_t j = 0; j < n; j++)"
+            },
+            {
+              "line": 1587,
+              "header": "for(size_t k = j + 1; k < n; k++)"
+            },
+            {
+              "line": 1595,
+              "header": "for(size_t j = 0; j < expected.size(); j++)"
+            },
+            {
+              "line": 1600,
+              "header": "for(int phase = 0; phase < 8; phase++)"
+            },
+            {
+              "line": 1601,
+              "header": "for(int linear = 0; linear < 4; linear++)"
+            },
+            {
+              "line": 1602,
+              "header": "for(int visible = 0; visible < 2; visible++)"
+            },
+            {
+              "line": 1611,
+              "header": "for(size_t j = 0; j < actual.size(); j++)"
+            },
+            {
+              "line": 1633,
+              "header": "for(uint64_t seed = 0; seed < 1000; seed++)"
+            },
+            {
+              "line": 1640,
+              "header": "for(uint64_t seed = 0; seed < 100; seed++)"
+            },
+            {
+              "line": 1649,
+              "header": "for(const auto& row : patterns)"
+            },
+            {
+              "line": 1682,
+              "header": "for(size_t j = 0; j < 2; j++)"
+            },
+            {
+              "line": 1723,
+              "header": "for(size_t j = 0; j < 80; j++)"
+            },
+            {
+              "line": 1725,
+              "header": "for(size_t j = 0; j < 82; j++)"
+            },
+            {
+              "line": 1741,
+              "header": "for(size_t n = 0; n <= 7; n++)"
+            },
+            {
+              "line": 1742,
+              "header": "for(size_t trial = 0; trial < 40; trial++)"
+            },
+            {
+              "line": 1746,
+              "header": "for(size_t j = 0; j < n; j++)"
+            },
+            {
+              "line": 1750,
+              "header": "for(size_t j = 0; j < width; j++)"
+            },
+            {
+              "line": 1752,
+              "header": "for(size_t j = 0; j < count; j++)"
+            },
+            {
+              "line": 1757,
+              "header": "for(size_t u = 0; u < (1ULL << n); u++)"
+            },
+            {
+              "line": 1760,
+              "header": "for(size_t j = 0; j < count; j++)"
+            },
+            {
+              "line": 1763,
+              "header": "for(size_t j = 0; j < width; j++)"
+            },
+            {
+              "line": 1768,
+              "header": "for(size_t u = 0; u < (1ULL << projected.columns.size()); u++)"
+            },
+            {
+              "line": 1779,
+              "header": "for(size_t n = 0; n <= 7; n++)"
+            },
+            {
+              "line": 1780,
+              "header": "for(size_t trial = 0; trial < 80; trial++)"
+            },
+            {
+              "line": 1785,
+              "header": "for(size_t j = 0; j < n; j++)"
+            },
+            {
+              "line": 1788,
+              "header": "for(size_t k = j + 1; k < n; k++)"
+            },
+            {
+              "line": 1792,
+              "header": "for(size_t j = 0; j < width; j++)"
+            },
+            {
+              "line": 1798,
+              "header": "for(size_t j = 0; j < n; j++)"
+            },
+            {
+              "line": 1802,
+              "header": "for(size_t j = 0; j < width; j++)"
+            },
+            {
+              "line": 1806,
+              "header": "for(size_t x = 0; x < (1ULL << n); x++)"
+            },
+            {
+              "line": 1808,
+              "header": "for(size_t j = 0; j < width; j++)"
+            },
+            {
+              "line": 1814,
+              "header": "for(size_t word = 0; word < sums.size(); word++)"
+            }
+          ],
+          "assertions": [
+            "main/require-001",
+            "main/require-002",
+            "main/require-003",
+            "main/require-004",
+            "main/require-005",
+            "main/require-006",
+            "main/require-007",
+            "main/require-008",
+            "main/require-009",
+            "main/require-010",
+            "main/require-011",
+            "main/require-012",
+            "main/require-013",
+            "main/require-014",
+            "main/require-015",
+            "main/require-016",
+            "main/require-017",
+            "main/require-018",
+            "main/require-019",
+            "main/require-020",
+            "main/require-021",
+            "main/require-022",
+            "main/require-023",
+            "main/require-024",
+            "main/require-025",
+            "main/require-026",
+            "main/require-027",
+            "main/require-028",
+            "main/require-029",
+            "main/require-030",
+            "main/require-031",
+            "main/require-032",
+            "main/require-033",
+            "main/require-034",
+            "main/require-035",
+            "main/require-036",
+            "main/require-037",
+            "main/require-038",
+            "main/require-039",
+            "main/require-040",
+            "main/require-041",
+            "main/require-042",
+            "main/require-043",
+            "main/require-044",
+            "main/require-045",
+            "main/require-046",
+            "main/require-047",
+            "main/require-048",
+            "main/require-049",
+            "main/require-050",
+            "main/require-051",
+            "main/require-052",
+            "main/require-053",
+            "main/require-054",
+            "main/require-055",
+            "main/require-056",
+            "main/require-057",
+            "main/require-058",
+            "main/require-059",
+            "main/require-060",
+            "main/require-061",
+            "main/require-062",
+            "main/require-063",
+            "main/require-064",
+            "main/require-065",
+            "main/require-066",
+            "main/require-067",
+            "main/require-068",
+            "main/require-069",
+            "main/require-070",
+            "main/require-071",
+            "main/require-072",
+            "main/require-073",
+            "main/require-074",
+            "main/require-075",
+            "main/require-076",
+            "main/require-077",
+            "main/require-078",
+            "main/require-079",
+            "main/require-080",
+            "main/require-081",
+            "main/require-082",
+            "main/require-083",
+            "main/require-084",
+            "main/require-085",
+            "main/require-086",
+            "main/require-087",
+            "main/require-088",
+            "main/require-089",
+            "main/require-090",
+            "main/require-091",
+            "main/require-092",
+            "main/require-093",
+            "main/require-094",
+            "main/require-095",
+            "main/require-096",
+            "main/require-097",
+            "main/require-098",
+            "main/require-099",
+            "main/require-100",
+            "main/require-101",
+            "main/require-102",
+            "main/require-103",
+            "main/require-104",
+            "main/require-105",
+            "main/require-106",
+            "main/require-107",
+            "main/require-108",
+            "main/require-109",
+            "main/require-110",
+            "main/require-111",
+            "main/require-112",
+            "main/require-113",
+            "main/require-114",
+            "main/require-115",
+            "main/require-116",
+            "main/require-117",
+            "main/require-118",
+            "main/require-119",
+            "main/require-120",
+            "main/require-121",
+            "main/require-122",
+            "main/require-123",
+            "main/require-124",
+            "main/require-125",
+            "main/require-126",
+            "main/require-127",
+            "main/require-128",
+            "main/require-129",
+            "main/require-130",
+            "main/require-131",
+            "main/require-132",
+            "main/require-133",
+            "main/require-134",
+            "main/require-135",
+            "main/require-136",
+            "main/require-137",
+            "main/require-138"
+          ],
+          "helper_calls": [
+            "check_axis_prefix",
+            "check_composed_feedback_frames",
+            "check_incremental_history_session",
+            "check_packed_clifford_updates",
+            "check_quadratic_batches",
+            "check_reference_boundary",
+            "check_reference_coordinates",
+            "check_transported_phase",
+            "dense",
+            "require",
+            "scalar_value"
+          ]
+        }
+      ],
+      "assertions": [
+        {
+          "id": "check_transported_phase/require-001",
+          "function": "check_transported_phase",
+          "line": 86,
+          "end_line": 86,
+          "expression_sha256": "bfb251ab31b0af41bc79133819f7cb511afa3c869909c85bc690f253f74252fb"
+        },
+        {
+          "id": "check_transported_phase/require-002",
+          "function": "check_transported_phase",
+          "line": 87,
+          "end_line": 88,
+          "expression_sha256": "93eb9be6beeacae2e44aeaf02b07ed4e8459b33b33e8e9276c20e380d3b4688b"
+        },
+        {
+          "id": "check_transported_phase/require-003",
+          "function": "check_transported_phase",
+          "line": 97,
+          "end_line": 97,
+          "expression_sha256": "d6ce89f1d993071b3a61f9f70dec125a6aac0740b856410cd9d5f9e7b9d43321"
+        },
+        {
+          "id": "check_transported_phase/require-004",
+          "function": "check_transported_phase",
+          "line": 101,
+          "end_line": 104,
+          "expression_sha256": "bd6f93ee35b2032d072cf569df09f300acc5109d5f4b0521ff0d6d0208987052"
+        },
+        {
+          "id": "check_transported_phase/require-005",
+          "function": "check_transported_phase",
+          "line": 111,
+          "end_line": 112,
+          "expression_sha256": "06bf274bb4840cafde3c37478eed0303f2c92dd26fc93f1433e2d36fddacf05f"
+        },
+        {
+          "id": "check_axis_prefix/require-001",
+          "function": "check_axis_prefix",
+          "line": 181,
+          "end_line": 182,
+          "expression_sha256": "9cf0f6125fc2bcf0df05289ec796a550fae3b320d56df5f0ca37a4baa9c32690"
+        },
+        {
+          "id": "check_axis_prefix/require-002",
+          "function": "check_axis_prefix",
+          "line": 183,
+          "end_line": 183,
+          "expression_sha256": "8a0b8b7a3368cb9aac085b307707d00bf477d02149aaca31ccb2c2304a7f1dad"
+        },
+        {
+          "id": "check_axis_prefix/require-003",
+          "function": "check_axis_prefix",
+          "line": 205,
+          "end_line": 207,
+          "expression_sha256": "f38848a172ebf22c1e7b95c4815e6aeab62df8e9a2dfc347f51d7053429edc2a"
+        },
+        {
+          "id": "check_axis_prefix/require-004",
+          "function": "check_axis_prefix",
+          "line": 208,
+          "end_line": 209,
+          "expression_sha256": "0965a08db50b65d465b9b5018066a6ccc07393ab4c00b7b63c6afdf62b299667"
+        },
+        {
+          "id": "check_reference_coordinates/require-001",
+          "function": "check_reference_coordinates",
+          "line": 241,
+          "end_line": 242,
+          "expression_sha256": "355af71c99d906c7e8e35601aff7a1d2fa5644aa5295920142f6d882a30a08e2"
+        },
+        {
+          "id": "check_reference_coordinates/require-002",
+          "function": "check_reference_coordinates",
+          "line": 243,
+          "end_line": 243,
+          "expression_sha256": "392172facb971480dfd8db02386a062b41cb2e28ac1b13b711842928583db5c7"
+        },
+        {
+          "id": "check_reference_coordinates/require-003",
+          "function": "check_reference_coordinates",
+          "line": 245,
+          "end_line": 245,
+          "expression_sha256": "2107457f578cb22a73c0230f8d58e969cb82fae4046652e27a160fa5640024e7"
+        },
+        {
+          "id": "check_reference_coordinates/require-004",
+          "function": "check_reference_coordinates",
+          "line": 247,
+          "end_line": 247,
+          "expression_sha256": "c7dfdb9f5449d5a02e67b20dfd8ed1095235f8f55bc8aad85ea3097ffaf2e5b3"
+        },
+        {
+          "id": "check_reference_coordinates/require-005",
+          "function": "check_reference_coordinates",
+          "line": 263,
+          "end_line": 263,
+          "expression_sha256": "43a01787f5ecbc6afb376b6ccde130c59041faf35be6bf422d405c7753a11095"
+        },
+        {
+          "id": "check_reference_coordinates/require-006",
+          "function": "check_reference_coordinates",
+          "line": 264,
+          "end_line": 264,
+          "expression_sha256": "08e6e62101f01084961df14a3804e9a09e96621585cb181a70e606852513056a"
+        },
+        {
+          "id": "check_packed_clifford_updates/require-001",
+          "function": "check_packed_clifford_updates",
+          "line": 283,
+          "end_line": 283,
+          "expression_sha256": "8a54287eb970cdbd20c5080440f1e05c981bbf979e664242207aea9d339afef8"
+        },
+        {
+          "id": "check_packed_clifford_updates/require-002",
+          "function": "check_packed_clifford_updates",
+          "line": 289,
+          "end_line": 289,
+          "expression_sha256": "ec44bb1c60d7a56ab923d7abbe4831978dafe3071b369e515d72c71b368536fc"
+        },
+        {
+          "id": "check_packed_clifford_updates/require-003",
+          "function": "check_packed_clifford_updates",
+          "line": 300,
+          "end_line": 300,
+          "expression_sha256": "c6b5e4a99ee614904c30522974eaa32ea8a1644e248af976a1df4566403d8005"
+        },
+        {
+          "id": "check_packed_clifford_updates/require-004",
+          "function": "check_packed_clifford_updates",
+          "line": 317,
+          "end_line": 318,
+          "expression_sha256": "0f1f17ad913d37549128b79b065d980e53407131a4e36525267e703a1f42b29c"
+        },
+        {
+          "id": "check_quadratic_batches/require-001",
+          "function": "check_quadratic_batches",
+          "line": 336,
+          "end_line": 336,
+          "expression_sha256": "716b19a57f9de3ffcecdf052bf0dcfd8a848f054e4795138488294cca19dd971"
+        },
+        {
+          "id": "check_quadratic_batches/require-002",
+          "function": "check_quadratic_batches",
+          "line": 342,
+          "end_line": 342,
+          "expression_sha256": "5f3e484396e580fd6521a4bd7fb61510c7d4e2a88c2fa83c2e4024325dc72bc3"
+        },
+        {
+          "id": "check_quadratic_batches/require-003",
+          "function": "check_quadratic_batches",
+          "line": 388,
+          "end_line": 389,
+          "expression_sha256": "927d86d026a5328cd95c5dc30ab6b1968fa0102eb95aa4a854e1cbf8f93d286e"
+        },
+        {
+          "id": "check_quadratic_batches/require-004",
+          "function": "check_quadratic_batches",
+          "line": 408,
+          "end_line": 410,
+          "expression_sha256": "c0e8b3c9662234ac2ef037f618c411f77eeae54402ee8eb2165f1f2981e43667"
+        },
+        {
+          "id": "check_quadratic_batches/require-005",
+          "function": "check_quadratic_batches",
+          "line": 418,
+          "end_line": 420,
+          "expression_sha256": "9ce240d0e23aa09d83cad18eea2feb45deb8d91016d5e7645183a179099e6c47"
+        },
+        {
+          "id": "check_composed_feedback_frames/require-001",
+          "function": "check_composed_feedback_frames",
+          "line": 440,
+          "end_line": 440,
+          "expression_sha256": "4c098b8fc5c73ad03f0c83fe9897dcee618206b3563e1a395d79dc53f6a6250a"
+        },
+        {
+          "id": "check_composed_feedback_frames/require-002",
+          "function": "check_composed_feedback_frames",
+          "line": 454,
+          "end_line": 455,
+          "expression_sha256": "66fa37403fe498b5721457c3e2c496646ae066ff45114f1a726f0afb9a090304"
+        },
+        {
+          "id": "check_reference_boundary/require-001",
+          "function": "check_reference_boundary",
+          "line": 501,
+          "end_line": 502,
+          "expression_sha256": "9db2bc15332a90d937973a1c6412cd83b5d1a9f6148cd030903c25355a13083b"
+        },
+        {
+          "id": "check_reference_boundary/require-002",
+          "function": "check_reference_boundary",
+          "line": 503,
+          "end_line": 503,
+          "expression_sha256": "26184297460f532a6daac2e7d148473fbf300db4733989bd367b3ee4171b7380"
+        },
+        {
+          "id": "check_reference_boundary/require-003",
+          "function": "check_reference_boundary",
+          "line": 510,
+          "end_line": 511,
+          "expression_sha256": "b2e7c1c0a8a840f001006fc54d96397e97f15c62a4ef76232ffe613801cde0ba"
+        },
+        {
+          "id": "check_reference_boundary/require-004",
+          "function": "check_reference_boundary",
+          "line": 516,
+          "end_line": 516,
+          "expression_sha256": "b3ae92deae6f1ab98e6f084b916943a6544a9a67a9257d69d6c72f3ab6d55888"
+        },
+        {
+          "id": "check_reference_boundary/require-005",
+          "function": "check_reference_boundary",
+          "line": 521,
+          "end_line": 521,
+          "expression_sha256": "17f8f0ba73647361ad2bbf5ea42eadf847da20effb014ef03bc9ef29c00f399c"
+        },
+        {
+          "id": "check_reference_boundary/require-006",
+          "function": "check_reference_boundary",
+          "line": 529,
+          "end_line": 530,
+          "expression_sha256": "83852c4b082c7b0f1f5c90fced52fddc019e17177a40c48502c4d66b6cdd9a86"
+        },
+        {
+          "id": "check_reference_boundary/require-007",
+          "function": "check_reference_boundary",
+          "line": 531,
+          "end_line": 531,
+          "expression_sha256": "7d90f341a01b1a7baf78193da84080e79e596149ce684314cae942578ec7e20f"
+        },
+        {
+          "id": "check_reference_boundary/require-008",
+          "function": "check_reference_boundary",
+          "line": 534,
+          "end_line": 536,
+          "expression_sha256": "f8c0ed8ed7a5860c20c242df669c33515b0ecc44d529de824742896aff00700a"
+        },
+        {
+          "id": "check_reference_boundary/require-009",
+          "function": "check_reference_boundary",
+          "line": 540,
+          "end_line": 540,
+          "expression_sha256": "0353be7dc377f3f0a349252896c67b68d5abdcda9b42a5448079b6fd09f5b951"
+        },
+        {
+          "id": "check_reference_boundary/require-010",
+          "function": "check_reference_boundary",
+          "line": 563,
+          "end_line": 564,
+          "expression_sha256": "738fe739cd77be31a1d879ef6915d158cae7067ac4b5c978a486d3ca547d0f6f"
+        },
+        {
+          "id": "check_reference_boundary/require-011",
+          "function": "check_reference_boundary",
+          "line": 572,
+          "end_line": 573,
+          "expression_sha256": "d76342128fe099cd1f6dfd2900e61a3fa4e81c90244630426614f08d51344a71"
+        },
+        {
+          "id": "check_reference_boundary/require-012",
+          "function": "check_reference_boundary",
+          "line": 577,
+          "end_line": 578,
+          "expression_sha256": "40114859fd892c8e4c7adcfc75ed1c5441a16e8221c393fb471568c6527db033"
+        },
+        {
+          "id": "check_reference_boundary/require-013",
+          "function": "check_reference_boundary",
+          "line": 609,
+          "end_line": 610,
+          "expression_sha256": "215fb89b401f41507eb63b1fd6425bd88a62b8a1a7b57b9b98b7813f52092224"
+        },
+        {
+          "id": "check_reference_boundary/require-014",
+          "function": "check_reference_boundary",
+          "line": 621,
+          "end_line": 621,
+          "expression_sha256": "80efad2e6d2e557209e487a51cb5ff1653b5ed755eec251b20eaddc5b7a7fb54"
+        },
+        {
+          "id": "check_reference_boundary/require-015",
+          "function": "check_reference_boundary",
+          "line": 622,
+          "end_line": 623,
+          "expression_sha256": "b65c51734cafc31eab5140eb53685b74383c50c09f3c7bef6da1e122134b82a7"
+        },
+        {
+          "id": "check_reference_boundary/require-016",
+          "function": "check_reference_boundary",
+          "line": 625,
+          "end_line": 625,
+          "expression_sha256": "2519cfca694c17d879b85bbb960b9f79d068c4ed9810d32547c80e0b37272df0"
+        },
+        {
+          "id": "check_incremental_history_session/require-001",
+          "function": "check_incremental_history_session",
+          "line": 689,
+          "end_line": 689,
+          "expression_sha256": "3859f6f2e6115be727cb9687d7a28a7b4dc702943d5e0554d9bdbdf36221e877"
+        },
+        {
+          "id": "check_incremental_history_session/require-002",
+          "function": "check_incremental_history_session",
+          "line": 707,
+          "end_line": 708,
+          "expression_sha256": "f35d2b6eddc6e79b32cbcc8a89c1a2c7c8bb52c71253776844e4dcff67d4c483"
+        },
+        {
+          "id": "check_incremental_history_session/require-003",
+          "function": "check_incremental_history_session",
+          "line": 715,
+          "end_line": 716,
+          "expression_sha256": "76d6cafd53fb61980ca30005f4521aa36799233bc956814ed9a00a777970c7be"
+        },
+        {
+          "id": "check_incremental_history_session/require-004",
+          "function": "check_incremental_history_session",
+          "line": 717,
+          "end_line": 718,
+          "expression_sha256": "3873aa10dad1d24dfe99c8ee980f2d255043ca5960b610527fdd3984a8fd1563"
+        },
+        {
+          "id": "check_incremental_history_session/require-005",
+          "function": "check_incremental_history_session",
+          "line": 723,
+          "end_line": 724,
+          "expression_sha256": "f562052574e73818fd3c8cc0101e8073291f4363416040c3a4e1a2de9aa0ec43"
+        },
+        {
+          "id": "check_incremental_history_session/require-006",
+          "function": "check_incremental_history_session",
+          "line": 725,
+          "end_line": 726,
+          "expression_sha256": "1f4055428f49636b1cc931f3763146733200c179fce3bd0bd7837dd896ae3ba1"
+        },
+        {
+          "id": "check_incremental_history_session/require-007",
+          "function": "check_incremental_history_session",
+          "line": 730,
+          "end_line": 731,
+          "expression_sha256": "e1400ae93d696e6fd3d57133424e5d902f4f999eb039eebb25aec6184a5ace3b"
+        },
+        {
+          "id": "check_incremental_history_session/require-008",
+          "function": "check_incremental_history_session",
+          "line": 732,
+          "end_line": 733,
+          "expression_sha256": "24447cebff2c4ac74dfa710afc4957084814e2f508c59e2386cf7bb5eff85c58"
+        },
+        {
+          "id": "check_incremental_history_session/require-009",
+          "function": "check_incremental_history_session",
+          "line": 740,
+          "end_line": 741,
+          "expression_sha256": "167a6f7fc0a66b9975e7c6b2c93c98c691497e6929a40290cffc2306f123a6aa"
+        },
+        {
+          "id": "check_incremental_history_session/require-010",
+          "function": "check_incremental_history_session",
+          "line": 748,
+          "end_line": 749,
+          "expression_sha256": "2f54a9415938ec56ac13a9bfa7f3447f11d7017d6d20eefcffc5e6bbae06d5cb"
+        },
+        {
+          "id": "check_incremental_history_session/require-011",
+          "function": "check_incremental_history_session",
+          "line": 763,
+          "end_line": 764,
+          "expression_sha256": "80524d4eaa5a6129d7003d5f1d8b3a8bc105cffc7951ed5eb7799c99b5b3141c"
+        },
+        {
+          "id": "check_incremental_history_session/require-012",
+          "function": "check_incremental_history_session",
+          "line": 766,
+          "end_line": 767,
+          "expression_sha256": "6b10f419bb3f675a88d083c0cc7ee90b96c3e9a504779a466df47d92b0b5e1cc"
+        },
+        {
+          "id": "main/require-001",
+          "function": "main",
+          "line": 820,
+          "end_line": 821,
+          "expression_sha256": "56d6870461a3237aefb03940136416a8fe884d20a63dd2c825b8928affb0fd5d"
+        },
+        {
+          "id": "main/require-002",
+          "function": "main",
+          "line": 824,
+          "end_line": 824,
+          "expression_sha256": "e7e8749fe990a35f54e99f1a67541b17ff04a2cfcd47a5c4ea8a48bcea89fd20"
+        },
+        {
+          "id": "main/require-003",
+          "function": "main",
+          "line": 827,
+          "end_line": 828,
+          "expression_sha256": "ff0d84932cb5f17604eb2eb77bba7411729797764e2e32c3a8b400ee7bcfb5cc"
+        },
+        {
+          "id": "main/require-004",
+          "function": "main",
+          "line": 847,
+          "end_line": 848,
+          "expression_sha256": "be57cdefef9188e2f69dc000aacc34ca05af0244efdb18956d6f2c9d00531059"
+        },
+        {
+          "id": "main/require-005",
+          "function": "main",
+          "line": 849,
+          "end_line": 849,
+          "expression_sha256": "679d9db3185f196358bc80420cbae3500c4bacf277139e13def730a71891290a"
+        },
+        {
+          "id": "main/require-006",
+          "function": "main",
+          "line": 857,
+          "end_line": 857,
+          "expression_sha256": "fe3fa953c714a2e47d649061d170be0aeaaf8ed3a131fda31b5965b6336ccde7"
+        },
+        {
+          "id": "main/require-007",
+          "function": "main",
+          "line": 858,
+          "end_line": 859,
+          "expression_sha256": "11d279aa199381a3622750f5a0ca7d2f8222a39fc38dfa5045df46d046e89b45"
+        },
+        {
+          "id": "main/require-008",
+          "function": "main",
+          "line": 860,
+          "end_line": 860,
+          "expression_sha256": "87b80c636867c657dcb65616f004b8d09b10ea09d09dfd362bc1eee03df07f63"
+        },
+        {
+          "id": "main/require-009",
+          "function": "main",
+          "line": 899,
+          "end_line": 900,
+          "expression_sha256": "ac5f6342441ac58f1d74fe94c7fa5f3c4f946b2261953a77ae81c6fba28b6655"
+        },
+        {
+          "id": "main/require-010",
+          "function": "main",
+          "line": 903,
+          "end_line": 903,
+          "expression_sha256": "c27211f8784e0db18d592e02b051c61995f37449fd304e8592590159c1afb659"
+        },
+        {
+          "id": "main/require-011",
+          "function": "main",
+          "line": 905,
+          "end_line": 908,
+          "expression_sha256": "cdbdb0575bfbe8fcd7e81115c7399fccb3bf03fa3827e8875c02595a91a4a31a"
+        },
+        {
+          "id": "main/require-012",
+          "function": "main",
+          "line": 911,
+          "end_line": 912,
+          "expression_sha256": "158b9a4116d3ee4d237b5f7aa4de367bb26856779eef70d68251ca3b6e05ff67"
+        },
+        {
+          "id": "main/require-013",
+          "function": "main",
+          "line": 924,
+          "end_line": 925,
+          "expression_sha256": "227d971000b8668cd34e793af3b6e22e4c893d70ae69a64e674a69f7ee6cfafe"
+        },
+        {
+          "id": "main/require-014",
+          "function": "main",
+          "line": 933,
+          "end_line": 935,
+          "expression_sha256": "7f0b694300409721b5b9ce0db984db92881ef2420329b657b54346a4685c853d"
+        },
+        {
+          "id": "main/require-015",
+          "function": "main",
+          "line": 937,
+          "end_line": 937,
+          "expression_sha256": "3a02bdac3122f52cf33732f4ec2b9943106884581070c5a76005d80cca3553d6"
+        },
+        {
+          "id": "main/require-016",
+          "function": "main",
+          "line": 942,
+          "end_line": 943,
+          "expression_sha256": "d57536c39ccf80a2e7bf2a55fd1664a1c2aad31e8ff98aa51003f682c968620c"
+        },
+        {
+          "id": "main/require-017",
+          "function": "main",
+          "line": 944,
+          "end_line": 944,
+          "expression_sha256": "846129eb7aec2044e80f12801ee594f074153940ec8bb5a55769a17d05ae54a4"
+        },
+        {
+          "id": "main/require-018",
+          "function": "main",
+          "line": 945,
+          "end_line": 946,
+          "expression_sha256": "bb652e7419b29fa5db3eb3e24112c1ad9ae6edea9471591f674ce43d5f050c46"
+        },
+        {
+          "id": "main/require-019",
+          "function": "main",
+          "line": 965,
+          "end_line": 966,
+          "expression_sha256": "262f377d90be3270ebf264c81b8da55cfbec7eb76ff94904f0e387a85cb28399"
+        },
+        {
+          "id": "main/require-020",
+          "function": "main",
+          "line": 968,
+          "end_line": 969,
+          "expression_sha256": "42e44868cd7c8018b7e390cc68ec7c60cc614f7a386c3b16d1efd5a58b45c6da"
+        },
+        {
+          "id": "main/require-021",
+          "function": "main",
+          "line": 970,
+          "end_line": 971,
+          "expression_sha256": "c80986d833bf7233111881d18c841e33059392631970f6bda4fe4f2e7482cc79"
+        },
+        {
+          "id": "main/require-022",
+          "function": "main",
+          "line": 976,
+          "end_line": 976,
+          "expression_sha256": "7321bdd3ada98b58c82ce4bbfc7daa035f8dd9c984bb36c2a323ef0bb9c6754e"
+        },
+        {
+          "id": "main/require-023",
+          "function": "main",
+          "line": 977,
+          "end_line": 977,
+          "expression_sha256": "a8636f92fcbb4f754a166b77a60721c151a5a95e6cd45850cd6a7782c03b663d"
+        },
+        {
+          "id": "main/require-024",
+          "function": "main",
+          "line": 985,
+          "end_line": 987,
+          "expression_sha256": "45c8c18d4bd4bbd75be4b19c57a2a3674327a8887af88656650fb1bfd22daa70"
+        },
+        {
+          "id": "main/require-025",
+          "function": "main",
+          "line": 992,
+          "end_line": 994,
+          "expression_sha256": "3bcf99501f2761a0dc86665b788f8c2e9eec830466317664ec0583223bec6c62"
+        },
+        {
+          "id": "main/require-026",
+          "function": "main",
+          "line": 996,
+          "end_line": 998,
+          "expression_sha256": "4b072308e19875a178815c3ee19ce91fcb9a4ea2119dc6c46263b63860492075"
+        },
+        {
+          "id": "main/require-027",
+          "function": "main",
+          "line": 1000,
+          "end_line": 1002,
+          "expression_sha256": "284f436cb7a4ad14c11ca4814c9541b2f59f0d621b17a8cf07aa409ea5360634"
+        },
+        {
+          "id": "main/require-028",
+          "function": "main",
+          "line": 1012,
+          "end_line": 1013,
+          "expression_sha256": "26b36839fafa6e2afc83837a38e9707b68c4dad910b31364dcfcec710c49cabf"
+        },
+        {
+          "id": "main/require-029",
+          "function": "main",
+          "line": 1016,
+          "end_line": 1017,
+          "expression_sha256": "0b3b64a5a585ddc78c50543db2fe55f3abdaef786aeb7e065654507050930d85"
+        },
+        {
+          "id": "main/require-030",
+          "function": "main",
+          "line": 1018,
+          "end_line": 1019,
+          "expression_sha256": "99e61cd8e2cbde35317f5bf3f33f067fdff467874cc20b6e8f4609564c898632"
+        },
+        {
+          "id": "main/require-031",
+          "function": "main",
+          "line": 1020,
+          "end_line": 1022,
+          "expression_sha256": "1f7d8f7f4c45e96bde82c27f8737b6dd9bb5581b63dcc597689399ab2c6825f8"
+        },
+        {
+          "id": "main/require-032",
+          "function": "main",
+          "line": 1054,
+          "end_line": 1056,
+          "expression_sha256": "1e6701c561dbb7d5d3934bab347e136daf5ae779ee10a39f582924bd28be8e35"
+        },
+        {
+          "id": "main/require-033",
+          "function": "main",
+          "line": 1080,
+          "end_line": 1081,
+          "expression_sha256": "7fb56b7c2f2eef141ab4bfb16575f7462ee6abaff2246abe91c1dbc03de5dc13"
+        },
+        {
+          "id": "main/require-034",
+          "function": "main",
+          "line": 1084,
+          "end_line": 1086,
+          "expression_sha256": "a6a34d6260b5691799b4d2a2a27db9614d960dcfa996999b7cd786d9632d3713"
+        },
+        {
+          "id": "main/require-035",
+          "function": "main",
+          "line": 1090,
+          "end_line": 1090,
+          "expression_sha256": "0846c55e91bd0f9234d263222891e7830b9c897d2ed0f6348b3d677b06d5acec"
+        },
+        {
+          "id": "main/require-036",
+          "function": "main",
+          "line": 1091,
+          "end_line": 1091,
+          "expression_sha256": "0545ffe0830a8c20278bdef880817514b4eff8c24d7eda73cab5424a644719b2"
+        },
+        {
+          "id": "main/require-037",
+          "function": "main",
+          "line": 1095,
+          "end_line": 1095,
+          "expression_sha256": "4f8862b9315eba9d7074213f1a9b5a76e2974ed38a5e59cc7680b110bc2a0af5"
+        },
+        {
+          "id": "main/require-038",
+          "function": "main",
+          "line": 1096,
+          "end_line": 1098,
+          "expression_sha256": "c2cb4fba32f19b383ee3fbc91aca3cde642da571457b5b908e6d2da793dfac87"
+        },
+        {
+          "id": "main/require-039",
+          "function": "main",
+          "line": 1102,
+          "end_line": 1104,
+          "expression_sha256": "b4aa1e6e0901de30b1f346b28e6134198f747b0e1369a596ac7a512be1a1eb19"
+        },
+        {
+          "id": "main/require-040",
+          "function": "main",
+          "line": 1105,
+          "end_line": 1107,
+          "expression_sha256": "6466547e7834f69bd2c2a7667f478231252e39d52058062438189cbdac189d7b"
+        },
+        {
+          "id": "main/require-041",
+          "function": "main",
+          "line": 1117,
+          "end_line": 1118,
+          "expression_sha256": "30db539639be09099626ab0e1b989c6fb4833da65e6e5eb3e79b18d1333c5a18"
+        },
+        {
+          "id": "main/require-042",
+          "function": "main",
+          "line": 1135,
+          "end_line": 1135,
+          "expression_sha256": "b9b4339f58febc76fc7515cd73f003e9fcc9354800a3779da8475b524cf341b8"
+        },
+        {
+          "id": "main/require-043",
+          "function": "main",
+          "line": 1145,
+          "end_line": 1145,
+          "expression_sha256": "841f6aae0cf9e68202624d43c22c18fa8ce318deb74d4788522ebb5d7bd6ee1a"
+        },
+        {
+          "id": "main/require-044",
+          "function": "main",
+          "line": 1148,
+          "end_line": 1148,
+          "expression_sha256": "ea56b67ba311b22c967c833b089d81d5625b943c7001c9a0f8dfe7e68b648257"
+        },
+        {
+          "id": "main/require-045",
+          "function": "main",
+          "line": 1153,
+          "end_line": 1153,
+          "expression_sha256": "bc370f02bf55dd881360690a365e7f088b73271fec2d78e571380248a0841891"
+        },
+        {
+          "id": "main/require-046",
+          "function": "main",
+          "line": 1160,
+          "end_line": 1160,
+          "expression_sha256": "f7d6134478c826e54e364c4177d92092763df30112945f861025830e5856c115"
+        },
+        {
+          "id": "main/require-047",
+          "function": "main",
+          "line": 1161,
+          "end_line": 1162,
+          "expression_sha256": "70a041e22222880862c77a658765431195ea6ca55a77ecd74bd77c22b6cebbfa"
+        },
+        {
+          "id": "main/require-048",
+          "function": "main",
+          "line": 1163,
+          "end_line": 1164,
+          "expression_sha256": "d20c7c11ddf79042b902c2060adb9095a2ec6a93d439adf4d4f38ee904e96a7a"
+        },
+        {
+          "id": "main/require-049",
+          "function": "main",
+          "line": 1165,
+          "end_line": 1165,
+          "expression_sha256": "1b65e82d4f92db1b20886a40a809d1b6e98ed8ed0968bb62a2a6bf9f6f2feecb"
+        },
+        {
+          "id": "main/require-050",
+          "function": "main",
+          "line": 1167,
+          "end_line": 1167,
+          "expression_sha256": "ff7e07cd7d6355ce3fe786683fb8bf15e5888a235ab098c89644981192b795a1"
+        },
+        {
+          "id": "main/require-051",
+          "function": "main",
+          "line": 1176,
+          "end_line": 1177,
+          "expression_sha256": "2e6b95ed09868b6fca4eed20f876ed413a6af71d69adfaf51b7a3dd4f1db547a"
+        },
+        {
+          "id": "main/require-052",
+          "function": "main",
+          "line": 1178,
+          "end_line": 1180,
+          "expression_sha256": "ac5b1b9378bdef70c562ee72e241abba89b20cb59d0454c9d435f53a90ce9528"
+        },
+        {
+          "id": "main/require-053",
+          "function": "main",
+          "line": 1181,
+          "end_line": 1181,
+          "expression_sha256": "81454a00c5d3557ce1044fb93fb971cbd1528c58279427e12ab24de46dce5920"
+        },
+        {
+          "id": "main/require-054",
+          "function": "main",
+          "line": 1184,
+          "end_line": 1184,
+          "expression_sha256": "8d75319726a86ddbef0c3fad553a7b53ec77a25cf3e21dc2f77d19a63671b262"
+        },
+        {
+          "id": "main/require-055",
+          "function": "main",
+          "line": 1185,
+          "end_line": 1185,
+          "expression_sha256": "3ff0bf5fb4e583bc029db381bf103209436360d6be6ed0bc32cc5fc1bdefbbcc"
+        },
+        {
+          "id": "main/require-056",
+          "function": "main",
+          "line": 1187,
+          "end_line": 1187,
+          "expression_sha256": "8a4a0003c5d0ab8e97d78914dcec130fa3567df12f06edbe9e0a7b94d04e1d1e"
+        },
+        {
+          "id": "main/require-057",
+          "function": "main",
+          "line": 1191,
+          "end_line": 1192,
+          "expression_sha256": "43df1160b6404ca5e84275377a58917d44197016cd8343b73e696fa3f6434e9d"
+        },
+        {
+          "id": "main/require-058",
+          "function": "main",
+          "line": 1193,
+          "end_line": 1194,
+          "expression_sha256": "3261a6dc14006d4bf18b637c6722e3c7ffbc9279d2cba94b0960a08ee79f1655"
+        },
+        {
+          "id": "main/require-059",
+          "function": "main",
+          "line": 1195,
+          "end_line": 1196,
+          "expression_sha256": "d4244b8105833279c464861db55adbdcaa6f7dcdbdf0d43d7ad7b28a9f3e9ad0"
+        },
+        {
+          "id": "main/require-060",
+          "function": "main",
+          "line": 1197,
+          "end_line": 1198,
+          "expression_sha256": "ba17e2fe2e5aeefd7d3a914f407111421bfbcc5d603ace079dad7f47adc59c40"
+        },
+        {
+          "id": "main/require-061",
+          "function": "main",
+          "line": 1203,
+          "end_line": 1204,
+          "expression_sha256": "341a88fc608507e8d182d91334b59c63b668c383256c20dc2bdca9628cc4a5c4"
+        },
+        {
+          "id": "main/require-062",
+          "function": "main",
+          "line": 1205,
+          "end_line": 1206,
+          "expression_sha256": "e7e7bf3bcae344c09dbace05e9e42e80e4a98be3d80334123164a44babc20554"
+        },
+        {
+          "id": "main/require-063",
+          "function": "main",
+          "line": 1217,
+          "end_line": 1217,
+          "expression_sha256": "bd03ee528a21a40c9b5757fb2c2d6346282e61a1204cc260caaaab535874697c"
+        },
+        {
+          "id": "main/require-064",
+          "function": "main",
+          "line": 1225,
+          "end_line": 1225,
+          "expression_sha256": "e7c777ce1a7c63645659ed4441d38400b79f0b9427cd49e47515311f77477d01"
+        },
+        {
+          "id": "main/require-065",
+          "function": "main",
+          "line": 1254,
+          "end_line": 1254,
+          "expression_sha256": "db2dd0d2337a592c8583be05b719df6e49113edbae6a044aa6dfa146f22b4eb8"
+        },
+        {
+          "id": "main/require-066",
+          "function": "main",
+          "line": 1255,
+          "end_line": 1256,
+          "expression_sha256": "3e330fc9520507cb8fbfdd1f0b8e06fd1ee5bdf5a2d2baec40d919c34aaa60ee"
+        },
+        {
+          "id": "main/require-067",
+          "function": "main",
+          "line": 1269,
+          "end_line": 1270,
+          "expression_sha256": "80be9440fade7d8220cf01aded2e609e927a91f52e0b81809cbb07633f68cd63"
+        },
+        {
+          "id": "main/require-068",
+          "function": "main",
+          "line": 1272,
+          "end_line": 1274,
+          "expression_sha256": "b866a659b171c91e6a871b34f5c21b19b625f6a1de0e55df678c0dcb784dd623"
+        },
+        {
+          "id": "main/require-069",
+          "function": "main",
+          "line": 1289,
+          "end_line": 1290,
+          "expression_sha256": "07d0a3df41d6ebeedb157143cb779222e6834f957caf9c63097e172f80ffb67a"
+        },
+        {
+          "id": "main/require-070",
+          "function": "main",
+          "line": 1296,
+          "end_line": 1296,
+          "expression_sha256": "de64ab3398125742d12ff460e53de8066044387a33757ea7654de10b591a2810"
+        },
+        {
+          "id": "main/require-071",
+          "function": "main",
+          "line": 1300,
+          "end_line": 1301,
+          "expression_sha256": "9fba931c698c08ec8abe7f60b29f0b0ae0c8f8a43a5efe97e115ab1bf91cb191"
+        },
+        {
+          "id": "main/require-072",
+          "function": "main",
+          "line": 1302,
+          "end_line": 1302,
+          "expression_sha256": "2243f22ef8328cc2862d651a7673554d4233248e1fcf65fa50f25304b37c6077"
+        },
+        {
+          "id": "main/require-073",
+          "function": "main",
+          "line": 1305,
+          "end_line": 1307,
+          "expression_sha256": "9aaa7d9745bcb47d1b8cd796ef811de63fe6c7133ce4a00c304ead256503ad01"
+        },
+        {
+          "id": "main/require-074",
+          "function": "main",
+          "line": 1317,
+          "end_line": 1319,
+          "expression_sha256": "2872364129f1aa0dc352c0fe0b26c6cf80d293fa78a1efe9e06c35462c7b8547"
+        },
+        {
+          "id": "main/require-075",
+          "function": "main",
+          "line": 1320,
+          "end_line": 1320,
+          "expression_sha256": "338d5331b858076fb100a3fd4fc498ea78ef7d26b9be9ae26664dced92d3ebd4"
+        },
+        {
+          "id": "main/require-076",
+          "function": "main",
+          "line": 1325,
+          "end_line": 1326,
+          "expression_sha256": "86da94a06c0b84206d58869b669eed7e1ee07d89828a7590ff917b738518c0b9"
+        },
+        {
+          "id": "main/require-077",
+          "function": "main",
+          "line": 1328,
+          "end_line": 1332,
+          "expression_sha256": "d4a01a87f91d3b30ea852e8f1d06a6d8913243b6256f570dc8b839c4c7c02684"
+        },
+        {
+          "id": "main/require-078",
+          "function": "main",
+          "line": 1334,
+          "end_line": 1335,
+          "expression_sha256": "6a857a3184c0563e405621406d22c6c1685db1d5fab33d2cbb528037c1844338"
+        },
+        {
+          "id": "main/require-079",
+          "function": "main",
+          "line": 1340,
+          "end_line": 1341,
+          "expression_sha256": "e0831270faa0b40c3f883ad64e3dab6e29976e48b2d8efb78b73d14b739fd92c"
+        },
+        {
+          "id": "main/require-080",
+          "function": "main",
+          "line": 1342,
+          "end_line": 1344,
+          "expression_sha256": "703b34e2d29f10db246d3019a1f9e5c1977e05e93c226cbc53cb63abfea632eb"
+        },
+        {
+          "id": "main/require-081",
+          "function": "main",
+          "line": 1357,
+          "end_line": 1360,
+          "expression_sha256": "d7a3f23f51257bcd3200c5012ee346c56811a8bd1714c33b5a42557ea4d09771"
+        },
+        {
+          "id": "main/require-082",
+          "function": "main",
+          "line": 1363,
+          "end_line": 1365,
+          "expression_sha256": "426719a1364f2c1c9d12360c21a3950df564783d8ad7daa27d2527e6f3a2156a"
+        },
+        {
+          "id": "main/require-083",
+          "function": "main",
+          "line": 1366,
+          "end_line": 1367,
+          "expression_sha256": "cdb607f7c7b1d72871cbb3ede8a40d174c479c1c79bf06e9f8d8d6f8243853ea"
+        },
+        {
+          "id": "main/require-084",
+          "function": "main",
+          "line": 1368,
+          "end_line": 1370,
+          "expression_sha256": "eac41fbf8290424d8cc878b9b1fc229fb85d7077052e251f582d120ff920affb"
+        },
+        {
+          "id": "main/require-085",
+          "function": "main",
+          "line": 1374,
+          "end_line": 1374,
+          "expression_sha256": "15c73e663a854f6adef2346af9b34c997c6885884ce2bf5237e675f8ad9c4f08"
+        },
+        {
+          "id": "main/require-086",
+          "function": "main",
+          "line": 1381,
+          "end_line": 1381,
+          "expression_sha256": "c1af186172cd6c8d6bbd746abbe9404b6157d1ff0e0b3001df777688e5455abe"
+        },
+        {
+          "id": "main/require-087",
+          "function": "main",
+          "line": 1390,
+          "end_line": 1391,
+          "expression_sha256": "d4a60dae17e5961635a4afe0a73f6658055e5bd7921f2090ce155c021b5ce416"
+        },
+        {
+          "id": "main/require-088",
+          "function": "main",
+          "line": 1393,
+          "end_line": 1394,
+          "expression_sha256": "b3f7376506790d79018817de8238a884e71d0563eb9e1087e59417f6d6239906"
+        },
+        {
+          "id": "main/require-089",
+          "function": "main",
+          "line": 1397,
+          "end_line": 1398,
+          "expression_sha256": "745e16275252aa3509b91c444dee7c34cdc7db677fcc71f2038a414ed1d7f553"
+        },
+        {
+          "id": "main/require-090",
+          "function": "main",
+          "line": 1403,
+          "end_line": 1404,
+          "expression_sha256": "a1bf0013d7ae188c58265839bd29f0c7c3d1f4cd9928de0a503bc283f516fc6c"
+        },
+        {
+          "id": "main/require-091",
+          "function": "main",
+          "line": 1405,
+          "end_line": 1406,
+          "expression_sha256": "c05ee894a299084eaa12dfaeb05da5bc58cd2394ca98edc54430456386392f45"
+        },
+        {
+          "id": "main/require-092",
+          "function": "main",
+          "line": 1407,
+          "end_line": 1409,
+          "expression_sha256": "3439f0f3775c5bf1008272d3994bd0f896713630487c34cbd2e0810a0f008777"
+        },
+        {
+          "id": "main/require-093",
+          "function": "main",
+          "line": 1410,
+          "end_line": 1412,
+          "expression_sha256": "fe22fc77dc5bdc0186b86a9c7be1dea20b74b8e973b56d7cc4ad30244eaf50e3"
+        },
+        {
+          "id": "main/require-094",
+          "function": "main",
+          "line": 1422,
+          "end_line": 1422,
+          "expression_sha256": "4a7ae7493e61467ecced32ccc44b5bf64f7b629f088e3140d5b586d316da1d73"
+        },
+        {
+          "id": "main/require-095",
+          "function": "main",
+          "line": 1436,
+          "end_line": 1436,
+          "expression_sha256": "e839a72c813c671a7662d0517640e1f1628758e9c37b20519b479f6c7b1222bc"
+        },
+        {
+          "id": "main/require-096",
+          "function": "main",
+          "line": 1448,
+          "end_line": 1449,
+          "expression_sha256": "585539f94da285560304386233886750e6662c94c865af54dd4000c36a862875"
+        },
+        {
+          "id": "main/require-097",
+          "function": "main",
+          "line": 1461,
+          "end_line": 1461,
+          "expression_sha256": "4db8aa048e9e04467c5ef399d6a7a34eb03e97cefe0424364d542232c8cdba1f"
+        },
+        {
+          "id": "main/require-098",
+          "function": "main",
+          "line": 1465,
+          "end_line": 1465,
+          "expression_sha256": "00d656eb6eed0a427d3b60dcb31998f22d76c160350ed6e26e4a610301b1fa45"
+        },
+        {
+          "id": "main/require-099",
+          "function": "main",
+          "line": 1469,
+          "end_line": 1469,
+          "expression_sha256": "49fb43184d4019fb84a9d5016ce543a02ca2f80376e9ce4f1d3725b205f3e75b"
+        },
+        {
+          "id": "main/require-100",
+          "function": "main",
+          "line": 1479,
+          "end_line": 1480,
+          "expression_sha256": "23aa28665094ee98b22b298182d0b7ddfa5c0ebb69be5eacbbc88dbb1e0fe89c"
+        },
+        {
+          "id": "main/require-101",
+          "function": "main",
+          "line": 1481,
+          "end_line": 1482,
+          "expression_sha256": "c9e6947e3dcce8f28e11cbae532aef54c5949dc8b5a58a7683f3c5a17c78d7d6"
+        },
+        {
+          "id": "main/require-102",
+          "function": "main",
+          "line": 1492,
+          "end_line": 1493,
+          "expression_sha256": "c61dc341c9b56e2e92a9818e55799c437b7b364f589d438aea51ae66b3d7029a"
+        },
+        {
+          "id": "main/require-103",
+          "function": "main",
+          "line": 1496,
+          "end_line": 1496,
+          "expression_sha256": "cefd046c41753008524dff119a4862fd6af59da73432b8b67da0b8dd95991aee"
+        },
+        {
+          "id": "main/require-104",
+          "function": "main",
+          "line": 1528,
+          "end_line": 1529,
+          "expression_sha256": "ff869af2cdb8424b821b2873025f0752c6ab802e9a17477c1b618c057fc39b5a"
+        },
+        {
+          "id": "main/require-105",
+          "function": "main",
+          "line": 1530,
+          "end_line": 1531,
+          "expression_sha256": "6df7e4207b5bab267904bd0b9025b29b266ecd5f5252b0382e7c80f2edbca71f"
+        },
+        {
+          "id": "main/require-106",
+          "function": "main",
+          "line": 1540,
+          "end_line": 1540,
+          "expression_sha256": "60e338f287e974c5ce673a70204847a6fa187bf2ad5605da96c878c894bd7d1a"
+        },
+        {
+          "id": "main/require-107",
+          "function": "main",
+          "line": 1559,
+          "end_line": 1561,
+          "expression_sha256": "ce90857605af83dcf932da03666dcb3159e22d3d831238779a61b3f6fcac6e5c"
+        },
+        {
+          "id": "main/require-108",
+          "function": "main",
+          "line": 1563,
+          "end_line": 1563,
+          "expression_sha256": "9aec9f30bf17de3166707103e3068a81872db3fa528346fd94d9dc02cc97da33"
+        },
+        {
+          "id": "main/require-109",
+          "function": "main",
+          "line": 1569,
+          "end_line": 1570,
+          "expression_sha256": "b050aa77ef1a07bd5af68157c71f969ab57963f360c787f646b74d699b96944b"
+        },
+        {
+          "id": "main/require-110",
+          "function": "main",
+          "line": 1596,
+          "end_line": 1597,
+          "expression_sha256": "c80f82ba279ec986a9a9b852d57bbdf1d70ae848360e70987f0926ef677149cf"
+        },
+        {
+          "id": "main/require-111",
+          "function": "main",
+          "line": 1612,
+          "end_line": 1612,
+          "expression_sha256": "e1a9960966f24a537ec749d1eb511c468d179137889f6921f407220e1b19001d"
+        },
+        {
+          "id": "main/require-112",
+          "function": "main",
+          "line": 1623,
+          "end_line": 1623,
+          "expression_sha256": "d073e35dfdadf4fdec831f8cf7f1f4f9b101da5ac9b6d3ce403b03f54b351cc9"
+        },
+        {
+          "id": "main/require-113",
+          "function": "main",
+          "line": 1626,
+          "end_line": 1626,
+          "expression_sha256": "cf4802ca4391116e4b1bfedaefb70d821972b674c070372e323665c4b08d809c"
+        },
+        {
+          "id": "main/require-114",
+          "function": "main",
+          "line": 1631,
+          "end_line": 1631,
+          "expression_sha256": "7c3ec5367028e975b44eb35f52f19c6af25d6bc94828863503ca0ea68722c972"
+        },
+        {
+          "id": "main/require-115",
+          "function": "main",
+          "line": 1634,
+          "end_line": 1634,
+          "expression_sha256": "8907c4a603c07cbc3b50224d80c505ee93a51c5ac16d90f5cf29aa1484c89b1d"
+        },
+        {
+          "id": "main/require-116",
+          "function": "main",
+          "line": 1642,
+          "end_line": 1644,
+          "expression_sha256": "4629bf46e33e25b21c3bc07bf5c75d844c137f3131c7ee85f027e85ad50f9974"
+        },
+        {
+          "id": "main/require-117",
+          "function": "main",
+          "line": 1647,
+          "end_line": 1647,
+          "expression_sha256": "7fac8a188f7b2acc0ee87be7746ef8f7e1cb17e46e903999b3b2bc5fb154fb42"
+        },
+        {
+          "id": "main/require-118",
+          "function": "main",
+          "line": 1652,
+          "end_line": 1652,
+          "expression_sha256": "f46470e4d7e5a72c82b788a992c5659942b919d76780101295463f431fe2ad7c"
+        },
+        {
+          "id": "main/require-119",
+          "function": "main",
+          "line": 1653,
+          "end_line": 1653,
+          "expression_sha256": "c9afd69c1c8e154d1fae6d1d3adf239de1f294739f15d46cc829a8b36e9f8e66"
+        },
+        {
+          "id": "main/require-120",
+          "function": "main",
+          "line": 1657,
+          "end_line": 1657,
+          "expression_sha256": "7acd9fd391cab1a2c56e2199eeb36b60296c7993faf04629daacee144139246e"
+        },
+        {
+          "id": "main/require-121",
+          "function": "main",
+          "line": 1659,
+          "end_line": 1659,
+          "expression_sha256": "8cd82d877caeefd14c093427ff2bf33e86e90465650c54d5fa7fc19ec4d59f46"
+        },
+        {
+          "id": "main/require-122",
+          "function": "main",
+          "line": 1662,
+          "end_line": 1662,
+          "expression_sha256": "82fa702922c8edd8d6df2735121a367072e317da6ce8db5c4c3f8153f236405e"
+        },
+        {
+          "id": "main/require-123",
+          "function": "main",
+          "line": 1664,
+          "end_line": 1664,
+          "expression_sha256": "68a105bcd20c14fc1e149a374a9c49842e06c771224eebb2da3cce784324bdf1"
+        },
+        {
+          "id": "main/require-124",
+          "function": "main",
+          "line": 1666,
+          "end_line": 1671,
+          "expression_sha256": "8a1d82ee16ea5e15dfadd18b9460bbfeb01ec49ffa2295668b0633ccb91f8128"
+        },
+        {
+          "id": "main/require-125",
+          "function": "main",
+          "line": 1672,
+          "end_line": 1672,
+          "expression_sha256": "d5e95253fd7cb843cd6517ea3761f467994c8a0e4fee3a56a1459192efd9c8f9"
+        },
+        {
+          "id": "main/require-126",
+          "function": "main",
+          "line": 1676,
+          "end_line": 1676,
+          "expression_sha256": "a8c96a0381866af5f65a3fc6e0f7cb2c6af36466b756040b357c32410c2dc9c0"
+        },
+        {
+          "id": "main/require-127",
+          "function": "main",
+          "line": 1684,
+          "end_line": 1685,
+          "expression_sha256": "6651270fc52f0d370b5c015b28301fdd18574b483e889b3c71493b7a8573610f"
+        },
+        {
+          "id": "main/require-128",
+          "function": "main",
+          "line": 1687,
+          "end_line": 1687,
+          "expression_sha256": "b138ef9585ce1937de0ff69971870711bbb438b7d6cd988fdd79ba4276c20559"
+        },
+        {
+          "id": "main/require-129",
+          "function": "main",
+          "line": 1702,
+          "end_line": 1702,
+          "expression_sha256": "8a577cc3bb2878bc9101941e1246b68dc91c796fb9596614d8f0bfcf44e38c35"
+        },
+        {
+          "id": "main/require-130",
+          "function": "main",
+          "line": 1709,
+          "end_line": 1709,
+          "expression_sha256": "294bc15a9e3faf615e2403cf2874666425ec2295c9f442ce13a1b674fb997c82"
+        },
+        {
+          "id": "main/require-131",
+          "function": "main",
+          "line": 1713,
+          "end_line": 1714,
+          "expression_sha256": "fe8631c40a879327f25578ffa16c8aff0e15aa59a925356548dba44854001601"
+        },
+        {
+          "id": "main/require-132",
+          "function": "main",
+          "line": 1715,
+          "end_line": 1716,
+          "expression_sha256": "56932f9444ef1fc86dadd05c01968f92d346f4c321e283cd3bb89d50dfedd1d7"
+        },
+        {
+          "id": "main/require-133",
+          "function": "main",
+          "line": 1730,
+          "end_line": 1730,
+          "expression_sha256": "15cd2839af9ee5681dfd23baf3de8020919d0fea2357f339dff2aaadd026d215"
+        },
+        {
+          "id": "main/require-134",
+          "function": "main",
+          "line": 1732,
+          "end_line": 1732,
+          "expression_sha256": "460b0a7894443e9d00cc73aadf9b1870f2c96aa1b6365f1593eee2a2a46aecf4"
+        },
+        {
+          "id": "main/require-135",
+          "function": "main",
+          "line": 1733,
+          "end_line": 1733,
+          "expression_sha256": "ae73854b4886b0276d29149aab8537ecf09a2d0f50d40cfb722c65182731c3ee"
+        },
+        {
+          "id": "main/require-136",
+          "function": "main",
+          "line": 1735,
+          "end_line": 1735,
+          "expression_sha256": "b9baa7136472ec713262b06a1d178542a41140ad90af220508d469651c210cf0"
+        },
+        {
+          "id": "main/require-137",
+          "function": "main",
+          "line": 1772,
+          "end_line": 1772,
+          "expression_sha256": "8a45a706a24754b6c72d5274da4a86781530c4a6fd7e070073ff64b00f1992fd"
+        },
+        {
+          "id": "main/require-138",
+          "function": "main",
+          "line": 1815,
+          "end_line": 1817,
+          "expression_sha256": "e1a5a3b9f40e3ac222f774e0f8490f3c846fbe10f101406d8674d14904592797"
+        }
+      ],
+      "counts": {
+        "functions": 14,
+        "assertions": 192,
+        "loop_headers": 197
+      }
+    }
+  },
+  "groups": [
+    {
+      "id": "causal/require",
+      "function": "require",
+      "line": 7,
+      "end_line": 9,
+      "assertions": [],
+      "loops": [],
+      "status": "unresolved",
+      "reason": "Assertion-free orchestration or independent oracle helper. Its complete source hash, loops and helper calls remain required context for dependent groups; candidate Rust code is not evidence of translation of this helper.",
+      "assessment": "helper_context",
+      "candidate_owners": [],
+      "candidate_witnesses": [],
+      "follow_up_issue": 1319
+    },
+    {
+      "id": "causal/scalar_parity",
+      "function": "scalar_parity",
+      "line": 10,
+      "end_line": 14,
+      "assertions": [],
+      "loops": [
+        0
+      ],
+      "status": "unresolved",
+      "reason": "Assertion-free orchestration or independent oracle helper. Its complete source hash, loops and helper calls remain required context for dependent groups; candidate Rust code is not evidence of translation of this helper.",
+      "assessment": "helper_context",
+      "candidate_owners": [],
+      "candidate_witnesses": [],
+      "follow_up_issue": 1319
+    },
+    {
+      "id": "causal/same_request",
+      "function": "same_request",
+      "line": 15,
+      "end_line": 17,
+      "assertions": [],
+      "loops": [],
+      "status": "unresolved",
+      "reason": "Assertion-free orchestration or independent oracle helper. Its complete source hash, loops and helper calls remain required context for dependent groups; candidate Rust code is not evidence of translation of this helper.",
+      "assessment": "helper_context",
+      "candidate_owners": [],
+      "candidate_witnesses": [],
+      "follow_up_issue": 1319
+    },
+    {
+      "id": "causal/check_pending_semantics",
+      "function": "check_pending_semantics",
+      "line": 19,
+      "end_line": 53,
+      "assertions": [
+        "check_pending_semantics/require-001",
+        "check_pending_semantics/require-002",
+        "check_pending_semantics/require-003",
+        "check_pending_semantics/require-004",
+        "check_pending_semantics/require-005",
+        "check_pending_semantics/require-006",
+        "check_pending_semantics/require-007",
+        "check_pending_semantics/require-008",
+        "check_pending_semantics/require-009",
+        "check_pending_semantics/require-010"
+      ],
+      "loops": [
+        0
+      ],
+      "status": "unresolved",
+      "reason": "No full incremental value-aware highest-pivot request/observe service was identified. The rank-only diagnostics basis and quantum RuntimePathState conditions do not provide readonly first-seen pending requests, consistent/contradictory observations and ordered history.",
+      "assessment": "implementation_gap",
+      "candidate_owners": [],
+      "candidate_witnesses": [],
+      "follow_up_issue": 1319
+    },
+    {
+      "id": "causal/check_finite_assignments",
+      "function": "check_finite_assignments",
+      "line": 55,
+      "end_line": 130,
+      "assertions": [
+        "check_finite_assignments/require-001",
+        "check_finite_assignments/require-002",
+        "check_finite_assignments/require-003",
+        "check_finite_assignments/require-004",
+        "check_finite_assignments/require-005"
+      ],
+      "loops": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13,
+        14,
+        15
+      ],
+      "status": "unresolved",
+      "reason": "No full incremental value-aware highest-pivot request/observe service was identified. The rank-only diagnostics basis and quantum RuntimePathState conditions do not provide readonly first-seen pending requests, consistent/contradictory observations and ordered history.",
+      "assessment": "implementation_gap",
+      "candidate_owners": [],
+      "candidate_witnesses": [],
+      "follow_up_issue": 1319
+    },
+    {
+      "id": "causal/check_large_request_order",
+      "function": "check_large_request_order",
+      "line": 132,
+      "end_line": 179,
+      "assertions": [
+        "check_large_request_order/require-001",
+        "check_large_request_order/require-002",
+        "check_large_request_order/require-003",
+        "check_large_request_order/require-004",
+        "check_large_request_order/require-005",
+        "check_large_request_order/require-006"
+      ],
+      "loops": [
+        0,
+        1,
+        2,
+        3
+      ],
+      "status": "unresolved",
+      "reason": "No full incremental value-aware highest-pivot request/observe service was identified. The rank-only diagnostics basis and quantum RuntimePathState conditions do not provide readonly first-seen pending requests, consistent/contradictory observations and ordered history.",
+      "assessment": "implementation_gap",
+      "candidate_owners": [],
+      "candidate_witnesses": [],
+      "follow_up_issue": 1319
+    },
+    {
+      "id": "causal/check_dense_spans",
+      "function": "check_dense_spans",
+      "line": 181,
+      "end_line": 220,
+      "assertions": [
+        "check_dense_spans/require-001",
+        "check_dense_spans/require-002",
+        "check_dense_spans/require-003",
+        "check_dense_spans/require-004"
+      ],
+      "loops": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6
+      ],
+      "status": "unresolved",
+      "reason": "No full incremental value-aware highest-pivot request/observe service was identified. The rank-only diagnostics basis and quantum RuntimePathState conditions do not provide readonly first-seen pending requests, consistent/contradictory observations and ordered history.",
+      "assessment": "implementation_gap",
+      "candidate_owners": [],
+      "candidate_witnesses": [],
+      "follow_up_issue": 1319
+    },
+    {
+      "id": "causal/main",
+      "function": "main",
+      "line": 222,
+      "end_line": 228,
+      "assertions": [],
+      "loops": [],
+      "status": "unresolved",
+      "reason": "Assertion-free orchestration or independent oracle helper. Its complete source hash, loops and helper calls remain required context for dependent groups; candidate Rust code is not evidence of translation of this helper.",
+      "assessment": "helper_context",
+      "candidate_owners": [],
+      "candidate_witnesses": [],
+      "follow_up_issue": 1319
+    },
+    {
+      "id": "foundation/require",
+      "function": "require",
+      "line": 35,
+      "end_line": 37,
+      "assertions": [],
+      "loops": [],
+      "status": "unresolved",
+      "reason": "Assertion-free orchestration or independent oracle helper. Its complete source hash, loops and helper calls remain required context for dependent groups; candidate Rust code is not evidence of translation of this helper.",
+      "assessment": "helper_context",
+      "candidate_owners": [],
+      "candidate_witnesses": [],
+      "follow_up_issue": 1321
+    },
+    {
+      "id": "foundation/scalar_value",
+      "function": "scalar_value",
+      "line": 38,
+      "end_line": 46,
+      "assertions": [],
+      "loops": [
+        0,
+        1
+      ],
+      "status": "unresolved",
+      "reason": "Assertion-free orchestration or independent oracle helper. Its complete source hash, loops and helper calls remain required context for dependent groups; candidate Rust code is not evidence of translation of this helper.",
+      "assessment": "helper_context",
+      "candidate_owners": [
+        {
+          "path": "rmagna/src/scalar.rs",
+          "anchor": "pub struct ExactScalar"
+        }
+      ],
+      "candidate_witnesses": [],
+      "follow_up_issue": 1321
+    },
+    {
+      "id": "foundation/dense",
+      "function": "dense",
+      "line": 47,
+      "end_line": 63,
+      "assertions": [],
+      "loops": [
+        0,
+        1,
+        2
+      ],
+      "status": "unresolved",
+      "reason": "Assertion-free orchestration or independent oracle helper. Its complete source hash, loops and helper calls remain required context for dependent groups; candidate Rust code is not evidence of translation of this helper.",
+      "assessment": "helper_context",
+      "candidate_owners": [
+        {
+          "path": "rmagna/src/stabilizer.rs",
+          "anchor": "pub struct AffineKet"
+        }
+      ],
+      "candidate_witnesses": [],
+      "follow_up_issue": 1321
+    },
+    {
+      "id": "foundation/finite_phase_sum",
+      "function": "finite_phase_sum",
+      "line": 65,
+      "end_line": 83,
+      "assertions": [],
+      "loops": [
+        0,
+        1,
+        2,
+        3
+      ],
+      "status": "unresolved",
+      "reason": "Assertion-free orchestration or independent oracle helper. Its complete source hash, loops and helper calls remain required context for dependent groups; candidate Rust code is not evidence of translation of this helper.",
+      "assessment": "helper_context",
+      "candidate_owners": [
+        {
+          "path": "rmagna/src/phase/tensor.rs",
+          "anchor": "pub struct PhasePathTensor"
+        }
+      ],
+      "candidate_witnesses": [],
+      "follow_up_issue": 1321
+    },
+    {
+      "id": "foundation/check_transported_phase",
+      "function": "check_transported_phase",
+      "line": 84,
+      "end_line": 113,
+      "assertions": [
+        "check_transported_phase/require-001",
+        "check_transported_phase/require-002",
+        "check_transported_phase/require-003",
+        "check_transported_phase/require-004",
+        "check_transported_phase/require-005"
+      ],
+      "loops": [
+        0,
+        1,
+        2,
+        3
+      ],
+      "status": "unresolved",
+      "reason": "Existing Rust functionality is an ownership candidate only. Qualify this complete source-bound assertion/loop group and its helper context; passing adjacent methods does not qualify this aggregate.",
+      "assessment": "validation_gap",
+      "candidate_owners": [
+        {
+          "path": "rmagna/src/phase/resource.rs",
+          "anchor": "pub struct PreparedPhaseResource"
+        }
+      ],
+      "candidate_witnesses": [],
+      "follow_up_issue": 1321
+    },
+    {
+      "id": "foundation/full_axis_sector",
+      "function": "full_axis_sector",
+      "line": 116,
+      "end_line": 151,
+      "assertions": [],
+      "loops": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8
+      ],
+      "status": "unresolved",
+      "reason": "Assertion-free orchestration or independent oracle helper. Its complete source hash, loops and helper calls remain required context for dependent groups; candidate Rust code is not evidence of translation of this helper.",
+      "assessment": "helper_context",
+      "candidate_owners": [
+        {
+          "path": "rmagna/src/phase.rs",
+          "anchor": "pub struct CliffordQuotient"
+        }
+      ],
+      "candidate_witnesses": [],
+      "follow_up_issue": 1321
+    },
+    {
+      "id": "foundation/check_axis_prefix",
+      "function": "check_axis_prefix",
+      "line": 152,
+      "end_line": 212,
+      "assertions": [
+        "check_axis_prefix/require-001",
+        "check_axis_prefix/require-002",
+        "check_axis_prefix/require-003",
+        "check_axis_prefix/require-004"
+      ],
+      "loops": [
+        0,
+        1,
+        2,
+        3,
+        4
+      ],
+      "status": "unresolved",
+      "reason": "PreparedContinuation reuses source endpoint generators, but is not Native BoundaryTracePlan commuting-axis prefix matching. The compressed seven-parity oracle, exact reused-generator counts and prefix mismatch contract remain unqualified.",
+      "assessment": "representation_difference",
+      "candidate_owners": [
+        {
+          "path": "rmagna/src/unitary/continuation.rs",
+          "anchor": "pub struct PreparedContinuation"
+        }
+      ],
+      "candidate_witnesses": [
+        {
+          "package": "rmagna",
+          "target": "fixed_reference_contracts",
+          "test": "full_original_continuation_generators_match_fresh_compilation_and_output_orders",
+          "source_sha256": "24952b063dc6840114e931373f6340113c304cbf71d93854824b5864d81b2a85"
+        }
+      ],
+      "follow_up_issue": 1321
+    },
+    {
+      "id": "foundation/check_reference_coordinates",
+      "function": "check_reference_coordinates",
+      "line": 213,
+      "end_line": 266,
+      "assertions": [
+        "check_reference_coordinates/require-001",
+        "check_reference_coordinates/require-002",
+        "check_reference_coordinates/require-003",
+        "check_reference_coordinates/require-004",
+        "check_reference_coordinates/require-005",
+        "check_reference_coordinates/require-006"
+      ],
+      "loops": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8
+      ],
+      "status": "unresolved",
+      "reason": "Existing Rust functionality is an ownership candidate only. Qualify this complete source-bound assertion/loop group and its helper context; passing adjacent methods does not qualify this aggregate.",
+      "assessment": "validation_gap",
+      "candidate_owners": [
+        {
+          "path": "rmagna/src/gf2.rs",
+          "anchor": "pub struct LinearFactorization"
+        }
+      ],
+      "candidate_witnesses": [
+        {
+          "package": "rmagna",
+          "target": "original_factor_kernels",
+          "test": "complete_original_factor_and_quadratic_contracts_follow_exact_stream",
+          "source_sha256": "c12937d59e7d183863fa3499dfd882acd17168f7e05425d16a29694323f3bf7d"
+        }
+      ],
+      "follow_up_issue": 1321
+    },
+    {
+      "id": "foundation/check_packed_clifford_updates",
+      "function": "check_packed_clifford_updates",
+      "line": 267,
+      "end_line": 321,
+      "assertions": [
+        "check_packed_clifford_updates/require-001",
+        "check_packed_clifford_updates/require-002",
+        "check_packed_clifford_updates/require-003",
+        "check_packed_clifford_updates/require-004"
+      ],
+      "loops": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13,
+        14
+      ],
+      "status": "unresolved",
+      "reason": "Existing Rust functionality is an ownership candidate only. Qualify this complete source-bound assertion/loop group and its helper context; passing adjacent methods does not qualify this aggregate.",
+      "assessment": "validation_gap",
+      "candidate_owners": [
+        {
+          "path": "rmagna/src/gf2.rs",
+          "anchor": "pub fn xors("
+        }
+      ],
+      "candidate_witnesses": [
+        {
+          "package": "rmagna",
+          "target": "original_packed_kernels",
+          "test": "original_packed_byte_oracles_follow_pinned_stream",
+          "source_sha256": "52722503a9deaf757b02176a114f0b11be01b2f0ad0cfdc8fe74d305c853a75e"
+        }
+      ],
+      "follow_up_issue": 1321
+    },
+    {
+      "id": "foundation/check_quadratic_batches",
+      "function": "check_quadratic_batches",
+      "line": 322,
+      "end_line": 423,
+      "assertions": [
+        "check_quadratic_batches/require-001",
+        "check_quadratic_batches/require-002",
+        "check_quadratic_batches/require-003",
+        "check_quadratic_batches/require-004",
+        "check_quadratic_batches/require-005"
+      ],
+      "loops": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13,
+        14,
+        15,
+        16,
+        17,
+        18,
+        19,
+        20,
+        21,
+        22,
+        23
+      ],
+      "status": "unresolved",
+      "reason": "Existing Rust functionality is an ownership candidate only. Qualify this complete source-bound assertion/loop group and its helper context; passing adjacent methods does not qualify this aggregate.",
+      "assessment": "validation_gap",
+      "candidate_owners": [
+        {
+          "path": "rmagna/src/quadratic.rs",
+          "anchor": "pub fn restrict_without_constant("
+        }
+      ],
+      "candidate_witnesses": [
+        {
+          "package": "rmagna",
+          "target": "original_factor_kernels",
+          "test": "complete_original_factor_and_quadratic_contracts_follow_exact_stream",
+          "source_sha256": "c12937d59e7d183863fa3499dfd882acd17168f7e05425d16a29694323f3bf7d"
+        }
+      ],
+      "follow_up_issue": 1321
+    },
+    {
+      "id": "foundation/check_composed_feedback_frames",
+      "function": "check_composed_feedback_frames",
+      "line": 424,
+      "end_line": 458,
+      "assertions": [
+        "check_composed_feedback_frames/require-001",
+        "check_composed_feedback_frames/require-002"
+      ],
+      "loops": [
+        0,
+        1
+      ],
+      "status": "unresolved",
+      "reason": "Existing Rust functionality is an ownership candidate only. Qualify this complete source-bound assertion/loop group and its helper context; passing adjacent methods does not qualify this aggregate.",
+      "assessment": "validation_gap",
+      "candidate_owners": [
+        {
+          "path": "rmagna/src/instrument/original_assignment_stream.rs",
+          "anchor": "pub struct OriginalAssignmentStream"
+        }
+      ],
+      "candidate_witnesses": [],
+      "follow_up_issue": 1321
+    },
+    {
+      "id": "foundation/check_reference_boundary",
+      "function": "check_reference_boundary",
+      "line": 459,
+      "end_line": 626,
+      "assertions": [
+        "check_reference_boundary/require-001",
+        "check_reference_boundary/require-002",
+        "check_reference_boundary/require-003",
+        "check_reference_boundary/require-004",
+        "check_reference_boundary/require-005",
+        "check_reference_boundary/require-006",
+        "check_reference_boundary/require-007",
+        "check_reference_boundary/require-008",
+        "check_reference_boundary/require-009",
+        "check_reference_boundary/require-010",
+        "check_reference_boundary/require-011",
+        "check_reference_boundary/require-012",
+        "check_reference_boundary/require-013",
+        "check_reference_boundary/require-014",
+        "check_reference_boundary/require-015",
+        "check_reference_boundary/require-016"
+      ],
+      "loops": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13,
+        14,
+        15,
+        16,
+        17,
+        18,
+        19,
+        20,
+        21,
+        22
+      ],
+      "status": "unresolved",
+      "reason": "Existing Rust functionality is an ownership candidate only. Qualify this complete source-bound assertion/loop group and its helper context; passing adjacent methods does not qualify this aggregate.",
+      "assessment": "validation_gap",
+      "candidate_owners": [
+        {
+          "path": "rmagna/src/records/prepared.rs",
+          "anchor": "pub struct PreparedCompletedRecords"
+        }
+      ],
+      "candidate_witnesses": [],
+      "follow_up_issue": 1321
+    },
+    {
+      "id": "foundation/check_incremental_history_session",
+      "function": "check_incremental_history_session",
+      "line": 627,
+      "end_line": 770,
+      "assertions": [
+        "check_incremental_history_session/require-001",
+        "check_incremental_history_session/require-002",
+        "check_incremental_history_session/require-003",
+        "check_incremental_history_session/require-004",
+        "check_incremental_history_session/require-005",
+        "check_incremental_history_session/require-006",
+        "check_incremental_history_session/require-007",
+        "check_incremental_history_session/require-008",
+        "check_incremental_history_session/require-009",
+        "check_incremental_history_session/require-010",
+        "check_incremental_history_session/require-011",
+        "check_incremental_history_session/require-012"
+      ],
+      "loops": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5
+      ],
+      "status": "unresolved",
+      "reason": "PathState retains all absolute observations and samples complete conditioned queries. This is not Native BoundaryHistorySession persistent Gaussian state with disposable commit/rollback, trace recovery and only-new-row accounting. Specify and qualify the Rust adaptation without claiming Native private state or update counters.",
+      "assessment": "representation_difference",
+      "candidate_owners": [
+        {
+          "path": "rmagna/src/runtime/mod.rs",
+          "anchor": "struct PathState<'a>"
+        }
+      ],
+      "candidate_witnesses": [
+        {
+          "package": "rmagna",
+          "target": "fixed_reference_contracts",
+          "test": "complete_incremental_history_stream_matches_preoptimization_baselines_and_real_work_budgets",
+          "source_sha256": "24952b063dc6840114e931373f6340113c304cbf71d93854824b5864d81b2a85"
+        }
+      ],
+      "follow_up_issue": 1321
+    },
+    {
+      "id": "foundation/main.wide-clifford-elimination",
+      "function": "main",
+      "line": 771,
+      "end_line": 832,
+      "assertions": [
+        "main/require-001",
+        "main/require-002",
+        "main/require-003"
+      ],
+      "loops": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9
+      ],
+      "status": "unresolved",
+      "reason": "Existing Rust functionality is an ownership candidate only. Qualify this complete source-bound assertion/loop group and its helper context; passing adjacent methods does not qualify this aggregate.",
+      "assessment": "validation_gap",
+      "candidate_owners": [
+        {
+          "path": "rmagna/src/stabilizer.rs",
+          "anchor": "pub struct AffineKet"
+        }
+      ],
+      "candidate_witnesses": [],
+      "follow_up_issue": 1321
+    },
+    {
+      "id": "foundation/main.word-shifts",
+      "function": "main",
+      "line": 833,
+      "end_line": 852,
+      "assertions": [
+        "main/require-004",
+        "main/require-005"
+      ],
+      "loops": [
+        10,
+        11,
+        12,
+        13
+      ],
+      "status": "unresolved",
+      "reason": "BitVector is fixed-width and has no public word-shift/trim API. Specify a Rust observable equivalent or implement that primitive, then validate all original shifts at cross-word boundaries. Existing indexed-bit correctness is not this source fixture.",
+      "assessment": "representation_difference",
+      "candidate_owners": [
+        {
+          "path": "rmagna/src/gf2.rs",
+          "anchor": "pub struct BitVector"
+        }
+      ],
+      "candidate_witnesses": [],
+      "follow_up_issue": 1321
+    },
+    {
+      "id": "foundation/main.history-efficiency",
+      "function": "main",
+      "line": 853,
+      "end_line": 862,
+      "assertions": [
+        "main/require-006",
+        "main/require-007",
+        "main/require-008"
+      ],
+      "loops": [],
+      "status": "unresolved",
+      "reason": "Existing Rust functionality is an ownership candidate only. Qualify this complete source-bound assertion/loop group and its helper context; passing adjacent methods does not qualify this aggregate.",
+      "assessment": "validation_gap",
+      "candidate_owners": [
+        {
+          "path": "rmagna/src/statistics/efficiency.rs",
+          "anchor": "pub struct HistoryEfficiency"
+        }
+      ],
+      "candidate_witnesses": [
+        {
+          "package": "rmagna",
+          "target": "history_efficiency_contracts",
+          "test": "original_weighted_residuals_include_noise_likelihood_and_zero_draw",
+          "source_sha256": "c7662312afbcc07295eff44a564073081d759f2a1fbf1ba24e16789e8268574e"
+        }
+      ],
+      "follow_up_issue": 1321
+    },
+    {
+      "id": "foundation/main.prepared-clifford",
+      "function": "main",
+      "line": 863,
+      "end_line": 926,
+      "assertions": [
+        "main/require-009",
+        "main/require-010",
+        "main/require-011",
+        "main/require-012",
+        "main/require-013"
+      ],
+      "loops": [
+        14,
+        15,
+        16,
+        17,
+        18,
+        19,
+        20,
+        21
+      ],
+      "status": "unresolved",
+      "reason": "Existing Rust functionality is an ownership candidate only. Qualify this complete source-bound assertion/loop group and its helper context; passing adjacent methods does not qualify this aggregate.",
+      "assessment": "validation_gap",
+      "candidate_owners": [
+        {
+          "path": "rmagna/src/quadratic/prepared.rs",
+          "anchor": "pub struct PreparedQuadraticSum"
+        }
+      ],
+      "candidate_witnesses": [],
+      "follow_up_issue": 1321
+    },
+    {
+      "id": "foundation/main.certificate-cache",
+      "function": "main",
+      "line": 927,
+      "end_line": 938,
+      "assertions": [
+        "main/require-014",
+        "main/require-015"
+      ],
+      "loops": [],
+      "status": "unresolved",
+      "reason": "OriginalTraceCache is bounded by entry count, not Native CertificateCache payload bytes and named certificates. Probability value-cache byte quotas store different objects. No equivalent certificate-byte eviction/clear contract has been qualified.",
+      "assessment": "implementation_gap",
+      "candidate_owners": [
+        {
+          "path": "rmagna/src/instrument/original_trace_cache.rs",
+          "anchor": "pub struct OriginalTraceCache"
+        }
+      ],
+      "candidate_witnesses": [],
+      "follow_up_issue": 1320
+    },
+    {
+      "id": "foundation/main.categorical-law-interning",
+      "function": "main",
+      "line": 939,
+      "end_line": 948,
+      "assertions": [
+        "main/require-016",
+        "main/require-017",
+        "main/require-018"
+      ],
+      "loops": [],
+      "status": "unresolved",
+      "reason": "Existing Rust functionality is an ownership candidate only. Qualify this complete source-bound assertion/loop group and its helper context; passing adjacent methods does not qualify this aggregate.",
+      "assessment": "validation_gap",
+      "candidate_owners": [
+        {
+          "path": "rmagna/src/noise/prepared.rs",
+          "anchor": "pub struct PreparedNoiseSchedule"
+        }
+      ],
+      "candidate_witnesses": [],
+      "follow_up_issue": 1321
+    },
+    {
+      "id": "foundation/main.virtual-noise-actions",
+      "function": "main",
+      "line": 949,
+      "end_line": 978,
+      "assertions": [
+        "main/require-019",
+        "main/require-020",
+        "main/require-021",
+        "main/require-022",
+        "main/require-023"
+      ],
+      "loops": [
+        22,
+        23
+      ],
+      "status": "unresolved",
+      "reason": "Existing Rust functionality is an ownership candidate only. Qualify this complete source-bound assertion/loop group and its helper context; passing adjacent methods does not qualify this aggregate.",
+      "assessment": "validation_gap",
+      "candidate_owners": [
+        {
+          "path": "rmagna/src/noise/original.rs",
+          "anchor": "pub enum OriginalNoiseAction"
+        }
+      ],
+      "candidate_witnesses": [],
+      "follow_up_issue": 1321
+    },
+    {
+      "id": "foundation/main.independent-proposal",
+      "function": "main",
+      "line": 979,
+      "end_line": 987,
+      "assertions": [
+        "main/require-024"
+      ],
+      "loops": [],
+      "status": "unresolved",
+      "reason": "Existing Rust functionality is an ownership candidate only. Qualify this complete source-bound assertion/loop group and its helper context; passing adjacent methods does not qualify this aggregate.",
+      "assessment": "validation_gap",
+      "candidate_owners": [
+        {
+          "path": "rmagna/src/instrument/original_record_proposals.rs",
+          "anchor": "pub struct OriginalIndependentRecordProposal"
+        }
+      ],
+      "candidate_witnesses": [],
+      "follow_up_issue": 1321
+    },
+    {
+      "id": "foundation/main.paired-ratio",
+      "function": "main",
+      "line": 988,
+      "end_line": 994,
+      "assertions": [
+        "main/require-025"
+      ],
+      "loops": [],
+      "status": "unresolved",
+      "reason": "Existing Rust functionality is an ownership candidate only. Qualify this complete source-bound assertion/loop group and its helper context; passing adjacent methods does not qualify this aggregate.",
+      "assessment": "validation_gap",
+      "candidate_owners": [
+        {
+          "path": "rmagna/src/statistics.rs",
+          "anchor": "pub struct PairedRatio"
+        }
+      ],
+      "candidate_witnesses": [
+        {
+          "package": "rmagna",
+          "target": "original_native_and_importance",
+          "test": "original_native_summary_matches_paired_delta_method",
+          "source_sha256": "452edbf9338585d11a01ea34126799544a487a0d99373b14ff43d807d3e0d876"
+        }
+      ],
+      "follow_up_issue": 1321
+    },
+    {
+      "id": "foundation/main.boundary-coordinate-rhs",
+      "function": "main",
+      "line": 995,
+      "end_line": 998,
+      "assertions": [
+        "main/require-026"
+      ],
+      "loops": [],
+      "status": "unresolved",
+      "reason": "Existing Rust functionality is an ownership candidate only. Qualify this complete source-bound assertion/loop group and its helper context; passing adjacent methods does not qualify this aggregate.",
+      "assessment": "validation_gap",
+      "candidate_owners": [
+        {
+          "path": "rmagna/src/gf2.rs",
+          "anchor": "pub struct LinearFactorization"
+        }
+      ],
+      "candidate_witnesses": [],
+      "follow_up_issue": 1321
+    },
+    {
+      "id": "foundation/main.literal-assignment-and-controls",
+      "function": "main",
+      "line": 999,
+      "end_line": 1056,
+      "assertions": [
+        "main/require-027",
+        "main/require-028",
+        "main/require-029",
+        "main/require-030",
+        "main/require-031",
+        "main/require-032"
+      ],
+      "loops": [],
+      "status": "unresolved",
+      "reason": "Existing Rust functionality is an ownership candidate only. Qualify this complete source-bound assertion/loop group and its helper context; passing adjacent methods does not qualify this aggregate.",
+      "assessment": "validation_gap",
+      "candidate_owners": [
+        {
+          "path": "rmagna/src/instrument/original.rs",
+          "anchor": "pub struct OriginalInstrument"
+        }
+      ],
+      "candidate_witnesses": [
+        {
+          "package": "rmagna",
+          "target": "original_literal_ids",
+          "test": "original_literal_ids_preserve_distinct_emission_fault_and_source_origins",
+          "source_sha256": "9859652edefbff962325ead6f7072199ab2912d9c70e0d2313fcfa18e5c40131"
+        }
+      ],
+      "follow_up_issue": 1321
+    },
+    {
+      "id": "foundation/main.operation-sampling",
+      "function": "main",
+      "line": 1057,
+      "end_line": 1086,
+      "assertions": [
+        "main/require-033",
+        "main/require-034"
+      ],
+      "loops": [],
+      "status": "unresolved",
+      "reason": "Existing Rust functionality is an ownership candidate only. Qualify this complete source-bound assertion/loop group and its helper context; passing adjacent methods does not qualify this aggregate.",
+      "assessment": "validation_gap",
+      "candidate_owners": [
+        {
+          "path": "rmagna/src/runtime/mod.rs",
+          "anchor": "pub struct CausalProgram"
+        }
+      ],
+      "candidate_witnesses": [],
+      "follow_up_issue": 1321
+    },
+    {
+      "id": "foundation/main.true-reported-records",
+      "function": "main",
+      "line": 1087,
+      "end_line": 1092,
+      "assertions": [
+        "main/require-035",
+        "main/require-036"
+      ],
+      "loops": [],
+      "status": "unresolved",
+      "reason": "Existing Rust functionality is an ownership candidate only. Qualify this complete source-bound assertion/loop group and its helper context; passing adjacent methods does not qualify this aggregate.",
+      "assessment": "validation_gap",
+      "candidate_owners": [
+        {
+          "path": "rmagna/src/instrument/original.rs",
+          "anchor": "pub struct OriginalAssignment"
+        }
+      ],
+      "candidate_witnesses": [],
+      "follow_up_issue": 1321
+    },
+    {
+      "id": "foundation/main.target-inverse",
+      "function": "main",
+      "line": 1093,
+      "end_line": 1098,
+      "assertions": [
+        "main/require-037",
+        "main/require-038"
+      ],
+      "loops": [],
+      "status": "unresolved",
+      "reason": "TaskEvaluator compiles the target independently and uses paired density overlap. It does not append Native inverse gates. Qualify the original ordered output/record fixture against the Rust adaptation; inverse gate-list identity is not claimed.",
+      "assessment": "representation_difference",
+      "candidate_owners": [
+        {
+          "path": "rmagna/src/task/evaluate.rs",
+          "anchor": "pub struct TaskEvaluator"
+        }
+      ],
+      "candidate_witnesses": [],
+      "follow_up_issue": 1321
+    },
+    {
+      "id": "foundation/main.recovery-ancilla",
+      "function": "main",
+      "line": 1099,
+      "end_line": 1107,
+      "assertions": [
+        "main/require-039",
+        "main/require-040"
+      ],
+      "loops": [],
+      "status": "unresolved",
+      "reason": "Existing Rust functionality is an ownership candidate only. Qualify this complete source-bound assertion/loop group and its helper context; passing adjacent methods does not qualify this aggregate.",
+      "assessment": "validation_gap",
+      "candidate_owners": [
+        {
+          "path": "rmagna/src/task/compose.rs",
+          "anchor": "pub(super) fn recovery("
+        }
+      ],
+      "candidate_witnesses": [
+        {
+          "package": "rmagna",
+          "target": "original_terminal_recovery",
+          "test": "original_repetition_recovery_preserves_encoded_magic_and_original_faults",
+          "source_sha256": "ce5a901556f6518ac15188374c1fe5083b1cf0a9f8c0ba03d706518b5edfd8a0"
+        }
+      ],
+      "follow_up_issue": 1321
+    },
+    {
+      "id": "foundation/main.file-target",
+      "function": "main",
+      "line": 1108,
+      "end_line": 1118,
+      "assertions": [
+        "main/require-041"
+      ],
+      "loops": [],
+      "status": "unresolved",
+      "reason": "Existing Rust functionality is an ownership candidate only. Qualify this complete source-bound assertion/loop group and its helper context; passing adjacent methods does not qualify this aggregate.",
+      "assessment": "validation_gap",
+      "candidate_owners": [
+        {
+          "path": "rmagna/src/file_api.rs",
+          "anchor": "pub struct FileTask"
+        }
+      ],
+      "candidate_witnesses": [],
+      "follow_up_issue": 1321
+    },
+    {
+      "id": "foundation/main.malformed-history-task",
+      "function": "main",
+      "line": 1119,
+      "end_line": 1136,
+      "assertions": [
+        "main/require-042"
+      ],
+      "loops": [],
+      "status": "unresolved",
+      "reason": "Existing Rust functionality is an ownership candidate only. Qualify this complete source-bound assertion/loop group and its helper context; passing adjacent methods does not qualify this aggregate.",
+      "assessment": "validation_gap",
+      "candidate_owners": [
+        {
+          "path": "rmagna/src/file_api.rs",
+          "anchor": "pub struct FileTask"
+        }
+      ],
+      "candidate_witnesses": [],
+      "follow_up_issue": 1321
+    },
+    {
+      "id": "foundation/main.file-causal-runtime",
+      "function": "main",
+      "line": 1137,
+      "end_line": 1182,
+      "assertions": [
+        "main/require-043",
+        "main/require-044",
+        "main/require-045",
+        "main/require-046",
+        "main/require-047",
+        "main/require-048",
+        "main/require-049",
+        "main/require-050",
+        "main/require-051",
+        "main/require-052",
+        "main/require-053"
+      ],
+      "loops": [
+        24,
+        25
+      ],
+      "status": "unresolved",
+      "reason": "Existing Rust functionality is an ownership candidate only. Qualify this complete source-bound assertion/loop group and its helper context; passing adjacent methods does not qualify this aggregate.",
+      "assessment": "validation_gap",
+      "candidate_owners": [
+        {
+          "path": "rmagna/src/file_api.rs",
+          "anchor": "pub struct CompiledFileTask"
+        }
+      ],
+      "candidate_witnesses": [],
+      "follow_up_issue": 1321
+    },
+    {
+      "id": "foundation/main.online-classical-knowledge",
+      "function": "main",
+      "line": 1183,
+      "end_line": 1188,
+      "assertions": [
+        "main/require-054",
+        "main/require-055",
+        "main/require-056"
+      ],
+      "loops": [],
+      "status": "unresolved",
+      "reason": "The diagnostics basis computes rank only. Native request/observe affine values, pending labels and contradiction semantics need a dedicated Rust counterpart.",
+      "assessment": "implementation_gap",
+      "candidate_owners": [
+        {
+          "path": "rmagna/src/task/evaluate/diagnostics.rs",
+          "anchor": "pub struct TaskSampleDiagnosticOptions"
+        }
+      ],
+      "candidate_witnesses": [],
+      "follow_up_issue": 1319
+    },
+    {
+      "id": "foundation/main.file-parser",
+      "function": "main",
+      "line": 1189,
+      "end_line": 1198,
+      "assertions": [
+        "main/require-057",
+        "main/require-058",
+        "main/require-059",
+        "main/require-060"
+      ],
+      "loops": [],
+      "status": "unresolved",
+      "reason": "Existing Rust functionality is an ownership candidate only. Qualify this complete source-bound assertion/loop group and its helper context; passing adjacent methods does not qualify this aggregate.",
+      "assessment": "validation_gap",
+      "candidate_owners": [
+        {
+          "path": "rmagna/src/circuit/mod.rs",
+          "anchor": "pub struct Circuit"
+        }
+      ],
+      "candidate_witnesses": [],
+      "follow_up_issue": 1321
+    },
+    {
+      "id": "foundation/main.scaled-noise-model",
+      "function": "main",
+      "line": 1199,
+      "end_line": 1218,
+      "assertions": [
+        "main/require-061",
+        "main/require-062",
+        "main/require-063"
+      ],
+      "loops": [
+        26
+      ],
+      "status": "unresolved",
+      "reason": "Existing Rust functionality is an ownership candidate only. Qualify this complete source-bound assertion/loop group and its helper context; passing adjacent methods does not qualify this aggregate.",
+      "assessment": "validation_gap",
+      "candidate_owners": [
+        {
+          "path": "rmagna/src/noise.rs",
+          "anchor": "pub struct NoiseModel"
+        }
+      ],
+      "candidate_witnesses": [],
+      "follow_up_issue": 1321
+    },
+    {
+      "id": "foundation/main.cached-noise-law-and-weight",
+      "function": "main",
+      "line": 1219,
+      "end_line": 1307,
+      "assertions": [
+        "main/require-064",
+        "main/require-065",
+        "main/require-066",
+        "main/require-067",
+        "main/require-068",
+        "main/require-069",
+        "main/require-070",
+        "main/require-071",
+        "main/require-072",
+        "main/require-073"
+      ],
+      "loops": [
+        27,
+        28,
+        29,
+        30,
+        31,
+        32,
+        33,
+        34,
+        35,
+        36,
+        37
+      ],
+      "status": "unresolved",
+      "reason": "Existing Rust functionality is an ownership candidate only. Qualify this complete source-bound assertion/loop group and its helper context; passing adjacent methods does not qualify this aggregate.",
+      "assessment": "validation_gap",
+      "candidate_owners": [
+        {
+          "path": "rmagna/src/noise.rs",
+          "anchor": "pub struct NoiseSampler"
+        }
+      ],
+      "candidate_witnesses": [
+        {
+          "package": "rmagna",
+          "target": "original_noise_laws",
+          "test": "original_more_than_32_laws_keep_39_location_order_and_earlier_reuse",
+          "source_sha256": "5c2dc3aed971a74558fcd7c7078a32dc714b3b788653ac8dafd002bb1da8d43d"
+        }
+      ],
+      "follow_up_issue": 1321
+    },
+    {
+      "id": "foundation/main.exact-categorical",
+      "function": "main",
+      "line": 1308,
+      "end_line": 1321,
+      "assertions": [
+        "main/require-074",
+        "main/require-075"
+      ],
+      "loops": [],
+      "status": "unresolved",
+      "reason": "Existing Rust functionality is an ownership candidate only. Qualify this complete source-bound assertion/loop group and its helper context; passing adjacent methods does not qualify this aggregate.",
+      "assessment": "validation_gap",
+      "candidate_owners": [
+        {
+          "path": "rmagna/src/records.rs",
+          "anchor": "pub fn bernoulli_ratio("
+        }
+      ],
+      "candidate_witnesses": [],
+      "follow_up_issue": 1321
+    },
+    {
+      "id": "foundation/main.fixed-virtual-template",
+      "function": "main",
+      "line": 1322,
+      "end_line": 1332,
+      "assertions": [
+        "main/require-076",
+        "main/require-077"
+      ],
+      "loops": [],
+      "status": "unresolved",
+      "reason": "Existing Rust functionality is an ownership candidate only. Qualify this complete source-bound assertion/loop group and its helper context; passing adjacent methods does not qualify this aggregate.",
+      "assessment": "validation_gap",
+      "candidate_owners": [
+        {
+          "path": "rmagna/src/noise/original.rs",
+          "anchor": "pub enum OriginalNoiseAction"
+        }
+      ],
+      "candidate_witnesses": [],
+      "follow_up_issue": 1321
+    },
+    {
+      "id": "foundation/main.selection-offset",
+      "function": "main",
+      "line": 1333,
+      "end_line": 1335,
+      "assertions": [
+        "main/require-078"
+      ],
+      "loops": [],
+      "status": "unresolved",
+      "reason": "Existing Rust functionality is an ownership candidate only. Qualify this complete source-bound assertion/loop group and its helper context; passing adjacent methods does not qualify this aggregate.",
+      "assessment": "validation_gap",
+      "candidate_owners": [
+        {
+          "path": "rmagna/src/instrument/original.rs",
+          "anchor": "pub struct OriginalInstrument"
+        }
+      ],
+      "candidate_witnesses": [],
+      "follow_up_issue": 1321
+    },
+    {
+      "id": "foundation/main.coherent-file-pipeline",
+      "function": "main",
+      "line": 1336,
+      "end_line": 1344,
+      "assertions": [
+        "main/require-079",
+        "main/require-080"
+      ],
+      "loops": [],
+      "status": "unresolved",
+      "reason": "Existing Rust functionality is an ownership candidate only. Qualify this complete source-bound assertion/loop group and its helper context; passing adjacent methods does not qualify this aggregate.",
+      "assessment": "validation_gap",
+      "candidate_owners": [
+        {
+          "path": "rmagna/src/instrument/original.rs",
+          "anchor": "pub struct OriginalInstrument"
+        }
+      ],
+      "candidate_witnesses": [],
+      "follow_up_issue": 1321
+    },
+    {
+      "id": "foundation/main.trace-purpose",
+      "function": "main",
+      "line": 1345,
+      "end_line": 1383,
+      "assertions": [
+        "main/require-081",
+        "main/require-082",
+        "main/require-083",
+        "main/require-084",
+        "main/require-085",
+        "main/require-086"
+      ],
+      "loops": [
+        38,
+        39,
+        40,
+        41,
+        42,
+        43
+      ],
+      "status": "unresolved",
+      "reason": "Existing Rust functionality is an ownership candidate only. Qualify this complete source-bound assertion/loop group and its helper context; passing adjacent methods does not qualify this aggregate.",
+      "assessment": "validation_gap",
+      "candidate_owners": [
+        {
+          "path": "rmagna/src/instrument/original_trace.rs",
+          "anchor": "pub struct OriginalStaticTrace"
+        }
+      ],
+      "candidate_witnesses": [
+        {
+          "package": "rmagna",
+          "target": "original_trace",
+          "test": "original_trace_cross_word_records_and_explicit_catalogue_selection",
+          "source_sha256": "f0f98c05161944869858fc3d50e43f24494c304f3f66318dcd6f84e2f47d51ed"
+        }
+      ],
+      "follow_up_issue": 1321
+    },
+    {
+      "id": "foundation/main.prepared-trace-runtime",
+      "function": "main",
+      "line": 1384,
+      "end_line": 1413,
+      "assertions": [
+        "main/require-087",
+        "main/require-088",
+        "main/require-089",
+        "main/require-090",
+        "main/require-091",
+        "main/require-092",
+        "main/require-093"
+      ],
+      "loops": [],
+      "status": "unresolved",
+      "reason": "Existing Rust functionality is an ownership candidate only. Qualify this complete source-bound assertion/loop group and its helper context; passing adjacent methods does not qualify this aggregate.",
+      "assessment": "validation_gap",
+      "candidate_owners": [
+        {
+          "path": "rmagna/src/instrument/original_prepared.rs",
+          "anchor": "pub struct OriginalPreparedTrace"
+        }
+      ],
+      "candidate_witnesses": [
+        {
+          "package": "rmagna",
+          "target": "fixed_reference_contracts",
+          "test": "original_prepared_record_entries_transport_both_irrational_event_masses",
+          "source_sha256": "24952b063dc6840114e931373f6340113c304cbf71d93854824b5864d81b2a85"
+        }
+      ],
+      "follow_up_issue": 1321
+    },
+    {
+      "id": "foundation/main.character-geometry",
+      "function": "main",
+      "line": 1414,
+      "end_line": 1470,
+      "assertions": [
+        "main/require-094",
+        "main/require-095",
+        "main/require-096",
+        "main/require-097",
+        "main/require-098",
+        "main/require-099"
+      ],
+      "loops": [
+        44,
+        45,
+        46,
+        47,
+        48,
+        49
+      ],
+      "status": "unresolved",
+      "reason": "Existing Rust functionality is an ownership candidate only. Qualify this complete source-bound assertion/loop group and its helper context; passing adjacent methods does not qualify this aggregate.",
+      "assessment": "validation_gap",
+      "candidate_owners": [
+        {
+          "path": "rmagna/src/phase/resource.rs",
+          "anchor": "pub struct PreparedPhaseResource"
+        }
+      ],
+      "candidate_witnesses": [
+        {
+          "package": "rmagna",
+          "target": "phase_resource",
+          "test": "catalogue_and_fiber_choices_match_direct_complex_sums_and_every_dependent_label",
+          "source_sha256": "7cd0f08e38fff375f064097a9f4ee08d3637ddb0ab5123128e0ab0ff49d1375c"
+        }
+      ],
+      "follow_up_issue": 1321
+    },
+    {
+      "id": "foundation/main.reference-resource-transport",
+      "function": "main",
+      "line": 1471,
+      "end_line": 1497,
+      "assertions": [
+        "main/require-100",
+        "main/require-101",
+        "main/require-102",
+        "main/require-103"
+      ],
+      "loops": [
+        50,
+        51,
+        52
+      ],
+      "status": "unresolved",
+      "reason": "Existing Rust functionality is an ownership candidate only. Qualify this complete source-bound assertion/loop group and its helper context; passing adjacent methods does not qualify this aggregate.",
+      "assessment": "validation_gap",
+      "candidate_owners": [
+        {
+          "path": "rmagna/src/phase/resource.rs",
+          "anchor": "pub struct PreparedPhaseResource"
+        }
+      ],
+      "candidate_witnesses": [],
+      "follow_up_issue": 1321
+    },
+    {
+      "id": "foundation/main.strict-parity-representation",
+      "function": "main",
+      "line": 1498,
+      "end_line": 1531,
+      "assertions": [
+        "main/require-104",
+        "main/require-105"
+      ],
+      "loops": [
+        53,
+        54,
+        55
+      ],
+      "status": "unresolved",
+      "reason": "Existing Rust functionality is an ownership candidate only. Qualify this complete source-bound assertion/loop group and its helper context; passing adjacent methods does not qualify this aggregate.",
+      "assessment": "validation_gap",
+      "candidate_owners": [
+        {
+          "path": "rmagna/src/phase/transport.rs",
+          "anchor": "pub enum NativeTransportMode"
+        }
+      ],
+      "candidate_witnesses": [],
+      "follow_up_issue": 1321
+    },
+    {
+      "id": "foundation/main.dimension-changing-transport",
+      "function": "main",
+      "line": 1532,
+      "end_line": 1570,
+      "assertions": [
+        "main/require-106",
+        "main/require-107",
+        "main/require-108",
+        "main/require-109"
+      ],
+      "loops": [
+        56
+      ],
+      "status": "unresolved",
+      "reason": "Existing Rust functionality is an ownership candidate only. Qualify this complete source-bound assertion/loop group and its helper context; passing adjacent methods does not qualify this aggregate.",
+      "assessment": "validation_gap",
+      "candidate_owners": [
+        {
+          "path": "rmagna/src/phase/resource.rs",
+          "anchor": "pub struct PreparedPhaseResource"
+        }
+      ],
+      "candidate_witnesses": [
+        {
+          "package": "rmagna",
+          "target": "phase_quotient_contracts",
+          "test": "original_dimension_churn_and_concurrent_queries_preserve_owned_values",
+          "source_sha256": "051e7f8787f8bc54af5a845f32f83d9be96f7d038f62f0bbf55335e49680ded9"
+        }
+      ],
+      "follow_up_issue": 1321
+    },
+    {
+      "id": "foundation/main.consuming-contraction",
+      "function": "main",
+      "line": 1571,
+      "end_line": 1598,
+      "assertions": [
+        "main/require-110"
+      ],
+      "loops": [
+        57,
+        58,
+        59,
+        60,
+        61
+      ],
+      "status": "unresolved",
+      "reason": "Existing Rust functionality is an ownership candidate only. Qualify this complete source-bound assertion/loop group and its helper context; passing adjacent methods does not qualify this aggregate.",
+      "assessment": "validation_gap",
+      "candidate_owners": [
+        {
+          "path": "rmagna/src/phase/tensor.rs",
+          "anchor": "pub struct PhasePathTensor"
+        }
+      ],
+      "candidate_witnesses": [],
+      "follow_up_issue": 1321
+    },
+    {
+      "id": "foundation/main.finite-sum-contraction",
+      "function": "main",
+      "line": 1599,
+      "end_line": 1613,
+      "assertions": [
+        "main/require-111"
+      ],
+      "loops": [
+        62,
+        63,
+        64,
+        65
+      ],
+      "status": "unresolved",
+      "reason": "Existing Rust functionality is an ownership candidate only. Qualify this complete source-bound assertion/loop group and its helper context; passing adjacent methods does not qualify this aggregate.",
+      "assessment": "validation_gap",
+      "candidate_owners": [
+        {
+          "path": "rmagna/src/phase/tensor.rs",
+          "anchor": "pub struct PhasePathTensor"
+        }
+      ],
+      "candidate_witnesses": [],
+      "follow_up_issue": 1321
+    },
+    {
+      "id": "foundation/main.completed-pair-sampling",
+      "function": "main",
+      "line": 1614,
+      "end_line": 1635,
+      "assertions": [
+        "main/require-112",
+        "main/require-113",
+        "main/require-114",
+        "main/require-115"
+      ],
+      "loops": [
+        66
+      ],
+      "status": "unresolved",
+      "reason": "Existing Rust functionality is an ownership candidate only. Qualify this complete source-bound assertion/loop group and its helper context; passing adjacent methods does not qualify this aggregate.",
+      "assessment": "validation_gap",
+      "candidate_owners": [
+        {
+          "path": "rmagna/src/records/prepared.rs",
+          "anchor": "pub struct PreparedCompletedRecords"
+        }
+      ],
+      "candidate_witnesses": [],
+      "follow_up_issue": 1321
+    },
+    {
+      "id": "foundation/main.sparse-noise-stream",
+      "function": "main",
+      "line": 1636,
+      "end_line": 1644,
+      "assertions": [
+        "main/require-116"
+      ],
+      "loops": [
+        67
+      ],
+      "status": "unresolved",
+      "reason": "Existing Rust functionality is an ownership candidate only. Qualify this complete source-bound assertion/loop group and its helper context; passing adjacent methods does not qualify this aggregate.",
+      "assessment": "validation_gap",
+      "candidate_owners": [
+        {
+          "path": "rmagna/src/noise/sparse.rs",
+          "anchor": "pub struct SparseNoiseSampler"
+        }
+      ],
+      "candidate_witnesses": [],
+      "follow_up_issue": 1321
+    },
+    {
+      "id": "foundation/main.weight-sectors",
+      "function": "main",
+      "line": 1645,
+      "end_line": 1654,
+      "assertions": [
+        "main/require-117",
+        "main/require-118",
+        "main/require-119"
+      ],
+      "loops": [
+        68
+      ],
+      "status": "unresolved",
+      "reason": "Existing Rust functionality is an ownership candidate only. Qualify this complete source-bound assertion/loop group and its helper context; passing adjacent methods does not qualify this aggregate.",
+      "assessment": "validation_gap",
+      "candidate_owners": [
+        {
+          "path": "rmagna/src/noise.rs",
+          "anchor": "pub struct NoiseModel"
+        }
+      ],
+      "candidate_witnesses": [],
+      "follow_up_issue": 1321
+    },
+    {
+      "id": "foundation/main.exact-statistics",
+      "function": "main",
+      "line": 1655,
+      "end_line": 1660,
+      "assertions": [
+        "main/require-120",
+        "main/require-121"
+      ],
+      "loops": [],
+      "status": "unresolved",
+      "reason": "Existing Rust functionality is an ownership candidate only. Qualify this complete source-bound assertion/loop group and its helper context; passing adjacent methods does not qualify this aggregate.",
+      "assessment": "validation_gap",
+      "candidate_owners": [
+        {
+          "path": "rmagna/src/statistics.rs",
+          "anchor": "pub struct ExactStatistics"
+        }
+      ],
+      "candidate_witnesses": [
+        {
+          "package": "rmagna",
+          "target": "original_native_and_importance",
+          "test": "original_huge_and_tiny_weights_remain_range_safe",
+          "source_sha256": "452edbf9338585d11a01ea34126799544a487a0d99373b14ff43d807d3e0d876"
+        }
+      ],
+      "follow_up_issue": 1321
+    },
+    {
+      "id": "foundation/main.wide-exact-scalars",
+      "function": "main",
+      "line": 1661,
+      "end_line": 1671,
+      "assertions": [
+        "main/require-122",
+        "main/require-123",
+        "main/require-124"
+      ],
+      "loops": [],
+      "status": "unresolved",
+      "reason": "Existing Rust functionality is an ownership candidate only. Qualify this complete source-bound assertion/loop group and its helper context; passing adjacent methods does not qualify this aggregate.",
+      "assessment": "validation_gap",
+      "candidate_owners": [
+        {
+          "path": "rmagna/src/scalar.rs",
+          "anchor": "pub struct ExactScalar"
+        }
+      ],
+      "candidate_witnesses": [],
+      "follow_up_issue": 1321
+    },
+    {
+      "id": "foundation/main.caller-rng",
+      "function": "main",
+      "line": 1672,
+      "end_line": 1673,
+      "assertions": [
+        "main/require-125"
+      ],
+      "loops": [],
+      "status": "unresolved",
+      "reason": "Existing Rust functionality is an ownership candidate only. Qualify this complete source-bound assertion/loop group and its helper context; passing adjacent methods does not qualify this aggregate.",
+      "assessment": "validation_gap",
+      "candidate_owners": [
+        {
+          "path": "rmagna/src/records.rs",
+          "anchor": "pub fn bernoulli_ratio("
+        }
+      ],
+      "candidate_witnesses": [],
+      "follow_up_issue": 1321
+    },
+    {
+      "id": "foundation/main.signed-affine-grouping",
+      "function": "main",
+      "line": 1674,
+      "end_line": 1677,
+      "assertions": [
+        "main/require-126"
+      ],
+      "loops": [],
+      "status": "unresolved",
+      "reason": "Existing Rust functionality is an ownership candidate only. Qualify this complete source-bound assertion/loop group and its helper context; passing adjacent methods does not qualify this aggregate.",
+      "assessment": "validation_gap",
+      "candidate_owners": [
+        {
+          "path": "rmagna/src/phase.rs",
+          "anchor": "pub struct PreparedPhaseSum"
+        }
+      ],
+      "candidate_witnesses": [],
+      "follow_up_issue": 1321
+    },
+    {
+      "id": "foundation/main.coherent-expansion",
+      "function": "main",
+      "line": 1678,
+      "end_line": 1688,
+      "assertions": [
+        "main/require-127",
+        "main/require-128"
+      ],
+      "loops": [
+        69
+      ],
+      "status": "unresolved",
+      "reason": "Existing Rust functionality is an ownership candidate only. Qualify this complete source-bound assertion/loop group and its helper context; passing adjacent methods does not qualify this aggregate.",
+      "assessment": "validation_gap",
+      "candidate_owners": [
+        {
+          "path": "rmagna/src/phase/tensor.rs",
+          "anchor": "pub struct PhasePathTensor"
+        }
+      ],
+      "candidate_witnesses": [],
+      "follow_up_issue": 1321
+    },
+    {
+      "id": "foundation/main.literal-callback-certificates",
+      "function": "main",
+      "line": 1689,
+      "end_line": 1716,
+      "assertions": [
+        "main/require-129",
+        "main/require-130",
+        "main/require-131",
+        "main/require-132"
+      ],
+      "loops": [],
+      "status": "unresolved",
+      "reason": "Existing Rust functionality is an ownership candidate only. Qualify this complete source-bound assertion/loop group and its helper context; passing adjacent methods does not qualify this aggregate.",
+      "assessment": "validation_gap",
+      "candidate_owners": [
+        {
+          "path": "rmagna/src/instrument/original_assignment_certificate.rs",
+          "anchor": "pub struct OriginalAssignmentCertificate"
+        }
+      ],
+      "candidate_witnesses": [
+        {
+          "package": "rmagna",
+          "target": "fixed_reference_contracts",
+          "test": "fresh_callback_phase_tables_invalidate_value_entries_without_version_changes",
+          "source_sha256": "24952b063dc6840114e931373f6340113c304cbf71d93854824b5864d81b2a85"
+        }
+      ],
+      "follow_up_issue": 1321
+    },
+    {
+      "id": "foundation/main.affine-proposal-hull",
+      "function": "main",
+      "line": 1717,
+      "end_line": 1773,
+      "assertions": [
+        "main/require-133",
+        "main/require-134",
+        "main/require-135",
+        "main/require-136",
+        "main/require-137"
+      ],
+      "loops": [
+        70,
+        71,
+        72,
+        73,
+        74,
+        75,
+        76,
+        77,
+        78,
+        79,
+        80
+      ],
+      "status": "unresolved",
+      "reason": "Existing Rust functionality is an ownership candidate only. Qualify this complete source-bound assertion/loop group and its helper context; passing adjacent methods does not qualify this aggregate.",
+      "assessment": "validation_gap",
+      "candidate_owners": [
+        {
+          "path": "rmagna/src/gf2.rs",
+          "anchor": "pub struct AffineSupport"
+        }
+      ],
+      "candidate_witnesses": [],
+      "follow_up_issue": 1321
+    },
+    {
+      "id": "foundation/main.quadratic-radical-support",
+      "function": "main",
+      "line": 1774,
+      "end_line": 1821,
+      "assertions": [
+        "main/require-138"
+      ],
+      "loops": [
+        81,
+        82,
+        83,
+        84,
+        85,
+        86,
+        87,
+        88,
+        89,
+        90
+      ],
+      "status": "unresolved",
+      "reason": "Existing Rust functionality is an ownership candidate only. Qualify this complete source-bound assertion/loop group and its helper context; passing adjacent methods does not qualify this aggregate.",
+      "assessment": "validation_gap",
+      "candidate_owners": [
+        {
+          "path": "rmagna/src/phase.rs",
+          "anchor": "pub struct RadicalReduction"
+        }
+      ],
+      "candidate_witnesses": [],
+      "follow_up_issue": 1321
+    }
+  ],
+  "claim": "decomposition_only_not_verified_parity",
+  "reference_sha256": "c49203a586f5a451e3183b435793df693dd486857356aed8826df5dc723e5454",
+  "upstream_commit": "56847478c840395735146ef1e1ccdc3d8aedc10f"
+}
