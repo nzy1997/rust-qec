@@ -4184,8 +4184,12 @@ matched capture uses a pinned receipt that binds its host, score contract,
 build and all six previously failed attempts. New measurements record the host
 fingerprint and score contract in each timing stage. Reuse checks the complete
 source batch inventory and the current machine fingerprint. The derived receipt
-retains its source receipts by SHA-256 and accounts for their failed attempts,
-including those retried or omitted from the selected backends.
+retains all source batches and stores its source receipts by SHA-256.
+`--backends` controls which backends may execute. Retrying a failed cell
+requires selecting its backend and passing `--retry-failed` together.
+To verify a separately recorded run, pass its receipt digest with
+`check --expected-receipt-sha256`. The paper bundle binds the raw receipts
+through its sealed index.
 The PPVM standalone
 driver is `peers/ppvm_cultivation.rs`. Its Cargo adapter uses the pinned source's
 `ppvm-stim`, `ppvm-pauli-sum` and `ppvm-tableau` crates, plus `serde` and

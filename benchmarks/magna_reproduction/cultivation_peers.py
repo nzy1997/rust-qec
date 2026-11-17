@@ -144,6 +144,7 @@ def reuse_history(root, receipt):
     digest = receipt['reuse_parent_sha256']
     paths = {}
     retained = failure_counts(receipt)
+    active = {(row['case']['id'],row['backend']) for row in receipt['cells']}
     while digest is not None:
         require(benchmark.sha(digest) and digest not in paths, 'invalid or cyclic matched reuse parent')
         path = reference.relative_file(directory,digest+'.json')
@@ -152,6 +153,8 @@ def reuse_history(root, receipt):
         legacy = legacy_capture(path,parent)
         require(retained >= failure_counts(parent,legacy=legacy is not None),
                 'matched reuse dropped an inherited failed attempt')
+        require(all((row['case']['id'],row['backend']) in active for row in parent['cells']),
+                'matched reuse dropped an inherited timing cell')
         if legacy:
             require(receipt['host']['fingerprint']==legacy['host_fingerprint'],
                     'legacy matched reuse host changed')
@@ -430,12 +433,13 @@ def run(args):
     plan = benchmark.manifest(pinned)
     binary = args.rust_example.resolve(strict=True)
     upstream = args.upstream.resolve(strict=True)
+    reuse = args.reuse.resolve(strict=True) if args.reuse is not None else None
     result_root = args.out.resolve()
     result_root.mkdir(exist_ok=False)
     (result_root/'batches').mkdir()
     reference.verify_source(upstream,pinned)
     identity = timing_identity()
-    receipt = dict(schema=SCHEMA, threads=1, reuse_parent_sha256=None, backends=args.backends, **identity,
+    receipt = dict(schema=SCHEMA, threads=1, reuse_parent_sha256=None, **identity,
                    rust_source_sha256=benchmark.source_identity(benchmark.ROOT),rust_binary_sha256=reference.digest(binary),
                    inputs=benchmark.input_identity(plan,result_root/'inputs',pinned,copy_from=upstream),
                    bounds=dict(timeout_seconds=args.timeout_seconds, rss_limit_bytes=64 << 30),
@@ -447,8 +451,8 @@ def run(args):
     wanted = timing_cases(plan)
     old_results, previous_failures = {}, []
     retained_legacy = saved_symft_build = None
-    if args.reuse is not None:
-        existing_path = args.reuse/'receipt.json'
+    if reuse is not None:
+        existing_path = reference.relative_file(reuse,'receipt.json')
         existing = read_json(existing_path)
         retained_legacy = legacy_capture(existing_path,existing)
         for key in ('threads','rust_source_sha256','rust_binary_sha256','inputs','timing_protocol','output_contract'):
@@ -461,12 +465,12 @@ def run(args):
         if retained_legacy:
             require(identity['host']['fingerprint']==retained_legacy['host_fingerprint'],
                     'legacy matched reuse host changed')
-        old_results = active_batch_inventory(args.reuse,existing,wanted)
-        ancestors = {} if retained_legacy else reuse_history(args.reuse,existing)
-        for row in previous_failure_inventory(args.reuse,existing,wanted,legacy=retained_legacy is not None):
+        old_results = active_batch_inventory(reuse,existing,wanted)
+        ancestors = {} if retained_legacy else reuse_history(reuse,existing)
+        for row in previous_failure_inventory(reuse,existing,wanted,legacy=retained_legacy is not None):
             previous = result_root/'previous-attempts'
             previous.mkdir(exist_ok=True)
-            shutil.copyfile(args.reuse/'previous-attempts'/row['path'],previous/row['path'])
+            shutil.copyfile(reuse/'previous-attempts'/row['path'],previous/row['path'])
             previous_failures.append(row)
         parent = reference.digest(existing_path)
         receipt['reuse_parent_sha256'] = parent
@@ -475,7 +479,11 @@ def run(args):
         for digest,path in {**ancestors,parent:existing_path}.items():
             shutil.copyfile(path,history/(digest+'.json'))
         saved_symft_build = retained_legacy['symft_build'] if retained_legacy else existing.get('symft_build')
-    if 'symft' in args.backends:
+    selected = {'rust', *args.backends}
+    previous_backends = {backend for _,backend in old_results}
+    backends = list(dict.fromkeys([*args.backends, *(name for name in BACKENDS if name in previous_backends)]))
+    receipt['backends'] = backends
+    if 'symft' in backends:
         if args.symft_archive is not None or args.symft_extension_sha256 is not None:
             require(args.symft_archive is not None and reference.digest(args.symft_archive)==SYMFT_ARCHIVE
                     and benchmark.sha(args.symft_extension_sha256),
@@ -503,17 +511,12 @@ def run(args):
         shutil.copyfile(path,previous/name)
         previous_failures.append(dict(row,path=name))
 
-    selected = {'rust', *args.backends}
-    for (_,backend),(row,path,_) in old_results.items():
-        if backend not in selected and row['status']!='complete':
-            preserve_failure(row,path)
-
     def retained(case, backend):
         entry = old_results.get((case['id'],backend))
         if entry is None:
             return None
         row,path,stage = entry
-        if args.retry_failed and row['status'] != 'complete':
+        if args.retry_failed and backend in selected and row['status'] != 'complete':
             preserve_failure(row,path)
             return None
         destination = result_root/'batches'/path.name
@@ -548,12 +551,13 @@ def run(args):
                 row.update(seconds_per_draw=payload['sampling_seconds']/case['shots'],
                            acceptance=exact.as_float(a['mean']),preparation_seconds=payload['preparation']['seconds'])
         results.append(row)
-        for backend in args.backends:
+        for backend in backends:
             peer_case = timing_case(case,backend)
             old = retained(peer_case,backend)
             if old is not None:
                 results.append(old)
                 continue
+            require(backend in selected, 'source capture omitted a retained timing cell')
             command = [args.python,str(Path(__file__).resolve()),'worker','--backend',backend,
                        '--upstream',upstream,'--cell',case['id']]
             if backend == 'ppvm':
@@ -592,7 +596,7 @@ def run(args):
     summary = {}
     for family in benchmark.FAMILIES:
         summary[family] = {}
-        for backend in ['rust', *args.backends]:
+        for backend in ['rust', *backends]:
             rows = [row for row in results if row['case']['family']==family and row['backend']==backend]
             require(len(rows) == 3, 'missing matched timing cell')
             summary[family][backend] = dict(statuses=[row['status'] for row in rows],
@@ -603,12 +607,16 @@ def run(args):
     print(json.dumps(summary,sort_keys=True))
 
 
-def check(root):
+def check(root, *, expected_receipt_sha256=None):
     """Check raw matched cells, including actual quotas, adapter and peer revisions."""
     pinned = reference.load_manifest()
     plan = benchmark.manifest(pinned)
-    receipt = read_json(root/'receipt.json')
-    legacy = legacy_capture(root/'receipt.json',receipt)
+    receipt_file = reference.relative_file(root,'receipt.json')
+    if expected_receipt_sha256 is not None:
+        require(benchmark.sha(expected_receipt_sha256) and reference.digest(receipt_file)==expected_receipt_sha256,
+                'matched timing receipt differs from trusted digest')
+    receipt = read_json(receipt_file)
+    legacy = legacy_capture(receipt_file,receipt)
     host_fields = {'system','machine'} if legacy else {'system','machine','fingerprint'}
     require(isinstance(receipt.get('host'),dict) and set(receipt['host'])==host_fields
             and all(isinstance(value,str) and value.strip() for value in receipt['host'].values())
@@ -627,12 +635,12 @@ def check(root):
         reuse_history(root,receipt)
     data, builds = {}, {}
     for key,(row,_,stage) in cells.items():
+        require(row['status']==stage['status']=='complete' and stage['returncode']==0,
+                'matched backend failed or missed a timing cell: '+str(key))
         if not legacy:
             check_timing_identity(stage,receipt)
             require(stage['reuse_parent_sha256']==receipt['reuse_parent_sha256'],
                     'matched timing stage lost its source receipt')
-        require(row['status']==stage['status']=='complete' and stage['returncode']==0,
-                'matched backend failed or missed a timing cell: '+str(key))
         case = wanted[key]
         backend = key[1]
         if backend == 'rust':
@@ -717,6 +725,7 @@ def main():
     execute.add_argument('--ppvm-executable',type=Path)
     verify = sub.add_parser('check')
     verify.add_argument('--results',type=Path,required=True)
+    verify.add_argument('--expected-receipt-sha256')
     child = sub.add_parser('worker')
     child.add_argument('--upstream',type=Path,required=True)
     child.add_argument('--backend',choices=BACKENDS,required=True)
@@ -725,7 +734,8 @@ def main():
     child.add_argument('--symft-extension-sha256')
     args = parser.parse_args()
     if args.operation == 'check':
-        print(json.dumps(check(args.results.resolve(strict=True)),sort_keys=True))
+        result = check(args.results.resolve(strict=True),expected_receipt_sha256=args.expected_receipt_sha256)
+        print(json.dumps(result,sort_keys=True))
     elif args.operation == 'run':
         require(1 <= args.timeout_seconds <= 1800 and len(set(args.backends))==len(args.backends), 'invalid peer run limits')
         run(args)

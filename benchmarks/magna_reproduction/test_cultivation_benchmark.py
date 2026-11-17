@@ -1,8 +1,12 @@
+from argparse import Namespace
+from contextlib import redirect_stdout
 from fractions import Fraction as F
+from io import StringIO
 import math
 from pathlib import Path
 from tempfile import TemporaryDirectory
 import unittest
+from unittest.mock import patch
 
 import cultivation_benchmark as benchmark
 import cultivation_peers as peers
@@ -152,14 +156,75 @@ POSTSELECT det[1] !det[0]
             benchmark.atomic(path,parent)
             digest = benchmark.reference.digest(path)
             saved = path.rename(history/f'{digest}.json')
-            child = dict(parent,reuse_parent_sha256=digest,cells=[],previous_failures=[failed])
+            completed = dict(failed,status='complete',sha256='d'*64)
+            child = dict(parent,reuse_parent_sha256=digest,cells=[completed],previous_failures=[failed])
             self.assertEqual(peers.reuse_history(root,child),{digest:saved})
             with self.assertRaisesRegex(ValueError,'dropped an inherited failed attempt'):
                 peers.reuse_history(root,dict(child,previous_failures=[]))
+            with self.assertRaisesRegex(ValueError,'dropped an inherited timing cell'):
+                peers.reuse_history(root,dict(child,cells=[]))
             with self.assertRaisesRegex(ValueError,'host or output contract changed'):
                 peers.reuse_history(root,dict(child,host=dict(identity['host'],fingerprint='c'*64)))
             with self.assertRaisesRegex(ValueError,'history inventory differs'):
                 peers.reuse_history(root,dict(child,reuse_parent_sha256=None))
+
+    def test_peer_timing_check_can_pin_the_exact_receipt(self):
+        with TemporaryDirectory() as scratch:
+            root = Path(scratch).resolve()
+            path = root/'receipt.json'
+            benchmark.atomic(path,dict(schema=peers.SCHEMA,reuse_parent_sha256='1'*64))
+            trusted = benchmark.reference.digest(path)
+            benchmark.atomic(path,dict(schema=peers.SCHEMA,reuse_parent_sha256=None))
+            with self.assertRaisesRegex(ValueError,'receipt differs from trusted digest'):
+                peers.check(root,expected_receipt_sha256=trusted)
+
+    def test_peer_reuse_keeps_active_failures_through_backend_reselection(self):
+        pinned = benchmark.reference.load_manifest()
+        plan = benchmark.manifest(pinned)
+        identity = dict(host=dict(system='Linux-test',machine='x86_64',fingerprint='1'*64),
+                        output_contract=peers.OUTPUT_CONTRACT)
+        source_digest = '2'*64
+        with TemporaryDirectory() as scratch:
+            root = Path(scratch).resolve()
+            binary = root/'producer'
+            binary.write_bytes(b'producer')
+            source = root/'captures'/'initial'
+            batches = source/'batches'
+            batches.mkdir(parents=True)
+            alias = root/'path-alias'
+            alias.symlink_to(source.parent,target_is_directory=True)
+            rows = []
+            for (_,backend),case in peers.timing_cases(plan).items():
+                if backend not in ('rust','magna','ppvm'):
+                    continue
+                status = 'failed' if backend=='ppvm' else 'complete'
+                stage = dict(case=case,backend=backend,status=status,reuse_parent_sha256=None,**identity)
+                path = batches/f'{case["id"]}-{backend}.json'
+                benchmark.atomic(path,stage)
+                rows.append(dict(stage,path=path.name,sha256=benchmark.reference.digest(path),seconds_per_draw=1))
+            benchmark.atomic(source/'receipt.json',dict(
+                schema=peers.SCHEMA,threads=1,backends=['magna','ppvm'],reuse_parent_sha256=None,
+                rust_source_sha256=source_digest,rust_binary_sha256=benchmark.reference.digest(binary),inputs={},
+                timing_protocol=dict(threads=1,excluded_warmup_draws=1,shots=1024,repetitions=3),
+                cells=rows,previous_failures=[],**identity))
+            middle = root/'deselected'
+            final = root/'reselected'
+            options = dict(upstream=root,rust_example=binary,python=binary,ppvm_executable=None,
+                           symft_archive=None,symft_extension_sha256=None,timeout_seconds=120)
+            with (patch.object(peers,'timing_identity',return_value=identity),
+                  patch.object(peers.reference,'verify_source'),
+                  patch.object(benchmark,'input_identity',return_value={}),
+                  patch.object(benchmark,'source_identity',return_value=source_digest),
+                  patch.object(benchmark,'run_stage',side_effect=AssertionError('unexpected Rust draw')),
+                  patch.object(peers,'bounded_worker',side_effect=AssertionError('unexpected peer draw')),
+                  redirect_stdout(StringIO())):
+                peers.run(Namespace(**options,out=middle,reuse=alias/source.name,backends=['magna'],retry_failed=True))
+                peers.run(Namespace(**options,out=final,reuse=middle,backends=['magna','ppvm'],retry_failed=False))
+            for result in (middle,final):
+                receipt = peers.read_json(result/'receipt.json')
+                self.assertEqual(receipt['backends'],['magna','ppvm'])
+                self.assertEqual([row for row in receipt['cells'] if row['status']=='failed'],
+                                 [row for row in rows if row['status']=='failed'])
 
     def test_native_peer_compares_counts_and_integrated_scores(self):
         case = dict(seed=3,shots=8)
