@@ -82,6 +82,59 @@ fn assert_scaled(weighted: &TaskEvaluation, mut unit: TaskEvaluation, likelihood
 }
 
 #[test]
+fn linear_prescribed_masses_match_the_unit_law_even_for_zero_probability_assignments() {
+    let files = Files::new();
+    files.put("ideal.magna", "H 0\nT 0");
+    let evaluator = make_evaluator(
+        &files,
+        "H 0\nT 0\nZ_ERROR(0) 0\nX_ERROR(1/5) 0",
+        r#"{"outputs":[0],"ideal_state":"ideal.magna","observables":[[0,1]]}"#,
+        &ControllerRegistry::default(),
+        EvaluationOptions::default(),
+    );
+    assert_eq!(evaluator.execution_route(), "linear_affine");
+    let fault = |site| FaultSelection {
+        site,
+        alternative: 0,
+    };
+    for assignment in [
+        vec![],
+        vec![fault(0)],
+        vec![fault(1)],
+        vec![fault(0), fault(1)],
+    ] {
+        let old = evaluator
+            .sample_prescribed(&assignment, &mut SplitMix64::new(0))
+            .unwrap();
+        let new = evaluator
+            .linear_prescribed_contributions(&assignment)
+            .unwrap();
+        assert_eq!(new.accepted, old.accepted);
+        assert_eq!(new.error, old.error);
+        assert_eq!(new.moments, old.moments);
+        assert_eq!(new.acceptance_resources, old.acceptance_resources);
+        assert_eq!(new.target_resources, old.target_resources);
+    }
+    assert_eq!(
+        evaluator
+            .sample_prescribed(&[fault(0)], &mut SplitMix64::new(0))
+            .unwrap()
+            .noise_probability,
+        rational(0, 1)
+    );
+    for invalid in [
+        vec![fault(0), fault(0)],
+        vec![fault(2)],
+        vec![FaultSelection {
+            site: 0,
+            alternative: 1,
+        }],
+    ] {
+        assert!(evaluator.linear_prescribed_contributions(&invalid).is_err());
+    }
+}
+
+#[test]
 fn supplied_linear_factors_normalize_and_scale_once_without_drawing_noise() {
     let files = Files::new();
     files.put("ideal.magna", "I 0");

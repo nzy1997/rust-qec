@@ -415,8 +415,10 @@ def main(argv=None):
                      help="protected Native Python executable; required for pilot manifests")
     run.add_argument("--rust-example", type=Path, required=True)
     run.add_argument("--out", type=Path, required=True)
+    run.add_argument("--jobs", type=int, default=1, help="cultivation precision worker count")
+    run.add_argument("--archive", type=Path, help="hash-pinned paper deposit for the full cultivation campaign")
     run.add_argument("--resume", action="store_true",
-                     help="BH only: validate and reuse an existing ordered campaign prefix")
+                     help="validate and reuse existing BH or cultivation batches")
     check = sub.add_parser("check")
     check.add_argument("--manifest", type=Path, required=True)
     check.add_argument("--results", type=Path, required=True)
@@ -435,10 +437,14 @@ def main(argv=None):
             import bh_benchmark
             result = (bh_benchmark.capture(args, manifest) if args.command == "run"
                       else bh_benchmark.check_capture(manifest, args.results))
+        elif manifest.get("schema") == "rmagna.paper-cultivation-plan.v1":
+            import cultivation_benchmark
+            result = (cultivation_benchmark.capture(args, manifest) if args.command == "run"
+                      else cultivation_benchmark.check_capture(manifest, args.results))
         else:
             if args.command == "run":
                 require(args.python is not None, "pilot run requires --python with the protected Native environment")
-                require(not args.resume, "--resume is currently supported only by BH campaigns")
+                require(not args.resume, "--resume requires a BH or cultivation campaign")
             result = capture(args, manifest) if args.command == "run" else check_capture(manifest, args.results, require_query_work=args.require_query_work)
         print(json.dumps(result, sort_keys=True))
         return 0
