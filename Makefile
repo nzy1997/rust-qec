@@ -2,6 +2,8 @@
 
 DEFAULT_BRANCH ?= master
 
+.PHONY: magna-paper-evidence-check
+
 # Cross-platform sed in-place: macOS needs -i '', Linux needs -i
 SED_I := sed -i$(shell if [ "$$(uname)" = "Darwin" ]; then echo " ''"; fi)
 QEC_CODE_RANDOM_WINDOW_OUT ?= benchmarks/out/qec_code_random_window
@@ -31,6 +33,7 @@ help:
 	@echo "  build-shot-viewer    - Rebuild the version-matched interactive-shot web bundle"
 	@echo "  rsmp-v1-readiness    - Run the deterministic rsmp v1 readiness gate"
 	@echo "  publication-evidence-check - Validate the publication benchmark evidence bundle (issue #601)"
+	@echo "  magna-paper-evidence-check - Regenerate the sealed Magna paper evidence offline"
 	@echo "  bench-surface-smoke  - Run the smoke surface decoder benchmark framework flow"
 	@echo "  bench-surface-full   - Run the full surface decoder benchmark framework flow"
 	@echo "  surface-decoder-compare-smoke - Run the smoke surface decoder comparison benchmark"
@@ -85,6 +88,10 @@ publication-evidence-check:
 		--readiness-out /tmp/rstim-publication-evidence-readiness.json
 	@cmp /tmp/rstim-publication-evidence-report.md benchmarks/publication_evidence/report.md
 	@cmp /tmp/rstim-publication-evidence-readiness.json benchmarks/publication_evidence/readiness.json
+
+magna-paper-evidence-check:
+	@python3 -B benchmarks/magna_reproduction/paper_evidence.py \
+		--results "$${MAGNA_PAPER_EVIDENCE_ROOT:?set MAGNA_PAPER_EVIDENCE_ROOT to the sealed evidence directory}"
 
 build-shot-viewer:
 	tools/build_shot_viewer.sh
