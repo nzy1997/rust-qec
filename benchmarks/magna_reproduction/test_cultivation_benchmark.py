@@ -1,5 +1,7 @@
 from fractions import Fraction as F
 import math
+from pathlib import Path
+from tempfile import TemporaryDirectory
 import unittest
 
 import cultivation_benchmark as benchmark
@@ -90,6 +92,58 @@ POSTSELECT det[1] !det[0]
         self.assertEqual(peers.lower_inverted_measurements(source),
                          'M(0.01) 0\nX 1\nM(0.01) 1\nX 1\nM(0.01) 2\n'
                          'Z 3\nMX 3\nZ 3\nX 4\nMY 4\nX 4\nCX rec[-1] 5\n')
+
+    def test_peer_failure_inventory_requires_every_raw_attempt(self):
+        case = dict(id='physical-0', family='example')
+        expected = {(case['id'],'ppvm'):case}
+        with TemporaryDirectory() as scratch:
+            root = Path(scratch)
+            previous = root/'previous-attempts'
+            previous.mkdir()
+            file = previous/'attempt.json'
+            stage = dict(case=case, backend='ppvm', status='failed', returncode=1)
+            benchmark.atomic(file,stage)
+            row = dict(stage,path=file.name,sha256=benchmark.reference.digest(file))
+            receipt = dict(previous_failures=[row])
+            self.assertEqual(peers.previous_failure_inventory(root,receipt,expected),[row])
+            with self.assertRaisesRegex(ValueError,'missing previous timing attempts'):
+                peers.previous_failure_inventory(root,{},expected)
+            with self.assertRaisesRegex(ValueError,'inventory differs'):
+                peers.previous_failure_inventory(root,dict(previous_failures=[]),expected)
+            with self.assertRaisesRegex(ValueError,'inventory differs'):
+                peers.previous_failure_inventory(root,dict(previous_failures=[row,row]),expected)
+            file.unlink()
+            with self.assertRaisesRegex(ValueError,'inventory differs'):
+                peers.previous_failure_inventory(root,receipt,expected)
+
+    def test_native_peer_compares_counts_and_integrated_scores(self):
+        case = dict(seed=3,shots=8)
+        times = dict(sampling_seconds=0.25,decoder_seconds=0)
+        estimates = dict(acceptance=0.625,error=0.125,conditional_error=0.2)
+        direct = dict(status='complete',requested=8,completed=8,seed=3,not_attempted=0,
+                      failed=0,failures=[],timings=times,estimates=estimates)
+        payload = dict(direct=direct,completed=8,sampling_seconds=0.25)
+        self.assertEqual(peers.native_acceptance(payload,case),0.625)
+        for changes in (dict(status='failed'),dict(completed=0),dict(seed=0),dict(timings=dict(times,sampling_seconds=0.5))):
+            with self.assertRaisesRegex(ValueError,'counts, seed or timing'):
+                peers.native_acceptance(dict(payload,direct=dict(direct,**changes)),case)
+        for changes in (dict(error=-1),dict(conditional_error=0.125),dict(error=0.75)):
+            with self.assertRaisesRegex(ValueError,'joint or conditional score'):
+                peers.native_acceptance(dict(payload,direct=dict(direct,estimates=dict(estimates,**changes))),case)
+
+    def test_symft_direct_counts_and_stage_identity_must_match(self):
+        case = dict(shots=8)
+        direct = dict(shots=8,accepted=5,discarded=3,logical_errors=1,active_threads=1)
+        payload = dict(direct=direct,completed=8,accepted=5,accepted_failure=1)
+        peers.check_symft_counts(payload,case)
+        for changes in (dict(accepted=4),dict(logical_errors=0),dict(discarded=4),dict(active_threads=2)):
+            with self.assertRaisesRegex(ValueError,'SymFT direct counts changed'):
+                peers.check_symft_counts(dict(payload,direct=dict(direct,**changes)),case)
+        identity = dict(host=dict(system='Linux-test',machine='x86_64'),output_contract=peers.OUTPUT_CONTRACT)
+        peers.check_timing_identity(identity,identity)
+        for key in identity:
+            with self.assertRaisesRegex(ValueError,'host or output contract changed'):
+                peers.check_timing_identity({k:v for k,v in identity.items() if k!=key},identity)
 
 
 if __name__ == '__main__':

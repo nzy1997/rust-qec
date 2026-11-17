@@ -31,6 +31,80 @@ SYMFT_COMMIT = 'c89b98514a919240b8afa53a271e08d926d3c987'
 SYMFT_ARCHIVE = '30e9b25cfcbb4f04dce204bb9c3d72f5b924de56225f5dd5f47e606dd4e3fe01'
 PPVM_COMMIT = '7b2e1bcbca06bcf28a57ef600b80273d6a337842'
 BACKENDS = ('magna','clifft','symft','ppvm')
+LEGACY_SCHEMA = 'rmagna.cultivation-matched-peer-timing.v1'
+SCHEMA = 'rmagna.cultivation-matched-peer-timing.v2'
+OUTPUT_CONTRACT = 'joint acceptance and target failure per attempted draw'
+RETAINED_CAPTURE = Path(__file__).parent/'paper/cultivation-peer-capture-v1.json'
+
+
+def timing_identity():
+    return dict(host=dict(system=f'{platform.system()}-{platform.release()}', machine=platform.machine()),
+                output_contract=OUTPUT_CONTRACT)
+
+
+def check_timing_identity(actual, expected):
+    require(all(actual.get(key) == expected[key] for key in ('host','output_contract')),
+            'matched timing host or output contract changed')
+
+
+def legacy_capture(root, receipt):
+    if receipt.get('schema') != LEGACY_SCHEMA:
+        require(receipt.get('schema') == SCHEMA, 'unsupported matched timing receipt')
+        return None
+    pinned = read_json(RETAINED_CAPTURE)
+    require(pinned['schema']=='rmagna.cultivation-matched-peer-provenance.v1'
+            and reference.digest(root/'receipt.json') in (pinned['receipt_sha256'],pinned['prior_receipt_sha256']),
+            'retained legacy matched timing receipt changed')
+    return pinned
+
+
+def timing_cases(plan):
+    return {(case['id'],backend):timing_case(case,backend)
+            for case in benchmark.cases(plan) if case['kind']=='timing'
+            for backend in ('rust', *BACKENDS)}
+
+
+def previous_failure_inventory(root, receipt, wanted):
+    directory = root/'previous-attempts'
+    require(not directory.is_symlink(), 'invalid previous timing attempts directory')
+    rows = receipt.get('previous_failures')
+    require(isinstance(rows,list), 'missing previous timing attempts')
+    paths = [row['path'] for row in rows]
+    actual = {path.name for path in directory.iterdir()} if directory.exists() else set()
+    require(len(paths)==len(set(paths)) and set(paths)==actual, 'previous timing attempt inventory differs')
+    for row in rows:
+        key = row['case']['id'], row['backend']
+        path = reference.relative_file(directory,row['path'])
+        stage = read_json(path)
+        require(reference.digest(path)==row['sha256'] and key in wanted
+                and row['case']==stage['case']==wanted[key] and row['backend']==stage.get('backend','rust')
+                and stage['status']==row['status'] and row['status'] in ('failed','timeout'),
+                'prior peer failure was changed or promoted')
+    return rows
+
+
+def native_acceptance(payload, case):
+    direct = payload['direct']
+    estimates = direct['estimates']
+    a, e, conditional = (estimates[key] for key in ('acceptance','error','conditional_error'))
+    require(direct['status']=='complete' and direct['seed']==case['seed']
+            and direct['requested']==direct['completed']==payload['completed']==case['shots']
+            and direct['failed']==direct['not_attempted']==0 and direct['failures']==[]
+            and direct['timings']['sampling_seconds']==payload['sampling_seconds']
+            and direct['timings']['decoder_seconds']==0, 'Magna native counts, seed or timing changed')
+    require(0 <= e <= a <= 1
+            and ((conditional is None and a==0)
+                 or (a>0 and isinstance(conditional,(float,int))
+                     and math.isclose(conditional,e/a,rel_tol=1e-12,abs_tol=1e-15))),
+            'Magna native joint or conditional score changed')
+    return a
+
+
+def check_symft_counts(payload, case):
+    direct = payload['direct']
+    require(direct['shots']==payload['completed']==case['shots'] and direct['active_threads']==1
+            and direct['accepted']==payload['accepted'] and direct['logical_errors']==payload['accepted_failure']
+            and direct['accepted']+direct['discarded']==case['shots'], 'SymFT direct counts changed')
 
 
 def peer_circuit(physical, task, target):
@@ -183,10 +257,13 @@ def clifft_cell(paths, case):
                 expected_detectors=expected,accepted=accepted,accepted_failure=failed)
 
 
-def symft_cell(paths, case):
+def symft_cell(paths, case, expected_extension):
     import symft
     from symft import _native
 
+    extension = Path(_native.__file__)
+    require(benchmark.sha(expected_extension) and reference.digest(extension)==expected_extension,
+            'loaded SymFT extension differs from the declared pinned-source build')
     text, expected = sampled_input(paths)
     started = time.perf_counter()
     sampler = symft.Circuit(text).compile_counts_sampler(batch=True,observable=0,
@@ -201,9 +278,10 @@ def symft_cell(paths, case):
     result = sampler.sample(shots=case['shots'],stream_id=case['seed'])
     sampling_seconds = time.perf_counter()-started
     require(result['active_threads']==1 and result['shots']==case['shots']
-            and result['accepted']+result['discarded']==case['shots'], 'SymFT changed timing or draw scope')
+            and result['accepted']+result['discarded']==case['shots']
+            and reference.digest(extension)==expected_extension, 'SymFT changed binary, timing or draw scope')
     return dict(build=dict(upstream_commit=SYMFT_COMMIT,archive_sha256=SYMFT_ARCHIVE,
-                           extension_sha256=reference.digest(Path(_native.__file__))),
+                           extension_sha256=expected_extension),
                 preparation_seconds=preparation_seconds,sampling_seconds=sampling_seconds,completed=result['shots'],
                 adapted_circuit_sha256=hashlib.sha256(text.encode()).hexdigest(),expected_detectors=expected,
                 accepted=result['accepted'],accepted_failure=result['logical_errors'],
@@ -255,12 +333,15 @@ def worker(args):
         result = native_cell(args.upstream,paths,case)
     elif args.backend == 'ppvm':
         result = ppvm_cell(paths,case,args.ppvm_executable)
+    elif args.backend == 'symft':
+        result = symft_cell(paths,case,args.symft_extension_sha256)
     else:
-        result = {'clifft':clifft_cell,'symft':symft_cell}[args.backend](paths,case)
+        result = clifft_cell(paths,case)
     # ru_maxrss is bytes on Darwin and KiB on Linux.
     rss = max(resource.getrusage(who).ru_maxrss for who in (resource.RUSAGE_SELF,resource.RUSAGE_CHILDREN))
     rss *= 1 if sys.platform=='darwin' else 1024
-    print(json.dumps(dict(case=case,inputs=identities,peer=args.backend,result=result,peak_rss_bytes=rss),allow_nan=False))
+    print(json.dumps(dict(case=case,inputs=identities,peer=args.backend,result=result,peak_rss_bytes=rss,
+                          **timing_identity()),allow_nan=False))
 
 
 def run(args):
@@ -272,30 +353,51 @@ def run(args):
     result_root.mkdir(exist_ok=False)
     (result_root/'batches').mkdir()
     reference.verify_source(upstream,pinned)
-    receipt = dict(schema='rmagna.cultivation-matched-peer-timing.v1',
-                   host=dict(system=platform.platform(), machine=platform.machine()),threads=1,
+    identity = timing_identity()
+    receipt = dict(schema=SCHEMA, threads=1, **identity,
                    rust_source_sha256=benchmark.source_identity(benchmark.ROOT),rust_binary_sha256=reference.digest(binary),
                    inputs=benchmark.input_identity(plan,result_root/'inputs',pinned,copy_from=upstream),
                    bounds=dict(timeout_seconds=args.timeout_seconds, rss_limit_bytes=64 << 30),
                    timing_protocol=dict(threads=1,excluded_warmup_draws=1,shots=1024,repetitions=3),
-                   output_contract='joint acceptance and target failure per attempted draw',
                    variants=dict(rust='integrated exact full-T masses',magna='integrated native full-T masses',
                                  clifft='full-T Born records with equivalent signed detectors and target readout',
                                  symft='full-T sampled counts with signed detector postselection',
                                  ppvm='full-T Born records with the paper coefficient threshold'))
-    old_results = {}
+    wanted = timing_cases(plan)
+    old_results, previous_failures = {}, []
+    retained_legacy = saved_symft_build = None
     if args.reuse is not None:
         existing = read_json(args.reuse/'receipt.json')
-        for key in ('schema','host','threads','rust_source_sha256','rust_binary_sha256','inputs','timing_protocol','output_contract'):
+        retained_legacy = legacy_capture(args.reuse,existing)
+        for key in ('threads','rust_source_sha256','rust_binary_sha256','inputs','timing_protocol','output_contract'):
             require(existing[key]==receipt[key], 'timing reuse identity changed: '+key)
+        # The archived v1 host used Python's presentation string. CPython 3.14
+        # includes the executable format on macOS, unlike the capture runtime.
+        expected_host = (dict(system=platform.platform().removesuffix('-Mach-O'),machine=platform.machine())
+                         if retained_legacy else identity['host'])
+        require(existing['host']==expected_host, 'timing reuse identity changed: host')
+        for row in previous_failure_inventory(args.reuse,existing,wanted):
+            previous = result_root/'previous-attempts'
+            previous.mkdir(exist_ok=True)
+            shutil.copyfile(args.reuse/'previous-attempts'/row['path'],previous/row['path'])
+            previous_failures.append(row)
         old_results = {(row['case']['id'],row['backend']):row for row in existing['cells']}
-    if 'symft' in args.backends and not any(row[1]=='symft' for row in old_results):
-        require(args.symft_archive is not None and reference.digest(args.symft_archive)==SYMFT_ARCHIVE,
-                'SymFT timing requires the pinned source archive')
+        saved_symft_build = retained_legacy['symft_build'] if retained_legacy else existing.get('symft_build')
+    if 'symft' in args.backends:
+        if args.symft_archive is not None or args.symft_extension_sha256 is not None:
+            require(args.symft_archive is not None and reference.digest(args.symft_archive)==SYMFT_ARCHIVE
+                    and benchmark.sha(args.symft_extension_sha256),
+                    'SymFT timing requires the pinned source archive and the built extension SHA-256')
+            declared = dict(upstream_commit=SYMFT_COMMIT,archive_sha256=SYMFT_ARCHIVE,
+                            extension_sha256=args.symft_extension_sha256)
+            require(saved_symft_build is None or saved_symft_build==declared, 'reused SymFT build changed')
+            saved_symft_build = declared
+        require(saved_symft_build is not None, 'SymFT timing requires a pinned-source build identity')
+        receipt['symft_build'] = saved_symft_build
     if 'ppvm' in args.backends and not any(row[1]=='ppvm' for row in old_results):
         require(args.ppvm_executable is not None, 'PPVM timing requires its pinned executable')
     env = dict(os.environ, **THREADS, PYTHONDONTWRITEBYTECODE='1')
-    results, previous_failures = [], []
+    results = []
 
     def retained(case, backend):
         row = old_results.get((case['id'],backend))
@@ -307,10 +409,20 @@ def run(args):
         if args.retry_failed and row['status'] != 'complete':
             previous = result_root/'previous-attempts'
             previous.mkdir(exist_ok=True)
-            shutil.copyfile(path,previous/path.name)
-            previous_failures.append(row)
+            name = f'{path.stem}-attempt-{len(previous_failures)}.json'
+            require(not (previous/name).exists(), 'duplicate previous attempt path')
+            shutil.copyfile(path,previous/name)
+            previous_failures.append(dict(row,path=name))
             return None
-        shutil.copyfile(path,result_root/'batches'/path.name)
+        destination = result_root/'batches'/path.name
+        if retained_legacy:
+            stage = read_json(path)
+            stage.update(identity)
+            if backend!='rust' and stage['status']=='complete':
+                stage['output'].update(identity)
+            benchmark.atomic(destination,stage)
+            return dict(row,sha256=reference.digest(destination))
+        shutil.copyfile(path,destination)
         return row
 
     for case in benchmark.cases(plan):
@@ -320,6 +432,8 @@ def run(args):
         if row is None:
             status = benchmark.run_stage(case,plan,result_root,binary,receipt)
             batch = benchmark.read_stage(result_root,case)
+            batch.update(identity)
+            benchmark.atomic(benchmark.stage_path(result_root,case),batch)
             row = dict(case=case,backend='rust',status=status,path=benchmark.stage_path(result_root,case).name,
                        sha256=reference.digest(benchmark.stage_path(result_root,case)))
             if status == 'complete':
@@ -338,12 +452,16 @@ def run(args):
             command = [args.python,str(Path(__file__).resolve()),'worker','--backend',backend,
                        '--upstream',upstream,'--cell',case['id']]
             if backend == 'ppvm':
+                require(args.ppvm_executable is not None, 'PPVM timing requires its pinned executable')
                 command.extend(['--ppvm-executable',args.ppvm_executable.resolve(strict=True)])
-            stage = dict(case=peer_case,backend=backend,status='failed')
+            if backend == 'symft':
+                command.extend(['--symft-extension-sha256',saved_symft_build['extension_sha256']])
+            stage = dict(case=peer_case,backend=backend,status='failed',**identity)
             try:
                 stage.update(bounded_worker(command,env,args.timeout_seconds))
                 if stage.get('returncode') == 0:
                     output = json.loads(stage['stdout'])
+                    check_timing_identity(output,identity)
                     require(output['inputs'] == receipt['inputs'][case['family']] and output['case'] == peer_case,
                             'peer did not use the matched full T input')
                     payload = output['result']
@@ -363,6 +481,7 @@ def run(args):
     require(reference.digest(binary) == receipt['rust_binary_sha256'], 'matched timing executable changed')
     receipt['cells'] = results
     receipt['previous_failures'] = previous_failures
+    previous_failure_inventory(result_root,receipt,wanted)
     summary = {}
     for family in benchmark.FAMILIES:
         summary[family] = {}
@@ -382,14 +501,17 @@ def check(root):
     pinned = reference.load_manifest()
     plan = benchmark.manifest(pinned)
     receipt = read_json(root/'receipt.json')
-    require(receipt['schema'] == 'rmagna.cultivation-matched-peer-timing.v1'
+    legacy = legacy_capture(root,receipt)
+    require(isinstance(receipt.get('host'),dict) and set(receipt['host'])=={'system','machine'}
+            and all(isinstance(value,str) and value.strip() for value in receipt['host'].values())
+            and receipt.get('output_contract')==OUTPUT_CONTRACT
             and receipt['inputs'] == benchmark.input_identity(plan,root/'inputs',pinned)
             and receipt['rust_source_sha256'] == benchmark.source_identity(benchmark.ROOT)
             and receipt['threads'] == 1 and receipt['timing_protocol'] == dict(
                 threads=1,excluded_warmup_draws=1,shots=1024,repetitions=3), 'matched timing identity or protocol changed')
-    wanted = {(case['id'],backend):timing_case(case,backend)
-              for case in benchmark.cases(plan) if case['kind']=='timing'
-              for backend in ('rust', *BACKENDS)}
+    symft_build = legacy['symft_build'] if legacy else receipt['symft_build']
+    wanted = timing_cases(plan)
+    previous_failure_inventory(root,receipt,wanted)
     seen, data, builds = set(), {}, {}
     for row in receipt['cells']:
         key = row['case']['id'],row['backend']
@@ -398,6 +520,8 @@ def check(root):
         path = reference.relative_file(root/'batches',row['path'])
         require(reference.digest(path)==row['sha256'], 'matched cell bytes changed')
         stage = read_json(path)
+        if not legacy:
+            check_timing_identity(stage,receipt)
         require(row['status']==stage['status']=='complete' and stage['returncode']==0,
                 'matched backend failed or missed a timing cell: '+str(key))
         case = wanted[key]
@@ -410,6 +534,8 @@ def check(root):
             acceptance=exact.as_float(moments['mean'])
         else:
             output = stage['output']
+            if not legacy:
+                check_timing_identity(output,receipt)
             require(output['case']==case and output['peer']==backend and output['inputs']==receipt['inputs'][case['family']]
                     and 0 < output['peak_rss_bytes'] <= 64 << 30, 'matched peer source, backend or memory bound changed')
             payload = output['result']
@@ -419,7 +545,7 @@ def check(root):
             if backend == 'magna':
                 require(build['upstream_commit']==pinned['upstream']['commit'] and benchmark.sha(build['extension_sha256'])
                         and Fraction(payload['physical_rate_deviation']) <= Fraction(1,10**18), 'Magna peer law or binary changed')
-                acceptance=payload['direct']['estimates']['acceptance']
+                acceptance=native_acceptance(payload,case)
             else:
                 paths = {k:root/'inputs'/name for k,name in benchmark.input_paths(plan,case['family']).items()}
                 text, expected = sampled_input(paths)
@@ -433,9 +559,10 @@ def check(root):
                 if backend=='clifft':
                     require(build['version']=='0.11.0' and benchmark.sha(build['extension_sha256']), 'Clifft version changed')
                 elif backend=='symft':
-                    require(build['upstream_commit']==SYMFT_COMMIT and build['archive_sha256']==SYMFT_ARCHIVE
-                            and benchmark.sha(build['extension_sha256']) and payload['direct']['active_threads']==1,
+                    require(build==symft_build and build['upstream_commit']==SYMFT_COMMIT
+                            and build['archive_sha256']==SYMFT_ARCHIVE and benchmark.sha(build['extension_sha256']),
                             'SymFT revision or thread count changed')
+                    check_symft_counts(payload,case)
                 else:
                     require(build['upstream_commit']==PPVM_COMMIT and benchmark.sha(build['executable_sha256'])
                             and payload['threads']==1 and payload['coefficient_threshold']==1e-10,
@@ -445,11 +572,6 @@ def check(root):
                 and row['seconds_per_draw']==seconds/case['shots'], 'matched timing/acceptance changed')
         data.setdefault((case['family'],backend),[]).append((acceptance,case['shots'],seconds/case['shots']))
     require(seen == set(wanted), 'matched timing report dropped a failed or missing cell')
-    for previous in receipt.get('previous_failures',[]):
-        path = reference.relative_file(root/'previous-attempts',previous['path'])
-        stage = read_json(path)
-        require(reference.digest(path)==previous['sha256'] and stage['status']==previous['status']!='complete',
-                'prior peer failure was changed or promoted')
     summary = {}
     for family in benchmark.FAMILIES:
         summary[family] = {}
@@ -483,6 +605,7 @@ def main():
     execute.add_argument('--reuse',type=Path)
     execute.add_argument('--retry-failed',action='store_true')
     execute.add_argument('--symft-archive',type=Path)
+    execute.add_argument('--symft-extension-sha256')
     execute.add_argument('--ppvm-executable',type=Path)
     verify = sub.add_parser('check')
     verify.add_argument('--results',type=Path,required=True)
@@ -491,6 +614,7 @@ def main():
     child.add_argument('--backend',choices=BACKENDS,required=True)
     child.add_argument('--cell',required=True)
     child.add_argument('--ppvm-executable',type=Path)
+    child.add_argument('--symft-extension-sha256')
     args = parser.parse_args()
     if args.operation == 'check':
         print(json.dumps(check(args.results.resolve(strict=True)),sort_keys=True))

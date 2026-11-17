@@ -4170,13 +4170,20 @@ timing sample size. These short batches have limited rare-error resolution.
 python3 benchmarks/magna_reproduction/cultivation_peers.py run \
   --upstream "$MAGNA_UPSTREAM" --rust-example "$MAGNA_CULTIVATION_RUNNER" \
   --python "$MAGNA_PEER_PYTHON" --backends magna clifft symft ppvm \
-  --symft-archive "$SYMFT_PINNED_ARCHIVE" --ppvm-executable "$PPVM_CULTIVATION_RUNNER" \
+  --symft-archive "$SYMFT_PINNED_ARCHIVE" --symft-extension-sha256 "$SYMFT_BUILD_SHA256" \
+  --ppvm-executable "$PPVM_CULTIVATION_RUNNER" \
   --out "$MAGNA_CULTIVATION_RESULTS/matched-peers"
 python3 benchmarks/magna_reproduction/cultivation_peers.py check \
   --results "$MAGNA_CULTIVATION_RESULTS/matched-peers"
 ```
 
-Use the pinned peer packages on the peer Python search path. The PPVM standalone
+Use the pinned peer packages on the peer Python search path. Obtain
+`SYMFT_BUILD_SHA256` from the extension produced by the pinned SymFT source
+build. The worker verifies this digest on the loaded extension. The original
+matched capture uses a pinned receipt that binds its host, score contract,
+build and all six previously failed attempts. New measurements record the host
+and score contract in each timing stage and retain previous attempts across reuse.
+The PPVM standalone
 driver is `peers/ppvm_cultivation.rs`. Its Cargo adapter uses the pinned source's
 `ppvm-stim`, `ppvm-pauli-sum` and `ppvm-tableau` crates, plus `serde` and
 `serde_json`, with versions projected from that source's lockfile. Build with
