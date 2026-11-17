@@ -779,7 +779,14 @@ impl CausalProgram {
         random: &mut impl RandomSource,
         arithmetic: &ScalarArithmetic,
     ) -> Result<ResolvedHistory, RuntimeError> {
-        self.resolve_with_faults(requested, faults, BigRational::one(), random, arithmetic)
+        self.resolve_with_faults(
+            requested,
+            faults,
+            BigRational::one(),
+            random,
+            arithmetic,
+            None,
+        )
     }
 
     /// Resolve sampled causal history for supplied categorical faults and an
@@ -798,7 +805,7 @@ impl CausalProgram {
     ) -> Result<ResolvedHistory, RuntimeError> {
         let likelihood =
             validate_supplied_likelihood(likelihood, arithmetic.max_coefficient_bits())?;
-        self.resolve_with_faults(requested, faults, likelihood, random, arithmetic)
+        self.resolve_with_faults(requested, faults, likelihood, random, arithmetic, None)
     }
 
     pub(crate) fn resolve_with_faults(
@@ -808,6 +815,7 @@ impl CausalProgram {
         likelihood: BigRational,
         random: &mut impl RandomSource,
         arithmetic: &ScalarArithmetic,
+        meter: Option<&ExecutionMeter>,
     ) -> Result<ResolvedHistory, RuntimeError> {
         self.validate_requested(requested)?;
         let probability = self.model.probability(faults)?;
@@ -823,7 +831,7 @@ impl CausalProgram {
             random,
             arithmetic,
             HistoryMode::Sample,
-            None,
+            meter,
         )
         .map_err(ExecutionError::runtime)
     }

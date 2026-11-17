@@ -1,5 +1,6 @@
 use num_rational::BigRational;
 use rmagna::circuit::{ParseOptions, parse_circuit};
+use rmagna::costs::ExecutionMeter;
 use rmagna::field::{ExactField, FieldArithmetic};
 use rmagna::instrument::FaultSelection;
 use rmagna::noise::{NoiseError, NoiseSampling, RandomSource, SplitMix64};
@@ -310,6 +311,57 @@ fn supplied_causal_factors_preserve_report_flip_correlation_postselection_and_re
             assert_eq!(seen, [true, true]);
         }
     }
+}
+
+#[test]
+fn supplied_noise_meter_counts_reported_decoder_work_with_identical_draws() {
+    let files = Files::new();
+    let mut registry = ControllerRegistry::default();
+    registry
+        .register("echo", "1", |bits: &[bool]| Ok(bits.to_vec()))
+        .unwrap();
+    let evaluator = make_evaluator(
+        &files,
+        "H 0\nM(1/10) 0\nDETECTOR rec[-1]\nCONTROL[echo] det[0] -> ctrl[0]\nX_ERROR(1/4) ctrl[0] 1",
+        r#"{"outputs":[1],"sample_records":[0]}"#,
+        &registry,
+        EvaluationOptions::default(),
+    );
+    let faults = [FaultSelection {
+        site: 0,
+        alternative: 0,
+    }];
+    let factor = rational(9, 5);
+    let meter = ExecutionMeter::default();
+    for seed in 0..3 {
+        let mut plain = SplitMix64::new(seed);
+        let mut observed = plain;
+        let expected = evaluator
+            .sample_supplied_noise(&faults, &factor, &mut plain)
+            .unwrap();
+        let actual = evaluator
+            .sample_supplied_noise_with_costs(&faults, &factor, &mut observed, &meter)
+            .unwrap();
+        assert!(expected == actual);
+        assert_eq!(plain, observed);
+        assert_eq!(actual.controller_calls.len(), 1);
+        assert_eq!(actual.controller_calls[0].inputs, actual.sampled_records);
+    }
+    let costs = meter.snapshot();
+    assert_eq!(costs.decoder.attempted, 3);
+    assert_eq!(costs.decoder.succeeded, 3);
+    assert_eq!(costs.decoder.failed, 0);
+    assert!(costs.query.succeeded >= 3);
+
+    let seed = SplitMix64::new(9);
+    let mut random = seed;
+    assert!(
+        evaluator
+            .sample_supplied_noise_with_costs(&faults, &rational(-1, 1), &mut random, &meter)
+            .is_err()
+    );
+    assert_eq!(random, seed);
+    assert_eq!(meter.snapshot(), costs);
 }
 
 #[test]
