@@ -160,6 +160,27 @@ fn independent(
     Ok(false)
 }
 
+fn intersecting_terms<'a>(
+    left: &'a BitVector,
+    right: &'a BitVector,
+) -> impl Iterator<Item = usize> + 'a {
+    left.words()
+        .iter()
+        .zip(right.words())
+        .enumerate()
+        .flat_map(|(index, (&left, &right))| {
+            let mut bits = left & right;
+            std::iter::from_fn(move || {
+                if bits == 0 {
+                    return None;
+                }
+                let bit = bits.trailing_zeros() as usize;
+                bits &= bits - 1;
+                Some(64 * index + bit)
+            })
+        })
+}
+
 struct SignatureRows {
     axes: Vec<BitVector>,
     work: u128,
@@ -266,12 +287,12 @@ fn pivot_signature_rows(
     let odd_words = k.div_ceil(64);
     let words = n.div_ceil(64);
     let projection_work = checked(
-        n.checked_mul(k + (2 * max_rank + 4) * odd_words)
+        n.checked_mul(2 * k + (2 * max_rank + 5) * odd_words)
             .and_then(|work| work.checked_add(2 * terms.len() as u128)),
         WORK,
     )?;
     let projection_geometry = checked(
-        (max_rank + 2)
+        (2 * max_rank + 2)
             .checked_mul(odd_words)
             .and_then(|size| size.checked_add(k + max_rank)),
         GEOMETRY,
@@ -299,8 +320,8 @@ fn pivot_signature_rows(
                     column.set(term, true).map_err(|e| error(SIGNATURE, e))?;
                 }
             }
-            if independent(column, &mut column_basis)? {
-                coordinates.push(index);
+            if independent(column.clone(), &mut column_basis)? {
+                coordinates.push(column);
                 if coordinates.len() as u128 == max_rank {
                     break;
                 }
@@ -308,33 +329,89 @@ fn pivot_signature_rows(
         }
         coordinates
     };
-    let rank = coordinates.len() as u128;
+    let contracted_width = coordinates.len();
+    let rank = contracted_width as u128;
+    let contracted_words = rank.div_ceil(64);
     let pairs = rank * (rank + 1) / 2;
-    let pair_work = checked(pairs.checked_mul((k + 2 * rank + 4) * words + 2 * k), WORK)?;
-    let work = checked(projection_work.checked_add(pair_work), WORK)?;
     let pair_geometry = checked(
-        (2 * rank + 1)
+        (rank + 1)
             .checked_mul(words)
-            .and_then(|size| size.checked_add(k + rank)),
+            .and_then(|size| size.checked_add(rank * odd_words))
+            .and_then(|size| size.checked_add((rank + k + 1) * contracted_words))
+            .and_then(|size| size.checked_add(2 * k + rank)),
         GEOMETRY,
     )?;
     let scan_geometry = projection_geometry.max(pair_geometry);
-    limit(WORK, work, options.max_signature_work)?;
     geometry(scan_geometry, options)?;
+
+    // A term present in d kept columns contributes to exactly d(d+1)/2
+    // pairs. Count the real incidence charge without inspecting the pairs.
+    let transpose_work = checked(
+        rank.checked_mul(2 * k + 2 * odd_words)
+            .and_then(|work| work.checked_add(k * (contracted_words + 3))),
+        WORK,
+    )?;
+    let mut work = checked(projection_work.checked_add(transpose_work), WORK)?;
+    limit(WORK, work, options.max_signature_work)?;
+    let mut degrees = vec![0u128; odd_count];
+    for column in &coordinates {
+        for term in column.ones() {
+            degrees[term] += 1;
+        }
+    }
+    let incidences = checked(
+        degrees.into_iter().try_fold(0u128, |sum, degree| {
+            sum.checked_add(degree * (degree + 1) / 2)
+        }),
+        WORK,
+    )?;
+    let pair_work = checked(
+        pairs
+            .checked_mul(odd_words + (2 * rank + 4) * contracted_words)
+            .and_then(|work| work.checked_add(incidences.checked_mul(contracted_words + 1)?)),
+        WORK,
+    )?;
+    let lift_work = checked(rank.checked_mul(odd_words + words + k * (words + 1)), WORK)?;
+    work = checked(
+        work.checked_add(pair_work)
+            .and_then(|work| work.checked_add(lift_work)),
+        WORK,
+    )?;
+    limit(WORK, work, options.max_signature_work)?;
+
+    // Restriction to these coordinates is injective on the span of odd axes,
+    // which contains every signature row. Reduce rows in that smaller space
+    // and reconstruct a full-width row only when it enters the original basis.
+    let mut restricted = (0..odd_count)
+        .map(|_| BitVector::zeros(contracted_width))
+        .collect::<Result<Vec<_>, _>>()
+        .map_err(|e| error(SIGNATURE, e))?;
+    for (index, column) in coordinates.iter().enumerate() {
+        for term in column.ones() {
+            restricted[term]
+                .set(index, true)
+                .map_err(|e| error(SIGNATURE, e))?;
+        }
+    }
     let mut pivots = BTreeMap::new();
     let mut axes = Vec::new();
-    for (position, &i) in coordinates.iter().enumerate() {
-        for &j in &coordinates[position..] {
-            let mut row = BitVector::zeros(width).map_err(|e| error(SIGNATURE, e))?;
-            for axis in &odd {
-                if axis.get(i).map_err(|e| error(SIGNATURE, e))?
-                    && axis.get(j).map_err(|e| error(SIGNATURE, e))?
-                {
-                    row.xor_assign(axis).map_err(|e| error(SIGNATURE, e))?;
-                }
+    'rows: for (position, left) in coordinates.iter().enumerate() {
+        for right in &coordinates[position..] {
+            let mut row = BitVector::zeros(contracted_width).map_err(|e| error(SIGNATURE, e))?;
+            for term in intersecting_terms(left, right) {
+                row.xor_assign(&restricted[term])
+                    .map_err(|e| error(SIGNATURE, e))?;
             }
-            if independent(row.clone(), &mut pivots)? {
-                axes.push(row);
+            if independent(row, &mut pivots)? {
+                let mut full = BitVector::zeros(width).map_err(|e| error(SIGNATURE, e))?;
+                for term in intersecting_terms(left, right) {
+                    full.xor_assign(odd[term])
+                        .map_err(|e| error(SIGNATURE, e))?;
+                }
+                axes.push(full);
+                if axes.len() == contracted_width {
+                    break 'rows;
+                }
             }
         }
     }
