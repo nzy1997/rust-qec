@@ -19,6 +19,7 @@ pub use resource::{
 };
 pub use selection::{
     FrozenPhasePlan, PhaseSelectionOptions, PhaseSelectionReceipt, PhaseSelectionRoute,
+    PhaseSignatureScan,
 };
 use std::{collections::BTreeMap, fmt, sync::Arc};
 pub use verification::{CertificateVerification, CertificateVerificationMethod};

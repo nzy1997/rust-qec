@@ -1,4 +1,5 @@
 //! Explicit native policy limits, shared by the selected query families.
+use rmagna::catalogue::PhaseSignatureScan;
 use rmagna::phase::{NativePhaseOptions, NativeTransportMode};
 use std::collections::BTreeMap;
 
@@ -29,6 +30,7 @@ pub(super) const FLAGS: &[&str] = &[
     "--native-max-quotient-rank",
     "--native-max-core-table-bytes",
     "--native-max-signature-work",
+    "--native-signature-scan",
     "--native-max-transform-work",
     "--native-max-construction-terms",
     "--native-max-construction-entries",
@@ -103,6 +105,14 @@ pub(super) fn configure(
     s.max_core_table_bytes =
         flags.number("--native-max-core-table-bytes", s.max_core_table_bytes)?;
     s.max_signature_work = flags.number("--native-max-signature-work", s.max_signature_work)?;
+    if flags.choice(
+        "--native-signature-scan",
+        "full",
+        &["full", "odd_axis_pivots"],
+    )? == "odd_axis_pivots"
+    {
+        s.signature_scan = PhaseSignatureScan::OddAxisPivots;
+    }
     s.max_transform_work = flags.number("--native-max-transform-work", s.max_transform_work)?;
     let c = &mut s.construction;
     c.max_terms = flags.number("--native-max-construction-terms", c.max_terms)?;

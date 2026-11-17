@@ -21,11 +21,28 @@ impl PhaseSelectionRoute {
     }
 }
 
+/// How to select the first independent native signature rows.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum PhaseSignatureScan {
+    #[default]
+    Full,
+    OddAxisPivots,
+}
+impl PhaseSignatureScan {
+    pub fn name(self) -> &'static str {
+        match self {
+            Self::Full => "full",
+            Self::OddAxisPivots => "odd_axis_pivots",
+        }
+    }
+}
+
 /// Independent logical construction bounds. These exclude allocator overhead
 /// and do not reproduce the native implementation's in-memory layout.
 #[derive(Clone, Copy, Debug)]
 pub struct PhaseSelectionOptions {
     pub max_quotient_rank: usize,
+    pub signature_scan: PhaseSignatureScan,
     /// Four logical native bytes per core assignment, checked before allocation.
     pub max_core_table_bytes: usize,
     /// Portable admission charge for a dense core plus its Fourier coefficient
@@ -46,6 +63,7 @@ impl Default for PhaseSelectionOptions {
     fn default() -> Self {
         Self {
             max_quotient_rank: 8,
+            signature_scan: PhaseSignatureScan::Full,
             max_core_table_bytes: 64 << 20,
             max_table_and_coefficient_bytes: usize::MAX,
             max_signature_work: 64 << 20,
@@ -65,9 +83,9 @@ pub struct PhaseSelectionReceipt {
     pub logical_table_and_coefficient_bytes: u128,
     /// Retained certified indicators, including supplied cancelling indicators.
     pub retained_terms: usize,
-    /// `n*(n+1)/2 * (input_terms + 2*n + 3) * ceil(n/64)`.
-    /// This bounds a complete lexicographic scan, including highest-bit reduction.
+    /// Logical word work for the selected signature scan and its elimination.
     pub signature_work_bound: u128,
+    pub signature_coordinates: usize,
     pub core_construction_work: u128,
     /// Zero for catalogue/product routes; rank * table_values for Walsh.
     pub transform_work: u128,
@@ -125,10 +143,51 @@ fn highest(row: &BitVector) -> Option<usize> {
     let word = row.words().iter().rposition(|&value| value != 0)?;
     Some(64 * word + 63 - row.words()[word].leading_zeros() as usize)
 }
-fn native_axes(
+
+fn independent(
+    mut row: BitVector,
+    pivots: &mut BTreeMap<usize, BitVector>,
+) -> Result<bool, CatalogueError> {
+    while let Some(pivot) = highest(&row) {
+        if let Some(basis) = pivots.get(&pivot) {
+            row.xor_assign(basis)
+                .map_err(|e| error("phase_selection.signature", e))?;
+        } else {
+            pivots.insert(pivot, row);
+            return Ok(true);
+        }
+    }
+    Ok(false)
+}
+
+struct SignatureRows {
+    axes: Vec<BitVector>,
+    work: u128,
+    geometry: u128,
+    coordinates: usize,
+}
+
+fn signature_rows(
     reference: &ParityPhase,
     options: &PhaseSelectionOptions,
-) -> Result<(Vec<BitVector>, u128, u128), CatalogueError> {
+) -> Result<SignatureRows, CatalogueError> {
+    let result = match options.signature_scan {
+        PhaseSignatureScan::Full => full_signature_rows(reference, options),
+        PhaseSignatureScan::OddAxisPivots => pivot_signature_rows(reference, options),
+    }?;
+    // Both scans finish before checking rank, so a refusal reports the complete rank.
+    limit(
+        "phase_selection.max_quotient_rank",
+        result.axes.len() as u128,
+        options.max_quotient_rank as u128,
+    )?;
+    Ok(result)
+}
+
+fn full_signature_rows(
+    reference: &ParityPhase,
+    options: &PhaseSelectionOptions,
+) -> Result<SignatureRows, CatalogueError> {
     let n = reference.num_variables() as u128;
     let words = n.div_ceil(64);
     let scan_geometry = checked(
@@ -163,32 +222,128 @@ fn native_axes(
             let original = reference
                 .signature_slice(i, j)
                 .map_err(|e| phase_error("phase_selection.signature", e))?;
-            let mut reduced = original.clone();
-            while let Some(pivot) = highest(&reduced) {
-                if let Some(row) = pivots.get(&pivot) {
-                    reduced
-                        .xor_assign(row)
-                        .map_err(|e| error("phase_selection.signature", e))?;
-                } else {
-                    pivots.insert(pivot, reduced);
-                    axes.push(original);
-                    break;
-                }
+            if independent(original.clone(), &mut pivots)? {
+                axes.push(original);
             }
             if axes.len() == reference.num_variables() {
                 break 'rows;
             }
         }
     }
-    // Geometry and full scanning work have already been admitted. Finish the
-    // bounded scan so the refusal reports the complete rank, not its first
-    // overflowing prefix (important when absorption changes the final rank).
-    limit(
-        "phase_selection.max_quotient_rank",
-        axes.len() as u128,
-        options.max_quotient_rank as u128,
+    Ok(SignatureRows {
+        axes,
+        work,
+        geometry: scan_geometry,
+        coordinates: reference.num_variables(),
+    })
+}
+
+fn pivot_signature_rows(
+    reference: &ParityPhase,
+    options: &PhaseSelectionOptions,
+) -> Result<SignatureRows, CatalogueError> {
+    const WORK: &str = "phase_selection.max_signature_work";
+    const GEOMETRY: &str = "phase_selection.geometry";
+    const SIGNATURE: &str = "phase_selection.signature";
+    let width = reference.num_variables();
+    let n = width as u128;
+    let terms = reference.terms();
+    limit(WORK, terms.len() as u128, options.max_signature_work)?;
+    let odd_count = terms
+        .iter()
+        .filter(|(_, coefficient)| coefficient & 1 != 0)
+        .count();
+    if odd_count == 0 {
+        return Ok(SignatureRows {
+            axes: Vec::new(),
+            work: terms.len() as u128,
+            geometry: 0,
+            coordinates: 0,
+        });
+    }
+    let k = odd_count as u128;
+    let max_rank = n.min(k);
+    let odd_words = k.div_ceil(64);
+    let words = n.div_ceil(64);
+    let projection_work = checked(
+        n.checked_mul(k + (2 * max_rank + 4) * odd_words)
+            .and_then(|work| work.checked_add(2 * terms.len() as u128)),
+        WORK,
     )?;
-    Ok((axes, work, scan_geometry))
+    let projection_geometry = checked(
+        (max_rank + 2)
+            .checked_mul(odd_words)
+            .and_then(|size| size.checked_add(k + max_rank)),
+        GEOMETRY,
+    )?;
+    limit(WORK, projection_work, options.max_signature_work)?;
+    geometry(projection_geometry, options)?;
+    let odd = terms
+        .iter()
+        .filter(|(_, coefficient)| coefficient & 1 != 0)
+        .map(|(axis, _)| axis)
+        .collect::<Vec<_>>();
+
+    // For coordinate i, its column lists the membership bits of all odd axes.
+    // A dependent column is a sum of earlier kept columns. Every pair using it
+    // is therefore a sum of lexicographically earlier pairs by bilinearity and
+    // symmetry. Omitting these pairs preserves the first independent *original*
+    // rows, including their order and full width.
+    let coordinates = {
+        let mut column_basis = BTreeMap::new();
+        let mut coordinates = Vec::new();
+        for index in 0..width {
+            let mut column = BitVector::zeros(odd_count).map_err(|e| error(SIGNATURE, e))?;
+            for (term, axis) in odd.iter().enumerate() {
+                if axis.get(index).map_err(|e| error(SIGNATURE, e))? {
+                    column.set(term, true).map_err(|e| error(SIGNATURE, e))?;
+                }
+            }
+            if independent(column, &mut column_basis)? {
+                coordinates.push(index);
+                if coordinates.len() as u128 == max_rank {
+                    break;
+                }
+            }
+        }
+        coordinates
+    };
+    let rank = coordinates.len() as u128;
+    let pairs = rank * (rank + 1) / 2;
+    let pair_work = checked(pairs.checked_mul((k + 2 * rank + 4) * words + 2 * k), WORK)?;
+    let work = checked(projection_work.checked_add(pair_work), WORK)?;
+    let pair_geometry = checked(
+        (2 * rank + 1)
+            .checked_mul(words)
+            .and_then(|size| size.checked_add(k + rank)),
+        GEOMETRY,
+    )?;
+    let scan_geometry = projection_geometry.max(pair_geometry);
+    limit(WORK, work, options.max_signature_work)?;
+    geometry(scan_geometry, options)?;
+    let mut pivots = BTreeMap::new();
+    let mut axes = Vec::new();
+    for (position, &i) in coordinates.iter().enumerate() {
+        for &j in &coordinates[position..] {
+            let mut row = BitVector::zeros(width).map_err(|e| error(SIGNATURE, e))?;
+            for axis in &odd {
+                if axis.get(i).map_err(|e| error(SIGNATURE, e))?
+                    && axis.get(j).map_err(|e| error(SIGNATURE, e))?
+                {
+                    row.xor_assign(axis).map_err(|e| error(SIGNATURE, e))?;
+                }
+            }
+            if independent(row.clone(), &mut pivots)? {
+                axes.push(row);
+            }
+        }
+    }
+    Ok(SignatureRows {
+        axes,
+        work,
+        geometry: scan_geometry,
+        coordinates: coordinates.len(),
+    })
 }
 fn factors_present(catalogue: &PhaseCatalogue, rank: usize) -> bool {
     (0..rank).step_by(2).all(|offset| {
@@ -239,7 +394,12 @@ impl FrozenPhasePlan {
         injection: Option<&PhaseInjectionOptions>,
         arithmetic: &ScalarArithmetic,
     ) -> Result<Self, CatalogueError> {
-        let (axes, signature_work_bound, scan_geometry) = native_axes(reference, options)?;
+        let SignatureRows {
+            axes,
+            work: signature_work_bound,
+            geometry: scan_geometry,
+            coordinates: signature_coordinates,
+        } = signature_rows(reference, options)?;
         let rank = axes.len();
         let values = u32::try_from(rank)
             .ok()
@@ -395,6 +555,7 @@ impl FrozenPhasePlan {
             logical_core_table_bytes: bytes as usize,
             retained_terms: prepared.num_terms(),
             signature_work_bound,
+            signature_coordinates,
             core_construction_work,
             transform_work,
             certification,

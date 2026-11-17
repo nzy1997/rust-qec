@@ -1,6 +1,6 @@
 use rmagna::catalogue::{
     CatalogueLimits, CliffordIndicator, FrozenPhasePlan, PhaseCatalogue, PhaseDecompositionInput,
-    PhaseSelectionOptions, PhaseSelectionRoute,
+    PhaseSelectionOptions, PhaseSelectionRoute, PhaseSignatureScan,
 };
 use rmagna::gf2::BitVector;
 use rmagna::phase::{ParityPhase, PhaseError};
@@ -166,6 +166,71 @@ fn assert_native(row: &Value, plan: &FrozenPhasePlan) {
         .unwrap();
         assert_eq!(term.phase, expected_phase);
     }
+}
+
+#[test]
+fn odd_axis_pivots_preserve_pinned_original_rows_sections_and_certificates() {
+    let fixture = fixture();
+    let options = PhaseSelectionOptions {
+        signature_scan: PhaseSignatureScan::OddAxisPivots,
+        ..Default::default()
+    };
+    let arithmetic = ScalarArithmetic::default();
+    for row in fixture["cases"].as_array().unwrap() {
+        let input = phase(row);
+        let certificate = source(row);
+        let plan =
+            FrozenPhasePlan::new(&input, certificate.as_ref(), &options, &arithmetic).unwrap();
+        assert_native(row, &plan);
+        assert!(plan.receipt().signature_coordinates <= input.num_variables());
+    }
+}
+
+#[test]
+fn odd_axis_pivots_admit_a_wide_sparse_phase_with_the_same_core_and_axes() {
+    let width = 257;
+    let make = |support| BitVector::from_indices(width, support).unwrap();
+    let a = make(vec![0, 2, 8, 80, 256]);
+    let b = make(vec![1, 2, 9, 81, 255]);
+    let c = make(vec![0, 1, 8, 9, 80, 81, 255, 256]);
+    let d = make(vec![83, 120, 244]);
+    let even = make((0..width).collect::<Vec<_>>());
+    let input = ParityPhase::new(width, 3, [(a, 1), (b, 3), (c, 5), (d, 7), (even, 2)]).unwrap();
+    let arithmetic = ScalarArithmetic::default();
+    let mut full = PhaseSelectionOptions::default();
+    full.max_signature_work = 1 << 30;
+    let original = FrozenPhasePlan::new(&input, None, &full, &arithmetic).unwrap();
+    assert_eq!(original.receipt().signature_coordinates, width);
+    full.max_signature_work = 1 << 20;
+    let error = FrozenPhasePlan::new(&input, None, &full, &arithmetic).unwrap_err();
+    assert!(error.to_string().contains("max_signature_work"));
+    let mut compressed = PhaseSelectionOptions {
+        signature_scan: PhaseSignatureScan::OddAxisPivots,
+        ..full
+    };
+    let result = FrozenPhasePlan::new(&input, None, &compressed, &arithmetic).unwrap();
+    assert_eq!(result.receipt().signature_coordinates, 3);
+    assert_eq!(result.signature_axes(), original.signature_axes());
+    assert_eq!(result.section_lifts(), original.section_lifts());
+    assert_eq!(
+        result.certificate().phase_table(),
+        original.certificate().phase_table()
+    );
+    assert_eq!(result.num_terms(), original.num_terms());
+    for (new, old) in result
+        .certificate()
+        .terms()
+        .iter()
+        .zip(original.certificate().terms())
+    {
+        assert_eq!(new.coefficient, old.coefficient);
+        assert_eq!(new.constraints, old.constraints);
+        assert_eq!(new.phase, old.phase);
+    }
+    assert!(result.receipt().signature_work_bound * 100 < original.receipt().signature_work_bound);
+    compressed.max_signature_work = result.receipt().signature_work_bound - 1;
+    let error = FrozenPhasePlan::new(&input, None, &compressed, &arithmetic).unwrap_err();
+    assert!(error.to_string().contains("max_signature_work"));
 }
 fn boundary(n: usize, update: u8) -> QuadraticForm {
     QuadraticForm::new(
