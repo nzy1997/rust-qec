@@ -37,7 +37,7 @@ pub use sequential::{
 
 use crate::instrument::{CompiledInstrument, FaultSelection};
 use crate::probability::Probability;
-use num_bigint::{BigUint, Sign};
+use num_bigint::{BigInt, BigUint, Sign};
 use num_rational::BigRational;
 use num_traits::{One, Zero};
 use std::{
@@ -224,6 +224,33 @@ impl ScaledNoiseProposal {
 }
 
 /// Balanced exact products avoid repeatedly reducing a growing left prefix.
+// All callers use normalized probabilities, or products/ratios constructed
+// from them. After cancelling the two cross-pairs the result is already
+// coprime; Ratio::new would repeat a full GCD on the large final integers.
+fn multiply_normalized(left: &BigRational, right: &BigRational) -> BigRational {
+    if left.is_zero() || right.is_zero() {
+        return BigRational::zero();
+    }
+    if left.is_one() {
+        return right.clone();
+    }
+    if right.is_one() {
+        return left.clone();
+    }
+    let ad = BigInt::from(gcd(
+        left.numer().magnitude().clone(),
+        right.denom().magnitude().clone(),
+    ));
+    let bc = BigInt::from(gcd(
+        left.denom().magnitude().clone(),
+        right.numer().magnitude().clone(),
+    ));
+    BigRational::new_raw(
+        (left.numer() / &ad) * (right.numer() / &bc),
+        (left.denom() / bc) * (right.denom() / ad),
+    )
+}
+
 pub(crate) fn probability_product<'a>(
     values: impl IntoIterator<Item = &'a BigRational>,
 ) -> BigRational {
@@ -240,7 +267,7 @@ pub(crate) fn probability_product<'a>(
             .chunks(2)
             .map(|pair| {
                 if pair.len() == 2 {
-                    &pair[0] * &pair[1]
+                    multiply_normalized(&pair[0], &pair[1])
                 } else {
                     pair[0].clone()
                 }
@@ -475,7 +502,10 @@ impl NoiseModel {
                 .iter()
                 .map(|(&site, &choice)| &self.categories[site].replacement_weights[choice]),
         );
-        Ok(&self.positive_identity_product * corrections)
+        Ok(multiply_normalized(
+            &self.positive_identity_product,
+            &corrections,
+        ))
     }
 }
 
