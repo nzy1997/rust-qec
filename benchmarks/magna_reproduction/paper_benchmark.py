@@ -415,10 +415,10 @@ def main(argv=None):
                      help="protected Native Python executable; required for pilot manifests")
     run.add_argument("--rust-example", type=Path, required=True)
     run.add_argument("--out", type=Path, required=True)
-    run.add_argument("--jobs", type=int, default=1, help="cultivation precision worker count")
-    run.add_argument("--archive", type=Path, help="hash-pinned paper deposit for the full cultivation campaign")
+    run.add_argument("--jobs", type=int, default=1, help="paper campaign precision worker count")
+    run.add_argument("--archive", type=Path, help="hash-pinned paper deposit for archive-backed campaigns")
     run.add_argument("--resume", action="store_true",
-                     help="validate and reuse existing BH or cultivation batches")
+                     help="validate and reuse existing paper campaign batches")
     check = sub.add_parser("check")
     check.add_argument("--manifest", type=Path, required=True)
     check.add_argument("--results", type=Path, required=True)
@@ -447,10 +447,14 @@ def main(argv=None):
                     import cultivation_peers
                     matched = cultivation_peers.check(args.results / "matched-peers")
                     result["matched_timing_batches"] = matched["executed_batches"]
+        elif manifest.get("schema") == "rmagna.paper-code-switch-plan.v1":
+            import code_switching_benchmark
+            result = (code_switching_benchmark.capture(args, manifest, run_process) if args.command == "run"
+                      else code_switching_benchmark.check_capture(manifest, args.results))
         else:
             if args.command == "run":
                 require(args.python is not None, "pilot run requires --python with the protected Native environment")
-                require(not args.resume, "--resume requires a BH or cultivation campaign")
+                require(not args.resume, "--resume requires a resumable paper campaign")
             result = capture(args, manifest) if args.command == "run" else check_capture(manifest, args.results, require_query_work=args.require_query_work)
         print(json.dumps(result, sort_keys=True))
         return 0

@@ -4199,3 +4199,41 @@ conjugates unsupported inverted measurements by a noiseless anticommuting Pauli
 on each side. This preserves the projected qubit and the sign of the report
 seen by feedback and detector scoring. A retry can retain the failed raw attempt
 and reuse completed counterpart timings with `--reuse` and `--retry-failed`.
+
+### B05 code-switching precision and timing
+
+Build the release example once and reuse the protected decoder environment.
+
+```sh
+cargo build --locked --release -p rmagna --example paper_decoder_run
+python3 benchmarks/magna_reproduction/paper_benchmark.py run \
+  --manifest benchmarks/magna_reproduction/paper/code-switching.json \
+  --upstream "$MAGNA_UPSTREAM" --python "$MAGNA_PYTHON" \
+  --rust-example "$MAGNA_DECODER_RUNNER" --archive "$MAGNA_PAPER_DEPOSIT" \
+  --out "$MAGNA_CODE_SWITCH_RESULTS" --jobs 8
+python3 benchmarks/magna_reproduction/paper_benchmark.py check \
+  --manifest benchmarks/magna_reproduction/paper/code-switching.json \
+  --results "$MAGNA_CODE_SWITCH_RESULTS"
+```
+
+The full schedule uses 21,757,952 precision draws across DK, WG-S and WG-T. The
+pilot manifest exercises every rate and each timing configuration with shorter
+precision batches. DK executes the pinned Steane CSS recovery and records the
+observed six-bit syndromes and the responses to them. The verifier checks the
+responses from the stabilizer check supports. The two WG inputs retain their
+eight ideal terminal readouts. Those readouts have zero probability under both
+noise laws.
+
+Each batch stores exact joint acceptance and error masses by physical fault
+count. The verifier combines the original histograms, applies the exact
+likelihood, and recomputes the paired conditional error variance. An estimate
+with zero observed errors retains unresolved precision. The six Table I timing
+trials run serially and have one excluded warmup each. Rust sampling time includes
+fault generation and probability evaluation. Subtract the observed decoder time
+within each run before taking the median. The historical outer trial clock,
+input hashes and seed schedule remain available alongside the Rust measurements.
+
+The result directory retains each completed range and any failed worker output.
+The same command with `--resume` reuses verified ranges on the same producer,
+source and worker policy. Retain the release binary while the shared build
+directory is reused for another workload.

@@ -337,6 +337,8 @@ fn run(mut args: impl Iterator<Item = String>) -> Result<Value, Box<dyn Error>> 
         "configuration":config,"completed":completed,"original_sites":sites.len(),"excluded_ideal_sites":ideal_sites,
         "histogram":histogram,"output_contract":"unit_noise_history_normalized_masses_with_external_occurrence_ratio",
         "rng_protocol":addressed_rng::PROTOCOL,"execution_route":evaluator.execution_route(),
+        "excluded_warmup":{"draws":1,"index":u32::MAX},
+        "build":{"debug_assertions":cfg!(debug_assertions),"os":std::env::consts::OS,"architecture":std::env::consts::ARCH},
         "decoder":process.as_ref().map(ControllerProcess::manifest),"decoder_histogram":decoder_histogram,
         "decoder_transcript_sha256":(expected_calls != 0).then(|| format!("{:x}",decoder_transcript_digest.finalize())),
         "timings":{"outer_seconds":outer_seconds,"preparation_seconds":prepare_seconds,"compile_seconds":compile_seconds,

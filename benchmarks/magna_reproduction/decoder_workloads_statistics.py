@@ -7,22 +7,19 @@ from cultivation_statistics import ZERO, add, as_float, divide, multiply, occurr
 from remaining_contracts import require
 
 
-def code_switch_estimators(payload):
+def code_switch_histogram(payload):
     require(payload['schema'] == 'rmagna.paper-code-switch-run.v1'
             and payload['status'] == 'complete' and payload['failure'] is None,
             'code-switching draw range did not complete')
     config = payload['configuration']
     count, sites = payload['completed'], payload['original_sites']
-    p, q = (Fraction(config[key]) for key in ('physical_rate', 'proposal_rate'))
     require(type(count) is int and 2 <= count == config['shots']
-            and type(sites) is int and sites > 0 and 0 < p < 1 and 0 < q < 1,
-            'invalid code-switching rate, draw count, or site count')
+            and type(sites) is int and sites > 0, 'invalid code-switching draw or site count')
     rows = payload['histogram']
     require(isinstance(rows, list) and len(rows) <= config['max_histogram_entries'],
             'code-switching histogram exceeds declared bound')
-    totals = {}
-    observations = set()
-    draws, positive = 0, 0
+    observations = {}
+    draws = 0
     for row in rows:
         require(isinstance(row, dict) and row.keys() == {'occurrences', 'acceptance', 'error', 'count'},
                 'invalid code-switching histogram fields')
@@ -35,8 +32,24 @@ def code_switch_estimators(payload):
                 'code-switching mass violates 0 <= E <= A')
         observation = occurrences, acceptance, error
         require(observation not in observations, 'duplicate code-switching histogram bin')
-        observations.add(observation)
+        observations[observation] = multiplicity
         draws += multiplicity
+    require(draws == count, 'code-switching histogram does not cover completed draws')
+    return observations
+
+
+def code_switch_estimators(payload):
+    config = payload['configuration']
+    p, q = (Fraction(config[key]) for key in ('physical_rate', 'proposal_rate'))
+    return code_switch_moments(code_switch_histogram(payload), p, q, payload['original_sites'])
+
+
+def code_switch_moments(observations, p, q, sites):
+    count = sum(observations.values())
+    require(count >= 2 and 0 < p < 1 and 0 < q < 1, 'invalid code-switching rates or total draw count')
+    totals = {}
+    positive = 0
+    for (occurrences, acceptance, error), multiplicity in observations.items():
         positive += multiplicity if error != ZERO else 0
         # Bin by occurrence before introducing the potentially large exact P/Q.
         values = (acceptance, error, multiply(acceptance, acceptance),
@@ -44,7 +57,6 @@ def code_switch_estimators(payload):
         group = totals.setdefault(occurrences, [ZERO] * len(values))
         for index, value in enumerate(values):
             group[index] = add(group[index], scale(value, multiplicity))
-    require(draws == count, 'code-switching histogram does not cover completed draws')
     weighted = [ZERO] * 5
     for occurrences, group in totals.items():
         likelihood = occurrence_ratio(p, q, sites, occurrences)
