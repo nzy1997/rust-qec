@@ -3,6 +3,7 @@
 from copy import deepcopy
 import hashlib
 from pathlib import Path
+import subprocess
 from tempfile import TemporaryDirectory
 import unittest
 from unittest.mock import patch
@@ -65,6 +66,14 @@ class PaperEvidenceTests(unittest.TestCase):
         receipt.symlink_to("../cultivation/receipt.json")
         with self.assertRaisesRegex(ValueError, "special file in evidence inventory"):
             evidence.verify_inventory(self.raw, self.index)
+
+    def test_missing_git_source_cannot_trigger_fetch(self):
+        failure = subprocess.CompletedProcess([], 128, b"", b"missing tree object")
+        with patch.object(evidence.subprocess, "run", return_value=failure) as run:
+            with self.assertRaisesRegex(ValueError, "local Git source unavailable .*missing tree object"):
+                evidence.git(self.root, "archive", "missing")
+        self.assertEqual(run.call_args.kwargs["env"]["GIT_NO_LAZY_FETCH"], "1")
+        self.assertEqual(run.call_args.kwargs["env"]["GIT_ALLOW_PROTOCOL"], "")
 
     def test_failed_recomputation_leaves_the_raw_bundle_retryable(self):
         self.sealed.rename(self.root/"previous-seal")

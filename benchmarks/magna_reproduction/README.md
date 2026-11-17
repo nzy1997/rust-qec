@@ -4282,7 +4282,10 @@ python3 -B benchmarks/magna_reproduction/paper_evidence_plot.py \
 
 The checker extracts a temporary source snapshot from local Git and recomputes
 each campaign with its original offline verifier. It needs the standard
-library, Python 3.12 or later with tar extraction filters, and Git. Plotting is
+library, Python 3.12 or later with tar extraction filters, and Git with all
+three pinned source snapshots available locally. A shallow or partial clone
+must already have those commits, trees, and blobs. Verification disables Git
+transports and Python site packages. Plotting is
 a separate step using Matplotlib. The regenerated CSV files carry the measured
 curves, uncertainties, timing rows and cultivation representation counts.
 The code-switching plot labels the deposited Daguerre–Kim tomography fit

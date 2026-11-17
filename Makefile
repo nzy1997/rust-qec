@@ -90,7 +90,7 @@ publication-evidence-check:
 	@cmp /tmp/rstim-publication-evidence-readiness.json benchmarks/publication_evidence/readiness.json
 
 magna-paper-evidence-check:
-	@python3 -B benchmarks/magna_reproduction/paper_evidence.py \
+	@python3 -E -S -B benchmarks/magna_reproduction/paper_evidence.py \
 		--results "$${MAGNA_PAPER_EVIDENCE_ROOT:?set MAGNA_PAPER_EVIDENCE_ROOT to the sealed evidence directory}"
 
 build-shot-viewer:

@@ -96,8 +96,11 @@ def validate_manifest(plan, *, finalized=True):
 
 
 def git(repo, *args):
-    return subprocess.run(["git", "--no-replace-objects", *args], cwd=repo,
-                          check=True, capture_output=True).stdout
+    env = dict(os.environ, GIT_NO_LAZY_FETCH="1", GIT_ALLOW_PROTOCOL="")
+    result = subprocess.run(["git", "--no-replace-objects", *args], cwd=repo, env=env, capture_output=True)
+    require(result.returncode == 0,
+            f"local Git source unavailable ({args[0]}): {result.stderr.decode(errors='replace').strip()}")
+    return result.stdout
 
 
 def check_campaign(repo, name, pin, path):
@@ -118,7 +121,7 @@ def check_campaign(repo, name, pin, path):
         manifest = reference.relative_file(here, "paper/"+CAMPAIGNS[name])
         require(file_record(manifest)["sha256"] == pin["plan_sha256"], f"evidence plan bytes changed for {name}")
         worker = subprocess.run(
-            [sys.executable, "-I", "-B", str(HERE/"paper_evidence_snapshot.py"), str(here), name,
+            [sys.executable, "-I", "-S", "-B", str(HERE/"paper_evidence_snapshot.py"), str(here), name,
              str(manifest), str(path)], cwd=snapshot, capture_output=True, text=True, timeout=1800)
         require(worker.returncode == 0, f"{name} offline verification failed: {worker.stderr.strip()}")
     return json.loads(worker.stdout)
