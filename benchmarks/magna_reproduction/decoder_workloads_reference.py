@@ -12,6 +12,7 @@ import zipfile
 
 import reference
 from remaining_contracts import require
+from logical_distillation_statistics import P0, NONIDENTITY, RATES, ResidualWeights
 
 
 CODE_SWITCHING = {
@@ -30,6 +31,8 @@ TIMING = {
 }
 BORN_SEED_OFFSET = 100_000
 TIMING_SEED = 2026100800
+LOGICAL_PRECISION_KERNEL = 'ddf7b470ff2874c573ba6e82db7edee2233f58fd'
+LOGICAL_SCOPES = {'encoded-input': 2026100631, 'serial-matched': 2026100801}
 TERMINAL_KERNEL = '47a2213f443ccee840442a88164697f6c5f31c40'
 TQD_SCALES = ((3, 5), (4, 6), (5, 8))
 TQD_RATES = ('.003', '.005', '.01', '.015', '.02')
@@ -198,6 +201,88 @@ def terminal_curves(read, paper_kernel):
                 scope='deposited_summaries_and_draw_references', points=points)
 
 
+def logical_distillation(read, paper_kernel):
+    model = ResidualWeights()
+    captures = {}
+    for scope, seed in LOGICAL_SCOPES.items():
+        folder = f'raw/logical-distillation/{scope}'
+        metadata = read(f'{folder}/metadata.json')
+        result = read(f'{folder}/result.json')
+        kernel = LOGICAL_PRECISION_KERNEL if scope == 'encoded-input' else paper_kernel
+        args = metadata['arguments']
+        require(metadata['commit'] == kernel and result['status'] == 'complete'
+                and result['shots'] == args['shots'] == 16384 and args['seed'] == seed
+                and tuple(map(Fraction, args['rates'])) == RATES
+                and Fraction(args['proposal_rate']) == P0 and Fraction(str(args['logical_proposal_rate'])) == NONIDENTITY,
+                'deposited logical distillation run design differs: ' + scope)
+        circuit = metadata['circuit']
+        require(circuit['architecture'] == args['architecture'] == 'compact'
+                and circuit['minimal_syndromes'] is args['minimal_syndromes'] is True
+                and circuit['physical_qubits'] == 102 and circuit['measurement_records'] == 451
+                and circuit['control_bits'] == 334 and circuit['magic_inputs'] == 15
+                and circuit['ideal_input_recovery_rounds'] == 15 and circuit['encoded_input_error'] == str(P0)
+                and result['resources']['num_qubits'] == 102 and result['resources']['num_records'] == 451,
+                'deposited logical distillation physical layout differs')
+        proposal = metadata['proposal']
+        require(tuple(map(tuple, metadata['pauli_weight_counts'])) == model.counts
+                and proposal['class_order'] == 'IXZY' and proposal['full_support'] is True
+                and proposal['manual_physical_faults'] is True and len(proposal['probabilities']) == 4,
+                'deposited logical distillation proposal differs')
+        masses = model.classes(P0)
+        probabilities = [1 - NONIDENTITY, *(NONIDENTITY * mass / (1 - masses[0]) for mass in masses[1:])]
+        for value, expected in zip(proposal['probabilities'], probabilities, strict=True):
+            matches(value, float(expected), 'logical residual proposal')
+        require(metadata['acceptance_estimator']
+                == '1 - mean(physical_likelihood_ratio * (history_weight - acceptance_contribution))'
+                and result['history_sampler'] == 'affine_support',
+                'deposited logical distillation estimator differs')
+        covariance = result['conditional_error_covariance']
+        require(len(covariance) == 3 and all(len(row) == 3 for row in covariance),
+                'invalid deposited cross-rate covariance shape')
+        for i,row in enumerate(covariance):
+            for j,value in enumerate(row):
+                require(number(value, 'logical covariance') == covariance[j][i],
+                        'deposited logical covariance is not symmetric')
+        points = []
+        for i, (rate, measured, prediction) in enumerate(zip(
+                RATES, result['rows'], metadata['exact_predictions'], strict=True)):
+            q_eff = model.q_eff(rate)
+            require(Fraction(measured['p']) == Fraction(prediction['physical_rate']) == rate
+                    and measured['exact'] == prediction and Fraction(prediction['effective_q_exact']) == q_eff,
+                    'deposited logical distillation exact prediction differs')
+            exact = {name: Fraction(value) for name, value in prediction['exact'].items()}
+            require(exact['conditional_error'] == exact['accepted_error']/exact['acceptance'],
+                    'invalid exact logical distillation ratio')
+            condition = number(measured['standard_error'], 'logical conditional uncertainty')
+            require(condition >= 0 and math.isclose(condition**2, covariance[i][i], rel_tol=2e-12),
+                    'deposited logical conditional uncertainty differs from covariance')
+            points.append(dict(p=str(rate), q_eff=str(q_eff), exact=prediction['exact'],
+                               acceptance=measured['acceptance'], acceptance_se=measured['acceptance_standard_error'],
+                               conditional_error=measured['conditional_error'], conditional_error_se=condition))
+        expected_checks = [(list(range(count)), 1536, 2*count, float(count in (0,3)), float(count == 3))
+                           for count in range(4)]
+        checks = [(row['resource_indices'], row['pattern'], row['physical_fault_weight'], row['acceptance'], row['error'])
+                  for row in result['prescribed_fault_checks']]
+        require(checks == expected_checks, 'deposited logical distillation prescribed control differs')
+        samples = number(result['sampling_seconds'], 'logical sampling seconds')
+        seconds = number(result['worker_seconds'], 'logical worker seconds')
+        require(0 < samples <= seconds, 'invalid deposited logical clock')
+        decoder = None
+        if scope == 'serial-matched':
+            decoder = number(result['decoder_seconds'], 'logical decoder seconds')
+            require(0 < decoder < samples, 'invalid deposited logical decoder clock')
+        captures[scope] = dict(kernel=kernel, native_sha256=metadata['binary_sha256'], inputs=metadata['inputs'],
+                               seed=seed, draws=args['shots'], points=points, conditional_error_covariance=covariance,
+                               minimum_error_fault_weight=result['minimum_error_fault_weight'],
+                               positive_error_draws=result['nonzero_error_draws'], clocks=metadata['clocks'],
+                               sampling_seconds=samples, worker_seconds=seconds, decoder_seconds=decoder,
+                               sampling_seconds_per_attempt=samples/args['shots'],
+                               decoder_subtracted_seconds_per_attempt=(samples-decoder)/args['shots'] if decoder is not None else None)
+    require(captures['encoded-input']['inputs'] == captures['serial-matched']['inputs'],
+            'deposited logical timing uses different physical inputs')
+    return captures
+
+
 def inspect(archive_path, pinned=None):
     """Return historical statistics from the pinned archive, without running Rust draws."""
     pinned = reference.load_manifest() if pinned is None else pinned
@@ -205,20 +290,25 @@ def inspect(archive_path, pinned=None):
     require(reference.digest(archive_path) == paper['archive_sha256'], 'decoder workload archive changed')
     used = {}
     with zipfile.ZipFile(archive_path) as archive:
-        def read(name):
+        def read_bytes(name):
             data = archive.read('magna-data-deposit/' + name)
             digest = hashlib.sha256(data).hexdigest()
             require(digest == paper['files'].get(name), 'deposited decoder workload member changed: ' + name)
             used[name] = digest
-            return json.loads(data)
+            return data
+
+        def read(name):
+            return json.loads(read_bytes(name))
 
         curves = {family: precision(read, family, design) for family, design in CODE_SWITCHING.items()}
         timings = {family: timing(read, family, design) for family, design in TIMING.items()}
         terminal = terminal_curves(read, paper['kernel_commit'])
+        logical = logical_distillation(read, paper['kernel_commit'])
+        read_bytes('raw/logical-distillation/serial-matched/draws.npz')
     return dict(schema='rmagna.paper-decoder-workloads-historical.v1',
                 archive_sha256=paper['archive_sha256'], paper=paper['arxiv'],
                 scope='historical_archive_only', raw_sha256=used, curves=curves, timings=timings,
-                tqd_terminal=terminal)
+                tqd_terminal=terminal, logical_distillation=logical)
 
 
 def main():

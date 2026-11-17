@@ -1,6 +1,8 @@
 //! Bounded, addressed code-switching draws for the paper evidence capture.
 #[path = "support/cultivation_rng.rs"]
 mod addressed_rng;
+#[path = "support/decoder_worker.rs"]
+mod decoder_worker;
 
 use num_rational::BigRational;
 use num_traits::{One, Zero};
@@ -13,7 +15,7 @@ use rmagna::noise::{
 };
 use rmagna::phase::NativePhaseOptions;
 use rmagna::probability::Probability;
-use rmagna::runtime::process::{ControllerProcess, ProcessOptions};
+use rmagna::runtime::process::ControllerProcess;
 use rmagna::runtime::{ControllerRegistry, HistorySampler};
 use rmagna::task::{EvaluationOptions, TaskEvaluator, TaskOptions, parse_task};
 use rmagna::unitary::CompilerStrategy;
@@ -23,7 +25,6 @@ use sha2::{Digest, Sha256};
 use std::collections::{BTreeMap, HashMap};
 use std::error::Error;
 use std::path::{Path, PathBuf};
-use std::process::Command;
 use std::time::Instant;
 
 #[derive(Deserialize, Serialize)]
@@ -49,28 +50,6 @@ struct Contribution {
 
 fn digest(bytes: &[u8]) -> String {
     format!("{:x}", Sha256::digest(bytes))
-}
-
-fn worker(path: &Path, python: &str) -> Result<ControllerProcess, Box<dyn Error>> {
-    let root = path
-        .parent()
-        .ok_or("controller file is missing a module root")?;
-    let mut command = Command::new(python);
-    command.args([
-        "-I",
-        "-B",
-        "-u",
-        concat!(env!("CARGO_MANIFEST_DIR"), "/python/decoder_worker.py"),
-    ]);
-    command
-        .arg("--controllers")
-        .arg(path)
-        .arg("--module-root")
-        .arg(root);
-    Ok(ControllerProcess::spawn(
-        command,
-        ProcessOptions::default(),
-    )?)
 }
 
 fn run(mut args: impl Iterator<Item = String>) -> Result<Value, Box<dyn Error>> {
@@ -113,7 +92,7 @@ fn run(mut args: impl Iterator<Item = String>) -> Result<Value, Box<dyn Error>> 
     let process = if expected_calls != 0 {
         let path = PathBuf::from(args.next().ok_or("missing DK controller manifest")?);
         let python = args.next().ok_or("missing DK Python command")?;
-        let process = worker(&path, &python)?;
+        let process = decoder_worker::worker(&path, &python)?;
         process.register_all(&mut registry)?;
         controller_sha256 = Some(digest(&std::fs::read(path)?));
         Some(process)

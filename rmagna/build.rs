@@ -42,11 +42,13 @@ fn main() {
         "rmagna/examples/paper_bh_run.rs",
         "rmagna/examples/paper_cultivation_run.rs",
         "rmagna/examples/paper_decoder_run.rs",
+        "rmagna/examples/paper_logical_distillation_run.rs",
         "rmagna/examples/support",
         "benchmarks/magna_reproduction/paper_query_work.py",
         "rmagna/tests/support/paper_proposal_probe.rs",
         "rmagna/tests/data/paper-proposal-runtime.json",
         "benchmarks/magna_reproduction/paper_proposals.py",
+        "benchmarks/magna_reproduction/paper/logical-residuals.json",
         "benchmarks/magna_reproduction/paper_proposal_draws.py",
         "benchmarks/magna_reproduction/paper_proposal_runtime_vectors.py",
     ];
