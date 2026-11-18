@@ -48,7 +48,7 @@ def precision_figure(plt, rows, family_name, out, preview):
     from matplotlib.ticker import NullLocator
 
     title, metrics = FIGURES[family_name]
-    fig, axes = plt.subplots(len(metrics)//2, 2, squeeze=False, figsize=(10, 4.2*(len(metrics)//2)),
+    fig, axes = plt.subplots(len(metrics)//2, 2, squeeze=False, figsize=(10, 5.2*(len(metrics)//2)),
                             layout="constrained")
     colors = plt.get_cmap("tab10")
     families = {family: colors(i) for i, family in enumerate(sorted({point["family"] for point in rows}))}
@@ -89,7 +89,7 @@ def precision_figure(plt, rows, family_name, out, preview):
             axis.axhline(0, color="0.65", linewidth=0.8)
         axis.grid(axis="y", which="major", alpha=0.25)
         if displayed:
-            axis.legend(fontsize=7, ncols=2, loc="best")
+            axis.legend(fontsize=7, ncols=2, loc="lower center", bbox_to_anchor=(0.5, 1.02))
     fig.suptitle(title + preview + "\nError bars show one standard error. Open triangles mark unresolved points.", fontsize=11)
     fig.savefig(out/f"{family_name}.png", dpi=180)
     plt.close(fig)
