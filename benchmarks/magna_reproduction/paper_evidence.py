@@ -114,7 +114,7 @@ def check_campaign(repo, name, pin, path):
     scope = [part for part in SOURCE_SCOPE if part in tracked or any(x.startswith(part+"/") for x in tracked)]
     archive = git(repo, "archive", "--format=tar", commit, *scope)
     with TemporaryDirectory(prefix="magna-paper-source-") as temporary:
-        snapshot = Path(temporary)
+        snapshot = Path(temporary).resolve()
         with tarfile.open(fileobj=io.BytesIO(archive), mode="r:") as source:
             source.extractall(snapshot, filter="data")
         here = snapshot/"benchmarks/magna_reproduction"

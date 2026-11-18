@@ -1,0 +1,27 @@
+{
+  "ablation_source_sha256": "207002e9fc15b485004722e36e67a848a4b5a07f292b8df50ad87ef7c08e7732",
+  "archive_sha256": "73de3979469d3cd39975ac5976303a71bd921eca7a29bd7de6119f7acc84b3f6",
+  "captures": {
+    "bh": {
+      "commit": "01b7e918aae7c522d7db87022722a88d06337ac4",
+      "plan_sha256": "359161c32f872866de7a56ec1e0a8f4209da24522e5cb1e068bb54b0341d1dbd",
+      "tree": "6087d09c988e9df23bc5d3813e6142ade719364b"
+    },
+    "cultivation": {
+      "commit": "0dfba3f3c502898de78b5602b6fbb0630263a76b",
+      "plan_sha256": "c783bb89c53e6a7cea68b28d748a0018450e39b0551491a7b45e03ff8438633f",
+      "tree": "36c1f2cf3c98655613d17783e4f4543f0d6e8e0c"
+    },
+    "decoder-workloads": {
+      "commit": "284e2a11c9a4c729fd1b5223779469495dca3c37",
+      "plan_sha256": "716e573209911d5c6cda67775d731201640f74bf915b3f913f8b4247c0a7920a",
+      "tree": "533ade07ec2422ac8903c535289b549edc974ca7"
+    }
+  },
+  "historical_kernel": "853fa2369817e1be65a710b42ff80606e219e464",
+  "index_sha256": "8ef3b3e0b5cb3d85cb9a3cfa23f77b0eaf887ada25fd4d48ff7a00ea49ed5d47",
+  "paper": "2610.22315v1",
+  "reference_sha256": "c49203a586f5a451e3183b435793df693dd486857356aed8826df5dc723e5454",
+  "schema": "rmagna.paper-evidence.v1",
+  "upstream_commit": "56847478c840395735146ef1e1ccdc3d8aedc10f"
+}

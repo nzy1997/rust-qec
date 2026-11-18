@@ -4266,6 +4266,10 @@ reports. Resuming a run requires the current producer and runner identities.
 
 ### B06 offline paper evidence
 
+The [paper evidence release](https://github.com/nzy1997/rust-qec/releases/tag/magna-paper-2610.22315-v1)
+provides the compressed bundle and its SHA-256 checksum. Extract the bundle
+and set `MAGNA_EVIDENCE_BUNDLE` to its root directory.
+
 The paper bundle uses the v1 archive, reviewed source revisions and retained
 independent raw captures. Its `raw/` directory holds the BH, cultivation,
 decoder-workload and provenance trees. Each raw file is bound by size and

@@ -1,9 +1,12 @@
 """Admission, corruption and timing checks for the offline paper bundle."""
 
+from contextlib import nullcontext
 from copy import deepcopy
 import hashlib
+import io
 from pathlib import Path
 import subprocess
+import tarfile
 from tempfile import TemporaryDirectory
 import unittest
 from unittest.mock import patch
@@ -74,6 +77,27 @@ class PaperEvidenceTests(unittest.TestCase):
                 evidence.git(self.root, "archive", "missing")
         self.assertEqual(run.call_args.kwargs["env"]["GIT_NO_LAZY_FETCH"], "1")
         self.assertEqual(run.call_args.kwargs["env"]["GIT_ALLOW_PROTOCOL"], "")
+
+    def test_campaign_snapshot_resolves_the_system_temporary_alias(self):
+        snapshot = self.root/"snapshot"
+        snapshot.mkdir()
+        alias = self.root/"snapshot-alias"
+        alias.symlink_to(snapshot.resolve(), target_is_directory=True)
+        manifest_name = "benchmarks/magna_reproduction/paper/bh.json"
+        manifest = b"{}"
+        archived = io.BytesIO()
+        with tarfile.open(fileobj=archived, mode="w") as archive:
+            entry = tarfile.TarInfo(manifest_name)
+            entry.size = len(manifest)
+            archive.addfile(entry, io.BytesIO(manifest))
+        pin = dict(commit="1"*40, tree="2"*40, plan_sha256=hashlib.sha256(manifest).hexdigest())
+        git_outputs = [pin["commit"].encode(), pin["tree"].encode(), (manifest_name+"\0").encode(), archived.getvalue()]
+        recomputed = subprocess.CompletedProcess([], 0, '{"status":"PASS"}', "")
+        with (patch.object(evidence, "git", side_effect=git_outputs),
+              patch.object(evidence, "TemporaryDirectory", return_value=nullcontext(str(alias))),
+              patch.object(evidence.subprocess, "run", return_value=recomputed) as run):
+            self.assertEqual(evidence.check_campaign(self.root, "bh", pin, self.raw/"bh"), {"status":"PASS"})
+        self.assertEqual(run.call_args.kwargs["cwd"], snapshot.resolve())
 
     def test_failed_recomputation_leaves_the_raw_bundle_retryable(self):
         self.sealed.rename(self.root/"previous-seal")
