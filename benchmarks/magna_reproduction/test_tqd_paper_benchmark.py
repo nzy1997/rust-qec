@@ -71,6 +71,22 @@ class TqdPaperBenchmarkTests(unittest.TestCase):
         self.assertEqual(first, [193, 357, 451, 556, 632, 640])
         self.assertEqual(second, [472, 526, 695])
 
+    def test_author_replay_ignores_ambient_python_import_settings(self):
+        with TemporaryDirectory() as scratch:
+            root = Path(scratch).resolve()
+            (root/'config').mkdir()
+            stage = dict(payload=dict(rows=[]))
+
+            def run_process(argv, timeout, directory):
+                self.assertEqual(argv[:5], ['python3','-E','-s','-B',str(HERE/'tqd_author_approximation.py')])
+                self.assertEqual(read_json(Path(argv[-1])), stage['payload'])
+                self.assertEqual((timeout,directory),(1800,root/'config'))
+                return dict(status='complete')
+
+            case = dict(kind='precision',timeout_seconds=1800)
+            benchmark.author_stage(stage,case,root,'python3',run_process)
+            self.assertEqual(stage['author']['status'],'complete')
+
     def test_combined_checker_requires_the_tqd_results_and_full_plan(self):
         plan = read_json(HERE/'paper/decoder_workloads.json')
         with TemporaryDirectory() as scratch:

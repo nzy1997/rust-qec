@@ -48,11 +48,11 @@ class Campaign:
     derived_inputs: Callable | None = None
     after_worker: Callable | None = None
 
-    def verify_identity(self, plan, out, receipt):
+    def verify_identity(self, plan, out, receipt, *, archived=False):
         require(receipt['schema'] == self.schema and receipt['manifest_sha256'] == digest_json(plan)
-                and receipt['runner_sha256'] == self.runner_identity()
-                and receipt['rust_source_sha256'] == source_identity(ROOT)
-                and receipt['rust_source_inputs'] == source_inputs(ROOT)
+                and (archived or (receipt['runner_sha256'] == self.runner_identity()
+                                  and receipt['rust_source_sha256'] == source_identity(ROOT)
+                                  and receipt['rust_source_inputs'] == source_inputs(ROOT)))
                 and sha(receipt['rust_binary_sha256']) and sha(receipt['python_environment']['sha256'])
                 and isinstance(receipt['python_environment']['launcher'], str),
                 f'{self.label} capture identity changed')
@@ -210,8 +210,12 @@ def capture(campaign, args, plan, run_process):
 
 def check_capture(campaign, plan, out):
     out = out.resolve(strict=True)
-    receipt = read_json(reference.relative_file(out, 'receipt.json'))
-    campaign.verify_identity(plan, out, receipt)
+    receipt_path = reference.relative_file(out, 'receipt.json')
+    receipt = read_json(receipt_path)
+    retained = read_json(HERE/'paper/decoder-workload-capture-v1.json')
+    archived = (retained['receipts'].get(campaign.schema) == reference.digest(receipt_path)
+                and retained['rust_source_sha256'] == receipt['rust_source_sha256'])
+    campaign.verify_identity(plan, out, receipt, archived=archived)
     actual = campaign.results_from_batches(plan, out, receipt)
     report = reference.relative_file(out, 'report.json')
     require(receipt['status'] == 'recorded' and receipt['report_sha256'] == reference.digest(report)

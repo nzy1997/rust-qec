@@ -4258,3 +4258,7 @@ The result directory retains each completed range and any failed worker output.
 The same command with `--resume` reuses verified ranges on the same producer,
 source and worker policy. Retain the release binary while the shared build
 directory is reused for another workload.
+The TQD author subprocess ignores Python environment variables and the user
+site. The offline checker admits the three original complete OMEN receipts
+by their exact SHA-256 values and rechecks their inputs, raw batches, and
+reports. Resuming a run requires the current producer and runner identities.

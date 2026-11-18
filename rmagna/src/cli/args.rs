@@ -63,6 +63,7 @@ Native selection limits (require native or native_injection in a query family):
   --native-max-quotient-rank N         Signature rank cap (default 8)
   --native-max-core-table-bytes N      Logical core table cap (default 67108864)
   --native-max-signature-work N        Signature scan work cap (default 67108864)
+  --native-signature-scan MODE         full|odd_axis_pivots; default full
   --native-max-transform-work N        Walsh work cap (default 67108864)
   --native-max-construction-terms N    Temporary certificate cap (default 1048576)
   --native-max-construction-entries N  Temporary entry cap (default 1024)

@@ -115,7 +115,7 @@ def author_stage(stage,case,out,python,run_process):
     with TemporaryDirectory(dir=out/'config') as directory:
         physical=Path(directory)/'physical.json'
         atomic(physical,stage['payload'])
-        argv=[python,HERE/'tqd_author_approximation.py','--upstream',out/'inputs',
+        argv=[python,'-E','-s','-B',HERE/'tqd_author_approximation.py','--upstream',out/'inputs',
               '--fault-map',out/'inputs'/MAP_NAME,'--physical-result',physical]
         stage['author']=run_process(list(map(str,argv)),case['timeout_seconds'],out/'config')
     require(stage['author']['status'] == 'complete','TQD author approximation failed; raw results retained')

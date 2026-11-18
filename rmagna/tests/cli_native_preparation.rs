@@ -5,6 +5,19 @@ use std::{
     sync::atomic::{AtomicUsize, Ordering},
 };
 struct Files(PathBuf);
+
+#[test]
+fn native_signature_scan_appears_in_help() {
+    let output = Command::new(env!("CARGO_BIN_EXE_rmagna"))
+        .arg("--help")
+        .output()
+        .unwrap();
+    assert!(output.status.success());
+    let help = String::from_utf8(output.stdout).unwrap();
+    assert!(help.contains("--native-signature-scan MODE"));
+    assert!(help.contains("full|odd_axis_pivots; default full"));
+}
+
 impl Files {
     fn new() -> Self {
         static NEXT: AtomicUsize = AtomicUsize::new(0);
