@@ -42,6 +42,7 @@ def add_arguments(parser):
     for family in FAMILIES:
         parser.add_argument("--" + family + "-preparation", choices=MODES)
     parser.add_argument("--native-transport", choices=("off", "prepared"))
+    parser.add_argument("--native-signature-scan", choices=("full", "odd_axis_pivots"))
     for flag, _, _, _ in LIMITS:
         parser.add_argument("--" + flag, type=int)
 
@@ -49,6 +50,8 @@ def add_arguments(parser):
 def validate(args, parser):
     modes = [mode(args, family) for family in FAMILIES]
     enabled = any(value in ("native", "native_injection") for value in modes)
+    if getattr(args, "native_signature_scan", None) is not None and not enabled:
+        parser.error("--native-signature-scan requires native or native_injection preparation")
     if getattr(args, "native_transport", None) is not None and not enabled:
         parser.error("--native-transport requires native or native_injection preparation")
     for flag, _, _, wide in LIMITS:
@@ -71,6 +74,9 @@ def command(args):
     transport = getattr(args, "native_transport", None)
     if transport is not None:
         result += ["--native-transport", transport]
+    scan = getattr(args, "native_signature_scan", None)
+    if scan is not None:
+        result += ["--native-signature-scan", scan]
     for flag, _, _, _ in LIMITS:
         value = getattr(args, flag.replace("-", "_"), None)
         if value is not None:
@@ -82,6 +88,9 @@ def policy(args, selected):
     result = {"mode": selected, "selection": {"construction": {"max_json_bytes": 16 << 20}, "preparation": {"core": {}}},
               "injection": {} if selected == "native_injection" else None,
               "transport": {"mode": getattr(args, "native_transport", None) or "off"}}
+    scan = getattr(args, "native_signature_scan", None)
+    if scan == "odd_axis_pivots":
+        result["selection"]["signature_scan"] = scan
     for flag, path, default, wide in LIMITS:
         if path.startswith("injection.") and result["injection"] is None:
             continue

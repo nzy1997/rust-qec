@@ -1,0 +1,22 @@
+{
+  "schema": "rmagna.paper-decoder-workloads-plan.v1",
+  "paper": "2610.22315v1",
+  "reference_sha256": "c49203a586f5a451e3183b435793df693dd486857356aed8826df5dc723e5454",
+  "archive_sha256": "73de3979469d3cd39975ac5976303a71bd921eca7a29bd7de6119f7acc84b3f6",
+  "upstream_commit": "56847478c840395735146ef1e1ccdc3d8aedc10f",
+  "historical_kernel": "853fa2369817e1be65a710b42ff80606e219e464",
+  "campaigns": {
+    "logical-distillation": {
+      "scope": "figure5-serial-table1",
+      "plan_sha256": "01503bf5e22a30f7e9d6f1ded1049a9a4a8d763abcaf4b8da082002f80995303"
+    },
+    "code-switching": {
+      "scope": "paper-code-switching",
+      "plan_sha256": "91172cffd0a2c6d5c3948ef806bebe34cc3e99eae6a6b28b96edfa57abbd9a9d"
+    },
+    "tqd": {
+      "scope": "terminal-curve-table1",
+      "plan_sha256": "b42205d647b465582413881f74753eb75790a5862a6095bddf1d30ef0858390a"
+    }
+  }
+}

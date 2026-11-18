@@ -36,6 +36,7 @@ class NativeOptionsTests(unittest.TestCase):
     def test_orphan_and_out_of_range_options_reject_before_reference_or_decoder_imports(self):
         invalid = [["--" + flag, "1"] for flag, _, _, _ in native.LIMITS]
         invalid += [["--native-transport", "off"],
+                    ["--native-signature-scan", "odd_axis_pivots"],
                     ["--probability-preparation", "native", "--injection-max-work", "0"],
                     ["--moment-preparation", "native", "--native-transport-max-terms", "0"],
                     ["--moment-preparation", "native", "--native-max-terms", "-1"],
@@ -55,17 +56,25 @@ class NativeOptionsTests(unittest.TestCase):
     def test_mixed_policy_forwarding_and_wide_limits_are_exact(self):
         args = arguments("--probability-preparation", "native", "--moment-preparation", "native_injection",
                          "--native-transport", "prepared", "--native-max-signature-work", str(2**100),
-                         "--injection-max-work", "0", "--native-transport-max-terms", "0")
+                         "--native-signature-scan", "odd_axis_pivots", "--injection-max-work", "0",
+                         "--native-transport-max-terms", "0")
         parser = argparse.ArgumentParser()
         native.validate(args, parser)
         self.assertEqual(vars(arguments(*native.command(args))), vars(args))
         policies = native.resolved(args)
         self.assertIsNone(policies["probability"]["injection"])
+        self.assertEqual(policies["probability"]["selection"]["signature_scan"], "odd_axis_pivots")
+        self.assertEqual(policies["moment"]["selection"]["signature_scan"], "odd_axis_pivots")
         self.assertEqual(policies["moment"]["injection"]["max_work"], "0")
         self.assertEqual(policies["moment"]["selection"]["max_signature_work"], str(2**100))
         self.assertEqual(policies["moment"]["selection"]["construction"]["max_json_bytes"], 16 << 20)
         self.assertEqual(policies["moment"]["transport"]["max_terms"], 0)
         native.verify(receipt(args), args)
+        regular = arguments("--probability-preparation", "native")
+        explicit = arguments("--probability-preparation", "native", "--native-signature-scan", "full")
+        self.assertEqual(native.resolved(regular), native.resolved(explicit))
+        with self.assertRaises(ValueError):
+            native.verify(receipt(regular), args)
 
     def test_every_configuration_leaf_and_count_rejects_boolean_or_wrong_value(self):
         args = arguments("--probability-preparation", "native_injection", "--native-transport", "prepared",

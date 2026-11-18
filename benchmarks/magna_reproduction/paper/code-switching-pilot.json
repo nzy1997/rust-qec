@@ -1,0 +1,110 @@
+{
+  "archive_sha256": "73de3979469d3cd39975ac5976303a71bd921eca7a29bd7de6119f7acc84b3f6",
+  "chunk_size": 4096,
+  "families": {
+    "dk": {
+      "active_sites": 184,
+      "excluded_ideal_sites": 0,
+      "grid": [
+        {
+          "born_seed": 2026201100,
+          "draws": 8192,
+          "noise_seed": 2026101100,
+          "p": "1/1000",
+          "q": "3/1000"
+        },
+        {
+          "born_seed": 2026201101,
+          "draws": 8192,
+          "noise_seed": 2026101101,
+          "p": "3/1000",
+          "q": "3/1000"
+        },
+        {
+          "born_seed": 2026201102,
+          "draws": 8192,
+          "noise_seed": 2026101102,
+          "p": "1/100",
+          "q": "1/100"
+        }
+      ]
+    },
+    "wg-S": {
+      "active_sites": 730,
+      "excluded_ideal_sites": 8,
+      "grid": [
+        {
+          "born_seed": 2026201200,
+          "draws": 8192,
+          "noise_seed": 2026101200,
+          "p": "1/1000",
+          "q": "3/1000"
+        },
+        {
+          "born_seed": 2026201201,
+          "draws": 8192,
+          "noise_seed": 2026101201,
+          "p": "3/1000",
+          "q": "3/1000"
+        },
+        {
+          "born_seed": 2026201202,
+          "draws": 8192,
+          "noise_seed": 2026101202,
+          "p": "1/100",
+          "q": "1/100"
+        }
+      ]
+    },
+    "wg-T": {
+      "active_sites": 730,
+      "excluded_ideal_sites": 8,
+      "grid": [
+        {
+          "born_seed": 2026201300,
+          "draws": 8192,
+          "noise_seed": 2026101300,
+          "p": "1/1000",
+          "q": "3/1000"
+        },
+        {
+          "born_seed": 2026201301,
+          "draws": 8192,
+          "noise_seed": 2026101301,
+          "p": "3/1000",
+          "q": "3/1000"
+        },
+        {
+          "born_seed": 2026201302,
+          "draws": 8192,
+          "noise_seed": 2026101302,
+          "p": "1/100",
+          "q": "1/100"
+        }
+      ]
+    }
+  },
+  "historical_kernel": "853fa2369817e1be65a710b42ff80606e219e464",
+  "max_histogram_entries": 65536,
+  "output_contract": "unit_noise_history_normalized_masses_with_external_occurrence_ratio",
+  "paper": "2610.22315v1",
+  "reference_sha256": "c49203a586f5a451e3183b435793df693dd486857356aed8826df5dc723e5454",
+  "rng_protocol": "splitmix64-addressed-u32-seed-u32-index-v1",
+  "schema": "rmagna.paper-code-switch-plan.v1",
+  "scope": "pilot",
+  "timeout_seconds": 300,
+  "timing": {
+    "born_seed": 2026200800,
+    "excluded_warmup_draws": 1,
+    "families": [
+      "dk",
+      "wg-T"
+    ],
+    "noise_seed": 2026100800,
+    "p": "1/1000",
+    "repetitions": 3,
+    "shots": 1024,
+    "workers": 1
+  },
+  "upstream_commit": "56847478c840395735146ef1e1ccdc3d8aedc10f"
+}

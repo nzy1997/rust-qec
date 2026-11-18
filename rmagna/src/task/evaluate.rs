@@ -592,7 +592,7 @@ impl TaskEvaluator {
         faults: &[FaultSelection],
         random: &mut impl RandomSource,
     ) -> Result<TaskEvaluation, TaskError> {
-        self.sample_with_faults(faults, BigRational::one(), random)
+        self.sample_with_faults(faults, BigRational::one(), random, None)
     }
 
     /// Evaluate linear task contributions for a prescribed fault assignment.
@@ -646,6 +646,29 @@ impl TaskEvaluator {
         likelihood: &BigRational,
         random: &mut impl RandomSource,
     ) -> Result<TaskEvaluation, TaskError> {
+        self.sample_supplied_noise_observed(faults, likelihood, random, None)
+    }
+
+    /// Evaluate supplied categorical noise and record actual history, query and
+    /// decoder work on the caller's meter. This uses the same likelihood and
+    /// entropy rules as [Self::sample_supplied_noise].
+    pub fn sample_supplied_noise_with_costs(
+        &self,
+        faults: &[FaultSelection],
+        likelihood: &BigRational,
+        random: &mut impl RandomSource,
+        meter: &ExecutionMeter,
+    ) -> Result<TaskEvaluation, TaskError> {
+        self.sample_supplied_noise_observed(faults, likelihood, random, Some(meter))
+    }
+
+    fn sample_supplied_noise_observed(
+        &self,
+        faults: &[FaultSelection],
+        likelihood: &BigRational,
+        random: &mut impl RandomSource,
+        meter: Option<&ExecutionMeter>,
+    ) -> Result<TaskEvaluation, TaskError> {
         let limit = self
             .options
             .scalars
@@ -653,7 +676,7 @@ impl TaskEvaluator {
             .min(self.options.fields.max_coefficient_bits());
         let likelihood =
             validate_supplied_likelihood(likelihood, limit).map_err(|e| error("noise", e))?;
-        self.sample_with_faults(faults, likelihood, random)
+        self.sample_with_faults(faults, likelihood, random, meter)
     }
 
     fn sample_with_faults(
@@ -661,6 +684,7 @@ impl TaskEvaluator {
         faults: &[FaultSelection],
         likelihood: BigRational,
         random: &mut impl RandomSource,
+        meter: Option<&ExecutionMeter>,
     ) -> Result<TaskEvaluation, TaskError> {
         match &self.execution {
             Execution::Causal(program) => {
@@ -671,22 +695,26 @@ impl TaskEvaluator {
                         likelihood,
                         random,
                         &self.options.scalars,
+                        meter,
                     )
                     .map_err(|e| error("runtime", e))?;
-                self.evaluate(EvaluationInput::history(&history))
+                self.evaluate_observed(EvaluationInput::history(&history), meter)
             }
             Execution::Linear {
                 instrument, model, ..
             } => {
                 let probability = model.probability(faults).map_err(|e| error("noise", e))?;
-                self.evaluate(EvaluationInput {
-                    instrument,
-                    faults,
-                    history_mass: &ExactScalar::one(),
-                    noise_probability: &probability,
-                    likelihood: &likelihood,
-                    history: None,
-                })
+                self.evaluate_observed(
+                    EvaluationInput {
+                        instrument,
+                        faults,
+                        history_mass: &ExactScalar::one(),
+                        noise_probability: &probability,
+                        likelihood: &likelihood,
+                        history: None,
+                    },
+                    meter,
+                )
             }
         }
     }

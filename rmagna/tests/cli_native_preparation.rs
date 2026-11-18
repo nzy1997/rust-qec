@@ -5,6 +5,19 @@ use std::{
     sync::atomic::{AtomicUsize, Ordering},
 };
 struct Files(PathBuf);
+
+#[test]
+fn native_signature_scan_appears_in_help() {
+    let output = Command::new(env!("CARGO_BIN_EXE_rmagna"))
+        .arg("--help")
+        .output()
+        .unwrap();
+    assert!(output.status.success());
+    let help = String::from_utf8(output.stdout).unwrap();
+    assert!(help.contains("--native-signature-scan MODE"));
+    assert!(help.contains("full|odd_axis_pivots; default full"));
+}
+
 impl Files {
     fn new() -> Self {
         static NEXT: AtomicUsize = AtomicUsize::new(0);
@@ -59,6 +72,54 @@ impl Drop for Files {
     fn drop(&mut self) {
         let _ = std::fs::remove_dir_all(&self.0);
     }
+}
+
+#[test]
+fn odd_axis_pivot_scan_is_reported_for_each_native_query_family() {
+    let files = Files::new();
+    let baseline = files.json("run", "native", &["--shots", "8", "--seed", "118"]);
+    let compressed = files.json(
+        "run",
+        "native",
+        &[
+            "--shots",
+            "8",
+            "--seed",
+            "118",
+            "--native-signature-scan",
+            "odd_axis_pivots",
+        ],
+    );
+    for family in [
+        "probability_preparation",
+        "density_preparation",
+        "moment_preparation",
+    ] {
+        assert!(
+            baseline["options"]["compile"][family]["selection"]
+                .get("signature_scan")
+                .is_none()
+        );
+        assert_eq!(
+            compressed["options"]["compile"][family]["selection"]["signature_scan"],
+            "odd_axis_pivots"
+        );
+    }
+    for key in ["completed", "estimates", "standard_errors"] {
+        assert!(baseline.get(key).is_some(), "missing {key}");
+        assert_eq!(compressed[key], baseline[key]);
+    }
+    let failure = files.run("validate", "native", &["--native-signature-scan", "bad"]);
+    assert!(!failure.status.success());
+    let message = format!(
+        "{} {}",
+        String::from_utf8_lossy(&failure.stdout),
+        String::from_utf8_lossy(&failure.stderr)
+    );
+    assert!(
+        message.contains("--native-signature-scan must be full or odd_axis_pivots"),
+        "{message}"
+    );
 }
 #[test]
 fn native_modes_report_resolved_options_actual_routes_and_reject_orphan_limits() {

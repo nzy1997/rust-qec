@@ -1,0 +1,11 @@
+{
+  "capture_commit": "968239368485d52b0425b4e0d8e9ea6afcb55dbf",
+  "capture_tree": "a0211ca430d16b7e90c52d363961b5e323ede440",
+  "receipts": {
+    "rmagna.paper-code-switch-capture.v1": "8a23cc92eff1d2addccc328c8387b314314438ebb8b721daea17780a4d17e2b9",
+    "rmagna.paper-logical-distillation-capture.v1": "b1338eeb9f336a2cbc343bf4cc3e0a86391a6ade7cca7c72c96fd894bd28427f",
+    "rmagna.paper-tqd-capture.v1": "762354f3dd27bbfe7c3b2b2f8f6eadf8dd6d043ee5770124e177273a15f6052a"
+  },
+  "rust_source_sha256": "f50e0c3d0e82bcb01b2a9c2017b996c395c368ec9fba24c9937f5bdbd3e134b4",
+  "schema": "rmagna.paper-decoder-workload-retained-capture.v1"
+}

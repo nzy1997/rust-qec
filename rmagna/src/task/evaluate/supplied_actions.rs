@@ -66,7 +66,7 @@ impl SuppliedActionEvaluator {
     /// independently weights the contributions.
     pub fn sample(&self, random: &mut impl RandomSource) -> Result<TaskEvaluation, TaskError> {
         self.evaluator
-            .sample_with_faults(&self.faults, self.likelihood.clone(), random)
+            .sample_with_faults(&self.faults, self.likelihood.clone(), random, None)
     }
 }
 

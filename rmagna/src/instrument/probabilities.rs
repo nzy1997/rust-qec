@@ -68,6 +68,9 @@ impl QueryPreparation {
                     value["selection"]["max_table_and_coefficient_bytes"] =
                         json!(s.max_table_and_coefficient_bytes);
                 }
+                if s.signature_scan != crate::catalogue::PhaseSignatureScan::Full {
+                    value["selection"]["signature_scan"] = json!(s.signature_scan.name());
+                }
                 value
             }
             QueryPreparation::FixedCatalogue(options) => json!({
