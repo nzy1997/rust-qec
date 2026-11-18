@@ -4258,7 +4258,78 @@ The result directory retains each completed range and any failed worker output.
 The same command with `--resume` reuses verified ranges on the same producer,
 source and worker policy. Retain the release binary while the shared build
 directory is reused for another workload.
+
 The TQD author subprocess ignores Python environment variables and the user
 site. The offline checker admits the three original complete OMEN receipts
 by their exact SHA-256 values and rechecks their inputs, raw batches, and
 reports. Resuming a run requires the current producer and runner identities.
+
+### B06 offline paper evidence
+
+The [paper evidence release](https://github.com/nzy1997/rust-qec/releases/tag/magna-paper-2610.22315-v1)
+provides the compressed bundle and its SHA-256 checksum. Extract the bundle
+and set `MAGNA_EVIDENCE_BUNDLE` to its root directory.
+
+The paper bundle uses the v1 archive, reviewed source revisions and retained
+independent raw captures. Its `raw/` directory holds the BH, cultivation,
+decoder-workload and provenance trees. Each raw file is bound by size and
+SHA-256 in a sealed index. The repository pins the index and the Git tree used
+to verify each capture. Use a checkout that contains those Git objects.
+
+```sh
+MAGNA_PAPER_EVIDENCE_ROOT="$MAGNA_EVIDENCE_BUNDLE" make magna-paper-evidence-check
+python3 -B benchmarks/magna_reproduction/paper_evidence.py \
+  --results "$MAGNA_EVIDENCE_BUNDLE" --out "$MAGNA_REGENERATED_DATA"
+python3 -B benchmarks/magna_reproduction/paper_evidence_plot.py \
+  --data "$MAGNA_REGENERATED_DATA/regenerated.json" --out "$MAGNA_REGENERATED_FIGURES"
+```
+
+The checker extracts a temporary source snapshot from local Git and recomputes
+each campaign with its original offline verifier. It needs the standard
+library, Python 3.12 or later with tar extraction filters, and Git with all
+three pinned source snapshots available locally. A shallow or partial clone
+must already have those commits, trees, and blobs. Verification disables Git
+transports and Python site packages. Plotting is
+a separate step using Matplotlib. The regenerated CSV files carry the measured
+curves, uncertainties, timing rows and cultivation representation counts.
+The code-switching plot labels the deposited Daguerre–Kim tomography fit
+and Table I point separately from the simulator's target-overlap estimates.
+The logical-distillation plot retains the published leading-order guide.
+Open triangles mark unresolved points at the plot boundary.
+The cultivation comparison labels each backend's count and keeps deposited
+sampling and same-host matched sampling in separate panels. The JSON keeps
+the exact covariance, workload and build identities, failed attempts,
+measured ablations, and remaining parity gaps.
+
+To assemble the bundle, arrange the existing full result directories at
+`raw/bh`, `raw/cultivation`, and `raw/decoder-workloads`. Retain provenance
+receipts under `raw/provenance` and the corrected matched cultivation run
+under `raw/cultivation/matched-peers`. Capture the work comparison once with
+the release example and put its source digest in `ablation_source_sha256` in
+the source plan.
+
+```sh
+cargo build --locked --release -p rmagna --example paper_ablation_run
+python3 -B benchmarks/magna_reproduction/paper_evidence_ablations.py \
+  --runner "${CARGO_TARGET_DIR:-target}/release/examples/paper_ablation_run" \
+  --results "$MAGNA_EVIDENCE_BUNDLE/raw/provenance/ablations.json"
+```
+
+The probe changes one of the template, compiler or history sampler policies
+at a time and checks exact mass for both equally probable reported histories
+of the same small circuit. Its scalar and packed comparison supplies identical
+finite thresholds and conceptual words. It counts calls to the word or plane
+provider with the bit planes already built. These measurements report work
+within the probe's fixtures.
+
+Pass an unsealed source plan with the reviewed commit, tree and campaign plan
+hashes to `paper_evidence.py --seal --manifest PLAN --results BUNDLE --archive DEPOSIT`.
+Sealing adds the hash-verified historical BH data and overview and writes the
+derived artifacts, index and finalized plan together in `sealed/`. The
+bundled curves preserve the paper's deposited values and independent Rust
+estimates with their own sample counts. Decoder clocks are subtracted per trial
+before taking the median. The paper evidence and same-host matched timings
+retain separate repeats and host identities. Cultivation retains positive-error
+counts, relative standard errors and worker time for each precision point,
+separate from the sampling time table. The broader #794 and #601
+publication protocols have their own readiness checks.

@@ -44,6 +44,7 @@ fn main() {
         "rmagna/examples/paper_decoder_run.rs",
         "rmagna/examples/paper_logical_distillation_run.rs",
         "rmagna/examples/paper_tqd_run.rs",
+        "rmagna/examples/paper_ablation_run.rs",
         "rmagna/examples/support",
         "benchmarks/magna_reproduction/paper_query_work.py",
         "rmagna/tests/support/paper_proposal_probe.rs",
