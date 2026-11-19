@@ -13,6 +13,9 @@ from tqd_fault_map import COLORS
 
 
 NESTED_DRAWS = 32
+SCHEMA = 'rmagna.paper-tqd-author-approximation.v2'
+LEGACY_SCHEMA = 'rmagna.paper-tqd-author-approximation.v1'
+OUTPUT_COLORS = ('b', 'r')
 
 
 def target_z_infidelity():
@@ -86,7 +89,9 @@ class AuthorApproximation:
             for _ in range(NESTED_DRAWS):
                 twisted = self.author.twisted.generate_twisted_z_errors(loops,size,depth,self.lookup,is_full=False)
                 failed = False
-                for color in COLORS:
+                # Green is measured in Z at exit. Its residual Z contributes
+                # only a phase to that measurement branch, whose outputs are b/r.
+                for color in OUTPUT_COLORS:
                     z = noise['Z',color] ^ twisted[color]
                     prediction = self.matching.decode(self.full @ z % 2)
                     failed |= bool(decoder.is_logical_error(z ^ prediction,size,depth,error_type='z'))
@@ -110,7 +115,7 @@ def evaluate_payload(upstream, fault_map, payload):
     author = AuthorApproximation(upstream,size,info['depth'])
     selected = [dict(author.evaluate(info['entries'],row['faults'],seed,row['index']),
                      fault_sha256=fault_identity(row['faults'])) for row in payload['rows']]
-    return dict(schema='rmagna.paper-tqd-author-approximation.v1', size=size, depth=info['depth'],
+    return dict(schema=SCHEMA, logical_z_colors=list(OUTPUT_COLORS), size=size, depth=info['depth'],
                 noise_seed=seed, nested_draws=NESTED_DRAWS, fault_map_sha256=payload['fault_map_sha256'],
                 author_source_sha256=author.hashes,
                 logical_z_infidelity=str(target_z_infidelity()), rows=selected)

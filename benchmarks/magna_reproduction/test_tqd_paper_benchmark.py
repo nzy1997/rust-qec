@@ -5,6 +5,8 @@ from fractions import Fraction
 from pathlib import Path
 from tempfile import TemporaryDirectory
 import unittest
+from unittest.mock import patch
+import json
 
 from cultivation_statistics import ONE
 import decoder_workloads_benchmark as workloads
@@ -12,6 +14,7 @@ import reference
 from remaining_contracts import read_json
 import tqd_paper_benchmark as benchmark
 from tqd_author_approximation import target_z_infidelity
+from tqd_author_approximation import LEGACY_SCHEMA, SCHEMA
 from tqd_paper_statistics import WARMUP, fault_stream, summarize, verify_readout_witness
 
 
@@ -99,6 +102,40 @@ class TqdPaperBenchmarkTests(unittest.TestCase):
             del incomplete['campaigns']['tqd']
             with self.assertRaisesRegex(ValueError, 'omits or changes a full campaign'):
                 workloads.check_capture(incomplete, root)
+
+    def test_reports_label_retained_output_scoring_and_reject_mixed_versions(self):
+        cases = [dict(id=str(index), family='tqd3', point=0, kind='precision') for index in range(2)]
+        plan = dict(scope='test', historical_kernel='test',
+                    families=dict(tqd3=dict(grid=[dict(point=0, p='1/50', draws=2)])))
+        selected = [(ONE, (Fraction(0), Fraction(0)), True, (Fraction(0), Fraction(0)), False)]
+        deposit = dict(points=[dict(distance=3, p='1/50', estimates={})])
+        for versions in ((LEGACY_SCHEMA, LEGACY_SCHEMA), (SCHEMA, SCHEMA), (LEGACY_SCHEMA, SCHEMA)):
+            with self.subTest(versions=versions), TemporaryDirectory() as scratch:
+                root = Path(scratch).resolve()
+                (root/'batches').mkdir()
+                (root/'inputs').mkdir()
+                (root/'inputs'/benchmark.MAP_NAME).write_text(json.dumps(dict(families=dict(tqd3=dict(entries=[])))))
+                for case, version in zip(cases, versions, strict=True):
+                    benchmark.stage_path(root, case).write_text(json.dumps(
+                        dict(payload={}, author=dict(payload=dict(schema=version)))))
+                with patch.object(benchmark, 'cases', return_value=cases), \
+                     patch.object(benchmark.historical, 'terminal_curves', return_value=deposit), \
+                     patch.object(benchmark, 'historical_networks', return_value={}), \
+                     patch.object(benchmark.historical, 'timing', return_value={}), \
+                     patch.object(benchmark, 'validate_stage', return_value=selected), \
+                     patch.object(benchmark, 'verify_readout_witness'):
+                    if len(set(versions)) > 1:
+                        with self.assertRaisesRegex(ValueError, 'mix approximation scoring versions'):
+                            benchmark.results_from_batches(plan, root, {}, {})
+                    else:
+                        report = benchmark.results_from_batches(plan, root, {}, {})
+                        self.assertEqual(report['completed_batches'], 2)
+                        if versions[0] == SCHEMA:
+                            self.assertEqual(report['schema'], 'rmagna.paper-tqd-report.v2')
+                            self.assertEqual(report['logical_z_colors'], ['b', 'r'])
+                        else:
+                            self.assertEqual(report['schema'], 'rmagna.paper-tqd-report.v1')
+                            self.assertNotIn('logical_z_colors', report)
 
 
 if __name__ == '__main__':

@@ -4242,7 +4242,14 @@ Rust decoder receives reported records through the pinned author bindings. An
 explicit readout flip at each size verifies the feedback boundary. The full
 four-logical-qubit branch has norm `5/8`. The author approximation consumes the
 same physical fault lists and runs 32 nested trials in each unflagged flux
-sector. The offline report computes the full curve, flux-matched curves and
+sector. Version 2 scores logical Z failures on the retained blue/red outputs.
+Green is measured in the Z basis at exit, so a green-only residual Z changes
+only the phase of the selected measurement branch. Green X residuals still
+participate in flux screening and in generating twisted Z errors on all colors.
+Author payloads declare `logical_z_colors: ["b", "r"]`; new reports use
+`rmagna.paper-tqd-report.v2`. Archived version 1 reports retain their original
+three-color scoring, and the checker rejects mixed scoring versions in a capture.
+The offline report computes the full curve, flux-matched curves and
 their paired difference. It keeps the deposited term counts `4/2/1` and the
 observed Rust resources in their respective query families.
 
