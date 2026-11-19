@@ -19,6 +19,11 @@ jobs:
     timeout-minutes: 5
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install pinned Magna reference runtime
+        run: python3 -m pip install -r benchmarks/magna_reproduction/reference-requirements.txt
       - name: Check Magna reference corruption controls
         run: |
           python3 -I -m unittest discover -s benchmarks/magna_reproduction -p 'test_*.py'

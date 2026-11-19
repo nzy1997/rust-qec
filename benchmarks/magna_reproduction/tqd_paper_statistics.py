@@ -6,7 +6,7 @@ import math
 
 from cultivation_statistics import ZERO, ONE, add, as_float, divide, multiply, real_field, scale, sign
 from remaining_contracts import require
-from tqd_author_approximation import NESTED_DRAWS, fault_identity, target_z_infidelity
+from tqd_author_approximation import LEGACY_SCHEMA, SCHEMA, OUTPUT_COLORS, NESTED_DRAWS, fault_identity, target_z_infidelity
 from tqd_fault_map import COLORS
 
 
@@ -93,8 +93,11 @@ def paired_rows(physical, author, expected_sources):
             and type(physical['active_sites']) is int and physical['active_sites'] > 0
             and len(physical['rows']) == n and physical['rng_protocol'] == RNG_PROTOCOL,
             'TQD physical draw range is incomplete')
-    require(author['schema'] == 'rmagna.paper-tqd-author-approximation.v1'
-            and author['size'] == config['size'] and author['noise_seed'] == config['seed']
+    schema = author['schema']
+    require((schema == SCHEMA and author.get('logical_z_colors') == list(OUTPUT_COLORS))
+            or (schema == LEGACY_SCHEMA and author.get('logical_z_colors', list(COLORS)) == list(COLORS)),
+            'TQD approximation schema or logical Z output colors changed')
+    require(author['size'] == config['size'] and author['noise_seed'] == config['seed']
             and author['depth'] == physical['charge_depth']-1
             and author['nested_draws'] == NESTED_DRAWS
             and author['author_source_sha256'] == expected_sources

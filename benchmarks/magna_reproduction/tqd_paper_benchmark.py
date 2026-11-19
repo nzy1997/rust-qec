@@ -14,6 +14,7 @@ import decoder_workloads_reference as historical
 import reference
 from remaining_contracts import read_json, require
 import tqd_fault_map
+from tqd_author_approximation import SCHEMA as AUTHOR_SCHEMA, OUTPUT_COLORS
 from tqd_paper_statistics import RNG_PROTOCOL, WARMUP, fault_stream, historical_networks, paired_rows, summarize, verify_readout_witness
 
 
@@ -190,6 +191,7 @@ def results_from_batches(plan,out,receipt,pinned):
     precision={}
     timing={}
     hashes={}
+    author_schemas=set()
     for case in planned:
         path=reference.relative_file(out,'batches/'+stage_path(out,case).name)
         stage=read_json(path)
@@ -198,6 +200,7 @@ def results_from_batches(plan,out,receipt,pinned):
         verify_readout_witness(stage['payload'],map_['families'][family]['entries'])
         hashes[case['id']]=reference.digest(path)
         if selected is not None:
+            author_schemas.add(stage['author']['payload']['schema'])
             precision.setdefault((family,case['point']),[]).extend(selected)
         else:
             n=case['shots']
@@ -219,7 +222,10 @@ def results_from_batches(plan,out,receipt,pinned):
                 combined=math.hypot(current['standard_error'],old['estimates'][label]['se']) if current['standard_error'] is not None else 0
                 estimates[label]=(current['mean']-old['estimates'][label]['mean'])/combined if combined else None
             curves[family].append(dict(p=point['p'],measured=measured,historical=old,pulls=estimates))
-    return dict(schema='rmagna.paper-tqd-report.v1',scope=plan['scope'],curves=curves,
+    require(len(author_schemas) == 1, 'TQD batches mix approximation scoring versions')
+    scoring = (dict(schema='rmagna.paper-tqd-report.v2', logical_z_colors=list(OUTPUT_COLORS))
+               if author_schemas == {AUTHOR_SCHEMA} else dict(schema='rmagna.paper-tqd-report.v1'))
+    return dict(**scoring,scope=plan['scope'],curves=curves,
                 timing={family:dict(trials=trials,historical=historic_timing[family],
                     median_sampling_seconds_per_attempt=median(t['sampling_seconds_per_attempt'] for t in trials),
                     median_decoder_subtracted_seconds_per_attempt=median(t['decoder_subtracted_seconds_per_attempt'] for t in trials))
