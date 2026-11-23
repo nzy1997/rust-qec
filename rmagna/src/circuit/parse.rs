@@ -12,6 +12,11 @@ pub struct ParseOptions {
     pub max_operations: usize,
     pub max_repeat_depth: usize,
     pub max_source_bytes: usize,
+    /// Opt in to arbitrary-precision REPEAT counts, as accepted by the Native
+    /// standalone parser. Empty and zero-count bodies need no expansion. A
+    /// nonempty expansion must still fit `max_instructions` before execution.
+    /// False preserves the default unsigned-64-bit syntax contract.
+    pub allow_wide_repeat_counts: bool,
     pub probabilities: ProbabilityParser,
     pub controllers: BTreeSet<String>,
 }
@@ -24,6 +29,7 @@ impl Default for ParseOptions {
             max_operations: 1_000_000,
             max_repeat_depth: 128,
             max_source_bytes: 64 * 1024 * 1024,
+            allow_wide_repeat_counts: false,
             probabilities: ProbabilityParser::default(),
             controllers: BTreeSet::new(),
         }
@@ -123,7 +129,7 @@ enum Node {
     Instruction(Text),
     Repeat {
         text: Text,
-        count: u64,
+        count: BigUint,
         body: Vec<Node>,
     },
 }
@@ -285,12 +291,21 @@ fn nodes(
                             "REPEAT requires one nonnegative integer count",
                         ));
                     }
-                    let count = words[1].parse::<u64>().map_err(|_| {
+                    let count = if options.allow_wide_repeat_counts {
+                        words[1].parse::<BigUint>().ok()
+                    } else {
+                        words[1].parse::<u64>().ok().map(BigUint::from)
+                    }
+                    .ok_or_else(|| {
                         error(
                             options,
                             text,
                             &[],
-                            "REPEAT count exceeds the unsigned 64-bit range or is invalid",
+                            if options.allow_wide_repeat_counts {
+                                "REPEAT requires one nonnegative integer count"
+                            } else {
+                                "REPEAT count exceeds the unsigned 64-bit range or is invalid"
+                            },
                         )
                     })?;
                     if !matches!(tokens.get(*position), Some(Token::Open(_))) {
@@ -375,16 +390,16 @@ fn expanded_count(nodes: &[Node], options: &ParseOptions) -> Result<usize, Parse
 fn instruction_count(node: &Node) -> BigUint {
     match node {
         Node::Instruction(_) => BigUint::from(1_u8),
-        Node::Repeat { count: 0, .. } => BigUint::zero(),
+        Node::Repeat { count, .. } if count.is_zero() => BigUint::zero(),
         Node::Repeat { count, body, .. } => {
-            body.iter().map(instruction_count).sum::<BigUint>() * *count
+            body.iter().map(instruction_count).sum::<BigUint>() * count
         }
     }
 }
 fn has_instructions(nodes: &[Node]) -> bool {
     nodes.iter().any(|node| match node {
         Node::Instruction(_) => true,
-        Node::Repeat { count, body, .. } => *count != 0 && has_instructions(body),
+        Node::Repeat { count, body, .. } => !count.is_zero() && has_instructions(body),
     })
 }
 
@@ -444,13 +459,15 @@ impl Builder<'_> {
             match node {
                 Node::Instruction(text) => self.instruction(text, repeat)?,
                 Node::Repeat { count, body, .. } => {
-                    if *count == 0 {
+                    if count.is_zero() {
                         continue;
                     }
                     if !has_instructions(body) {
                         continue;
                     }
-                    for iteration in 0..*count {
+                    // Preflight admits at most usize::MAX actual instructions;
+                    // a nonempty repeat therefore also fits the u64 address.
+                    for iteration in 0..count.to_u64().expect("admitted repeat count fits u64") {
                         repeat.push(iteration);
                         self.expand(body, repeat)?;
                         repeat.pop();

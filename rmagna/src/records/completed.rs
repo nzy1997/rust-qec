@@ -1,4 +1,6 @@
 //! Explicit completed marginals of arbitrary coherent stabilizer terms.
+#[path = "mixture.rs"]
+mod mixture;
 #[path = "prepared.rs"]
 mod prepared;
 use super::pair::{
@@ -11,6 +13,7 @@ use crate::noise::RandomSource;
 use crate::pauli::{PauliError, PauliWord};
 use crate::scalar::{ExactScalar, ScalarArithmetic, ScalarError};
 use crate::stabilizer::{AffineKet, StabilizerError};
+pub use mixture::{CompletedAffineComponent, CompletedAffineMixture};
 pub use prepared::{
     PreparedCompletedRecords, PreparedRecordLimits, PreparedRecordResult, PreparedRecordStatistics,
     PreparedRecordWork,

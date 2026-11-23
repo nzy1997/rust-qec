@@ -30,11 +30,56 @@ class StandaloneContractsTests(unittest.TestCase):
         self.assertEqual((result['helpers'], result['groups'], result['assertions'], result['loop_headers']),
                          (22, 66, 217, 226))
         self.assertEqual((result['covered_groups'], result['covered_assertions']), (0, 0))
-        self.assertEqual((result['unresolved_groups'], result['unresolved_assertions']), (56, 187))
-        self.assertEqual((result['unexecuted_groups'], result['unexecuted_assertions']), (10, 30))
+        self.assertEqual((result['unresolved_groups'], result['unresolved_assertions']), (2, 13))
+        self.assertEqual((result['unexecuted_groups'], result['unexecuted_assertions']), (64, 204))
         self.assertEqual(result['aggregate_statuses'], dict(causal='requires_execution', foundation='unmapped'))
-        self.assertEqual(result['assessments'], dict(validation_gap=47, helper_context=5,
-                                                   source_bound_witness=10, representation_difference=4))
+        self.assertEqual(result['assessments'], dict(implementation_gap=2, source_bound_witness=64))
+
+    def test_foundation_completion_refuses_the_real_trace_storage_gaps(self):
+        result = self.check()
+        foundation = result['suites']['foundation']
+        self.assertEqual((foundation['helpers'], foundation['groups'], foundation['assertions'],
+                          foundation['loop_headers']), (14, 58, 192, 197))
+        self.assertEqual(foundation['unresolved_groups'], [
+            'foundation/main.trace-purpose', 'foundation/main.prepared-trace-runtime'])
+        self.assertEqual(result['follow_up_issues'], [1335])
+        with self.assertRaisesRegex(ValueError, 'actual pinned source'):
+            contracts.require_complete(result)
+        result['upstream_verified'] = True
+        result['execution'] = dict(status='PASS', source_bound=True, compiler_bound=True)
+        with self.assertRaisesRegex(ValueError, '13 assertions remain'):
+            contracts.require_complete(result)
+        changed = copy.deepcopy(self.catalogue)
+        for group in changed['groups']:
+            if group['status'] == 'unresolved':
+                group['status'] = 'bound'
+        with self.assertRaisesRegex(ValueError, 'no reviewed Rust qualification'):
+            self.check(catalogue=changed)
+
+    def test_foundation_qualification_rejects_an_existing_adjacent_fixture(self):
+        changed = copy.deepcopy(self.catalogue)
+        group = next(g for g in changed['groups'] if g['id'] == 'foundation/check_reference_coordinates')
+        # This is a real passing test in the identical source file. Its name
+        # cannot stand in for the original coordinate schedule.
+        group['qualification']['witnesses'][0]['test'] = 'word_shifts'
+        with self.assertRaisesRegex(ValueError, 'source-specific witnesses'):
+            self.check(catalogue=changed)
+        for field in ('adaptation', 'support_sources'):
+            changed = copy.deepcopy(self.catalogue)
+            group = next(g for g in changed['groups'] if g['id'] == 'foundation/check_reference_coordinates')
+            group['qualification'][field] = '' if field == 'adaptation' else {}
+            with self.subTest(field=field), self.assertRaises(ValueError):
+                self.check(catalogue=changed)
+
+    def test_source_text_cache_is_immutable_and_never_hides_changes(self):
+        import coverage_rust as rust
+        old = '#[test] fn first() {}'
+        new = '#[test] fn second() {}'
+        self.assertEqual(rust.flat_tests(old), {'first'})
+        with self.assertRaises(AttributeError):
+            rust.flat_tests(old).add('invented')
+        self.assertEqual(rust.flat_tests(new), {'second'})
+        self.assertEqual(rust.flat_tests(old), {'first'})
 
     def test_missing_group_helper_loop_and_forged_coverage_all_fail(self):
         changes = [

@@ -2820,7 +2820,7 @@
     {
       "id": "test_native_standalone.NativeStandaloneTest.test_foundation_without_cpython",
       "status": "unmapped",
-      "reason": "The complete pinned foundation fixture has 192 assertions and 197 loop headers. Online causal knowledge and complete-certificate snapshots now bind 5 assertions to executable fixtures; the other 187 assertions and all remaining contexts require full qualification in #1321. The aggregate remains unmapped."
+      "reason": "The complete192-assertion foundation fixture is partitioned source-specifically. Source/compiler/process receipts can qualify179 assertions in56 groups; the two trace-purpose/runtime groups (13 assertions) remain unresolved because Rust retains raw/query AffineKet amplitude boundaries. #1335 must complete observable trace-storage release before aggregate promotion; numerical equality and existing neighboring tests cannot qualify those groups."
     },
     {
       "id": "test_native_standalone.NativeStandaloneTest.test_reference_runtime_headers_are_self_contained",

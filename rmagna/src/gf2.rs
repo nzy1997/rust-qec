@@ -137,6 +137,45 @@ impl BitVector {
         Ok(())
     }
 
+    /// Shift every coordinate left without truncation. The declared width grows
+    /// by `offset`, including for an all-zero vector. Width overflow and storage
+    /// allocation failures return `AllocationFailed`.
+    pub fn shifted_left(&self, offset: usize) -> Result<Self, Gf2Error> {
+        let width = self
+            .width
+            .checked_add(offset)
+            .ok_or(Gf2Error::AllocationFailed)?;
+        let mut result = Self::zeros(width)?;
+        let (words, bits) = (offset / 64, offset % 64);
+        for (j, &value) in self.words.iter().enumerate() {
+            result.words[j + words] |= value << bits;
+            if bits != 0 && j + words + 1 < result.words.len() {
+                result.words[j + words + 1] |= value >> (64 - bits);
+            }
+        }
+        Ok(result)
+    }
+
+    /// Discard the lowest `offset` coordinates. The declared width saturates
+    /// at zero, with no nonzero padding in a partial final word.
+    pub fn shifted_right(&self, offset: usize) -> Result<Self, Gf2Error> {
+        let mut result = Self::zeros(self.width.saturating_sub(offset))?;
+        let (words, bits) = (offset / 64, offset % 64);
+        for (j, value) in result.words.iter_mut().enumerate() {
+            *value = self.words[j + words] >> bits;
+            if bits != 0 && j + words + 1 < self.words.len() {
+                *value |= self.words[j + words + 1] << (64 - bits);
+            }
+        }
+        Ok(result)
+    }
+
+    /// XOR only coordinates strictly above `cut`. Width validation precedes
+    /// mutation, even when the cut lies outside the vector.
+    pub fn xor_above_assign(&mut self, other: &Self, cut: usize) -> Result<(), Gf2Error> {
+        self.xor_tail_assign(other, cut.saturating_add(1).min(self.width))
+    }
+
     /// XOR indices at or above `start`, preserving lower indices and padding.
     pub(crate) fn xor_tail_assign(&mut self, other: &Self, start: usize) -> Result<(), Gf2Error> {
         other.check_width(self.width)?;
@@ -577,6 +616,22 @@ pub struct AffineSupport {
     columns: Vec<BitVector>,
 }
 impl AffineSupport {
+    /// Smallest affine family containing every supplied family, without
+    /// enumerating its words. An empty input has no hull. All widths must agree.
+    pub fn hull(families: &[Self]) -> Result<Option<Self>, Gf2Error> {
+        let Some(first) = families.first() else {
+            return Ok(None);
+        };
+        let mut columns = first.columns.clone();
+        for family in &families[1..] {
+            let mut difference = family.offset.clone();
+            difference.xor_assign(&first.offset)?;
+            columns.push(difference);
+            columns.extend(family.columns.iter().cloned());
+        }
+        Ok(Some(Self::new(first.offset.clone(), columns)?))
+    }
+
     pub fn new(offset: BitVector, columns: Vec<BitVector>) -> Result<Self, Gf2Error> {
         for column in &columns {
             column.check_width(offset.width())?;

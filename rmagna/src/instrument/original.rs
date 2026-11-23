@@ -115,6 +115,9 @@ pub use assignment_plan::{
 };
 
 pub type OriginalWire = i64;
+#[path = "original_literal_layout.rs"]
+mod literal_layout;
+pub use literal_layout::OriginalLiteralProgramLayout;
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum OriginalPauli {
     I,

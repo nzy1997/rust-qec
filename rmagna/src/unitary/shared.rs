@@ -272,15 +272,9 @@ fn copy_observation(gates: &mut Vec<CliffordGate>, word: &PauliWord, ancilla: us
     gates.push(CliffordGate::H(ancilla));
 }
 
-pub(super) fn compile(
+fn rotation_slots(
     source: &UnitaryCircuit,
-    input: &AffineKet,
-    arithmetic: &ScalarArithmetic,
-    max_path_bits: usize,
-) -> Result<CompiledUnitary, UnitaryError> {
-    if input.width() != source.width {
-        return Err(UnitaryError::DimensionMismatch);
-    }
+) -> Result<(Vec<Option<CliffordGate>>, Vec<Slot>), UnitaryError> {
     let mut x = (0..source.width)
         .map(|q| {
             PauliWord::new(
@@ -327,6 +321,145 @@ pub(super) fn compile(
             }
         }
     }
+    Ok((cliffords, slots))
+}
+
+#[derive(Clone, Copy, Debug)]
+pub struct AxisSectorOptions {
+    /// Conservative packed geometry/metadata/scratch units, excluding the
+    /// caller's circuit and rows. One unit is eight bytes; this is not RSS.
+    pub max_geometry_words: usize,
+}
+impl Default for AxisSectorOptions {
+    fn default() -> Self {
+        Self {
+            max_geometry_words: 16 << 20,
+        }
+    }
+}
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct CommutingAxisSector {
+    pub common: bool,
+    pub rotation_slots: usize,
+    pub independent_axes: usize,
+    /// Canonical coefficient masks over the caller's ordered rows. Empty for
+    /// a noncommuting rotation family, which makes no closed-sector claim.
+    pub rows: Vec<BitVector>,
+}
+impl UnitaryCircuit {
+    /// Analyze all odd rotation axes in the stripped Clifford dilation, using
+    /// the compiler's actual slot extraction. Commuting families return every
+    /// row combination commuting with those axes. No fixed input, state-vector
+    /// expansion, phase-resource selection or numeric assignment is needed.
+    pub fn commuting_axis_sector(
+        &self,
+        rows: &[BitVector],
+        options: AxisSectorOptions,
+    ) -> Result<CommutingAxisSector, UnitaryError> {
+        if rows.iter().any(|row| row.width() != self.width) {
+            return Err(UnitaryError::DimensionMismatch);
+        }
+        let mut count = 0usize;
+        for &gate in &self.gates {
+            if physical_clifford(gate).is_none() {
+                count = count
+                    .checked_add(
+                        diagonal_terms(gate)
+                            .into_iter()
+                            .filter(|(_, c)| *c != 0)
+                            .count(),
+                    )
+                    .ok_or(UnitaryError::DimensionOverflow)?;
+            }
+        }
+        let (n, s, m) = (self.width as u128, count as u128, rows.len() as u128);
+        let words = 64u128
+            .saturating_mul(n.saturating_add(s).saturating_add(1))
+            .saturating_mul((2 * n).div_ceil(64) + 4)
+            .saturating_add(
+                64u128
+                    .saturating_mul(s.saturating_add(m).saturating_add(1))
+                    .saturating_mul(m.div_ceil(64) + 4),
+            )
+            .saturating_add(4u128.saturating_mul(self.gates.len() as u128));
+        if words > options.max_geometry_words as u128 {
+            return Err(PhaseError::ResourceLimit {
+                option: "axis_sector.max_geometry_words",
+                limit: options.max_geometry_words as u128,
+                required: words,
+            }
+            .into());
+        }
+        if count == 0 {
+            return Ok(CommutingAxisSector {
+                common: true,
+                rotation_slots: 0,
+                independent_axes: 0,
+                rows: LinearFactorization::new(rows.len(), &[])?.nullspace()?,
+            });
+        }
+        let (cliffords, slots) = rotation_slots(self)?;
+        let mut axes = Vec::with_capacity(slots.len());
+        for slot in &slots {
+            let mut axis = slot.axis.clone();
+            for &gate in cliffords.iter().flatten() {
+                axis = axis.conjugated(gate)?;
+            }
+            axes.push(axis);
+        }
+        let packed_axes = axes.iter().map(packed).collect::<Result<Vec<_>, _>>()?;
+        let factor = LinearFactorization::new(
+            axes.len(),
+            &transpose_columns(packed_axes[0].width(), &packed_axes)?,
+        )?;
+        let basis = factor
+            .pivot_columns()
+            .iter()
+            .map(|&j| &axes[j])
+            .collect::<Vec<_>>();
+        let mut common = true;
+        for (j, axis) in basis.iter().enumerate() {
+            for previous in &basis[..j] {
+                common &= commute(axis, previous)?;
+            }
+        }
+        let closed = if common {
+            let anti = basis
+                .iter()
+                .map(|axis| {
+                    let bits = rows
+                        .iter()
+                        .map(|row| axis.x().dot(row))
+                        .collect::<Result<Vec<_>, _>>()?;
+                    BitVector::from_indices(
+                        rows.len(),
+                        bits.iter().enumerate().filter_map(|(j, &v)| v.then_some(j)),
+                    )
+                })
+                .collect::<Result<Vec<_>, Gf2Error>>()?;
+            LinearFactorization::new(rows.len(), &anti)?.nullspace()?
+        } else {
+            Vec::new()
+        };
+        Ok(CommutingAxisSector {
+            common,
+            rotation_slots: slots.len(),
+            independent_axes: basis.len(),
+            rows: closed,
+        })
+    }
+}
+
+pub(super) fn compile(
+    source: &UnitaryCircuit,
+    input: &AffineKet,
+    arithmetic: &ScalarArithmetic,
+    max_path_bits: usize,
+) -> Result<CompiledUnitary, UnitaryError> {
+    if input.width() != source.width {
+        return Err(UnitaryError::DimensionMismatch);
+    }
+    let (cliffords, slots) = rotation_slots(source)?;
     if slots.is_empty() {
         let mut result = source.compile_parity(input, arithmetic, max_path_bits)?;
         Arc::make_mut(&mut result.compilation).strategy = CompilerStrategy::SharedCommutingLayer;

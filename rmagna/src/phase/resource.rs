@@ -352,4 +352,35 @@ impl PreparedPhaseResource {
             Decomposition::Native(resource) => resource.expand(updated, boundary, arithmetic),
         }
     }
+
+    /// Reuse a rank-zero core for a Clifford phase on another variable domain.
+    /// The updated phase and boundary describe the complete new tensor; no odd
+    /// resource coordinate, decomposition search or old quadratic is carried
+    /// across domains. Ordinary [`Self::expand`] keeps its strict dimensions.
+    pub fn expand_clifford(
+        &self,
+        updated: &ParityPhase,
+        boundary: &AffineKet,
+        arithmetic: &ScalarArithmetic,
+    ) -> Result<Vec<AffineKet>, PhaseError> {
+        if self.quotient_rank() != 0 {
+            return Err(PhaseError::NotClifford);
+        }
+        if updated.num_variables() != boundary.columns().len() {
+            return Err(PhaseError::DimensionMismatch);
+        }
+        let (global, quadratic) = updated.clifford()?;
+        let phase = super::add_quadratic(boundary.phase(), &quadratic)?;
+        let coefficient = arithmetic.multiply(
+            boundary.coefficient(),
+            &arithmetic.omega(i64::from(global), 0)?,
+        )?;
+        let ket = AffineKet::new(
+            boundary.offset().clone(),
+            boundary.columns().to_vec(),
+            phase,
+            coefficient,
+        )?;
+        Ok(ket.contract(arithmetic)?.into_iter().collect())
+    }
 }
