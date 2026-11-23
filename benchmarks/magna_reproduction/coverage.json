@@ -2338,8 +2338,34 @@
     },
     {
       "id": "test_native_causal.NativeCausalTest.test_online_basis_without_cpython",
-      "status": "unmapped",
-      "reason": "The standalone catalogue binds all 8 causal helpers / 25 assertions / 29 loop headers. Full value-aware request/observe behavior is unresolved in #1319; rank-only diagnostics and conditioned quantum samples are ownership candidates, not a completed service qualification. The aggregate remains unmapped."
+      "status": "verified",
+      "contract": "Complete pinned causal standalone fixture: all 8 helper contexts, 25 assertions and 29 loop headers, exact original width/seed/iteration schedules, finite possible-world and scalar-span oracles, descending duplicate request order, independent offsets, readonly requests, and ordered contradiction handling. Rust uses explicit physical widths and owned masks; private Native container ABI is adapted. Source-specific compiler/process receipts are additionally required by standalone verification.",
+      "rust_tests": [
+        {
+          "package": "rmagna",
+          "target": "standalone_causal_knowledge",
+          "test": "check_pending_semantics",
+          "source_sha256": "42ff31103f099d541fbe17a42f0172d24e16996fdf5878480a09a650ba74174c"
+        },
+        {
+          "package": "rmagna",
+          "target": "standalone_causal_knowledge",
+          "test": "check_finite_assignments",
+          "source_sha256": "42ff31103f099d541fbe17a42f0172d24e16996fdf5878480a09a650ba74174c"
+        },
+        {
+          "package": "rmagna",
+          "target": "standalone_causal_knowledge",
+          "test": "check_large_request_order",
+          "source_sha256": "42ff31103f099d541fbe17a42f0172d24e16996fdf5878480a09a650ba74174c"
+        },
+        {
+          "package": "rmagna",
+          "target": "standalone_causal_knowledge",
+          "test": "check_dense_spans",
+          "source_sha256": "42ff31103f099d541fbe17a42f0172d24e16996fdf5878480a09a650ba74174c"
+        }
+      ]
     },
     {
       "id": "test_native_compact_suffix.NativeCompactSuffixTests.test_lossless_storage_and_ordered_faults_without_cpython",
@@ -2794,7 +2820,7 @@
     {
       "id": "test_native_standalone.NativeStandaloneTest.test_foundation_without_cpython",
       "status": "unmapped",
-      "reason": "The standalone catalogue binds all 14 foundation helpers / 192 assertions / 197 loop headers and their complete semantic groups. Existing Rust owners and16 candidate witnesses are not full source-fixture qualification. Online-knowledge and complete-snapshot gaps are tracked in #1319/#1320; complete foundation qualification is #1321. This aggregate remains unmapped."
+      "reason": "The complete pinned foundation fixture has 192 assertions and 197 loop headers. Online causal knowledge and complete-certificate snapshots now bind 5 assertions to executable fixtures; the other 187 assertions and all remaining contexts require full qualification in #1321. The aggregate remains unmapped."
     },
     {
       "id": "test_native_standalone.NativeStandaloneTest.test_reference_runtime_headers_are_self_contained",

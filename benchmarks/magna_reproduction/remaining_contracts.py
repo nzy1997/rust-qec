@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Check outstanding-method requirements without claiming executable Rust parity."""
+"""Check outstanding obligations and source-bound standalone Rust executions."""
 
 import argparse
 import ast
@@ -134,6 +134,10 @@ def main(argv=None):
     parser.add_argument("--upstream", type=Path)
     parser.add_argument("--catalogue-only", action="store_true",
                         help="standalone only: skip the external locked Cargo consumer check")
+    parser.add_argument("--rust-run", type=Path,
+                        help="standalone only: reuse a retained compiler/process receipt")
+    parser.add_argument("--record-rust-run", type=Path,
+                        help="standalone only: record execution; defaults to drafts/magna-standalone-execution.json")
     args = parser.parse_args(argv)
     try:
         pinned = reference.load_manifest()
@@ -141,13 +145,31 @@ def main(argv=None):
         if args.command == "standalone":
             import standalone_contracts
             import standalone_consumer
+            import standalone_execution
             require(args.upstream is not None, "standalone requires --upstream with the pinned source")
             before = reference.verify_source(args.upstream, pinned)
             sources = {name: reference.relative_file(args.upstream, path).read_text()
                        for name, path in standalone_contracts.SOURCES.items()}
+            catalogue = read_json(args.manifest or HERE / "standalone-contracts.json")
+            standalone_contracts.check_inventory(
+                catalogue, ledger, pinned, reference.digest(HERE / "reference.json"), ROOT)
+            require(not (args.rust_run and args.record_rust_run),
+                    "choose retained --rust-run or fresh --record-rust-run")
+            receipt_path = args.rust_run or args.record_rust_run or ROOT/'drafts/magna-standalone-execution.json'
+            if args.rust_run:
+                execution = read_json(receipt_path)
+            else:
+                from cultivation_benchmark import atomic
+                witnesses = [witness for group in catalogue['groups'] if group['status'] == 'bound'
+                             for witness in standalone_contracts.qualification(ROOT, group)]
+                targets = {witness['target'] for witness in witnesses}
+                execution = standalone_execution.capture(ROOT, targets)
+                receipt_path.parent.mkdir(parents=True, exist_ok=True)
+                atomic(receipt_path, execution)
             result = standalone_contracts.check_catalogue(
-                sources, read_json(args.manifest or HERE / "standalone-contracts.json"),
-                ledger, pinned, reference.digest(HERE / "reference.json"), ROOT)
+                sources, catalogue, ledger, pinned, reference.digest(HERE / "reference.json"), ROOT,
+                rust_run=execution)
+            result['rust_run'] = dict(path=str(receipt_path.resolve()), sha256=reference.digest(receipt_path))
             result["consumer"] = (
                 dict(status="not_run", scope="catalogue_only_no_header_compilation_claim")
                 if args.catalogue_only else standalone_consumer.check_consumer(
@@ -156,6 +178,8 @@ def main(argv=None):
                     "standalone source inventory changed during verification")
         else:
             require(not args.catalogue_only, "--catalogue-only requires standalone")
+            require(args.rust_run is None and args.record_rust_run is None,
+                    "Rust execution options require standalone")
             result = check_contracts(
                 read_json(args.manifest or HERE / "remaining-contracts.json"), ledger,
                 pinned, upstream=args.upstream)
