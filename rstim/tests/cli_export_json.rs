@@ -162,6 +162,34 @@ fn export_json_can_highlight_dem_error_origins() {
 }
 
 #[test]
+fn export_json_sample_shot_labels_missed_loss_with_the_recorded_bit() {
+    for (seed, bit, label) in [("1", false, "L=0 | M=0[L]"), ("4", true, "L=0 | M=1[L]")] {
+        let output = run_export_json_with_stdin(
+            &["--sample_shot", "--seed", seed],
+            "R 0\nLOSS(1) 0\nML(1) 0\n",
+        );
+        assert!(
+            output.status.success(),
+            "stderr: {}",
+            String::from_utf8_lossy(&output.stderr),
+        );
+
+        let document: Value = serde_json::from_slice(&output.stdout).unwrap();
+        let measurement = document["operations"][2]["annotations"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|annotation| annotation["context"]["annotation_kind"] == "measurement")
+            .unwrap();
+        assert_eq!(measurement["label"], label);
+        let components = &measurement["context"]["components"];
+        assert_eq!(components["loss_flag"]["bit"], false);
+        assert_eq!(components["value"]["bit"], bit);
+        assert_eq!(components["value"]["loss_cause"], true);
+    }
+}
+
+#[test]
 fn export_json_sample_shot_exports_fixed_seed_sample_visualization_contract() {
     let output = run_export_json_with_stdin(
         &["--sample_shot", "--seed", "7"],

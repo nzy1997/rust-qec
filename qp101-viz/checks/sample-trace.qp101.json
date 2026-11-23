@@ -114,6 +114,50 @@
           }
         }
       ]
+    },
+    { "type": "tick" },
+    {
+      "type": "gate",
+      "gate": "ML",
+      "params": [1.0],
+      "targets": [0],
+      "annotations": [
+        {
+          "kind": "marker",
+          "target_slots": [0],
+          "label": "flip",
+          "style": { "preset": "danger", "color": "red", "highlight": true },
+          "tags": ["sample-trace", "query-result"],
+          "context": {
+            "query_kind": "sample_trace",
+            "annotation_kind": "noise",
+            "instr_name": "ML",
+            "op_path": [8],
+            "repeat_iterations": [],
+            "target_qubits": [0],
+            "branch_label": "flip"
+          }
+        },
+        {
+          "kind": "marker",
+          "target_slots": [0],
+          "label": "L=0 | M=0[L]",
+          "tags": ["sample-trace", "query-result"],
+          "context": {
+            "query_kind": "sample_trace",
+            "annotation_kind": "measurement",
+            "loss_visible": true,
+            "instr_name": "ML",
+            "op_path": [8],
+            "repeat_iterations": [],
+            "target_qubit": 0,
+            "components": {
+              "loss_flag": { "measurement_index": 4, "bit": false },
+              "value": { "measurement_index": 5, "bit": false, "loss_cause": true }
+            }
+          }
+        }
+      ]
     }
   ]
 }

@@ -132,6 +132,11 @@ Annotation objects use the following common fields:
 - `tags` (optional): String tags for filtering or downstream processing.
 - `context` (optional): Arbitrary machine-readable JSON payload for tool-specific metadata.
 
+RStim sample-trace measurement labels show the recorded value, with `[L]`
+appended when physical atom loss caused that outcome. A loss-visible
+measurement also shows the separate reported flag. For example,
+`L=0 | M=0[L]` denotes a missed loss with a recorded value of zero.
+
 ### Core Gate Operation
 
 The generic core operation is `type: "gate"`:

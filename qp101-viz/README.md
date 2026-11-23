@@ -93,7 +93,7 @@ cargo run -p rstim --example mixed_noise_showcase
 - `DEPOLARIZE2` renders as connected two-box noise gates, and each rendered pair carries its own parameter note above it.
 - single-qubit measurement families such as `M`, `MX`, `MY`, `MR`, `ML`, and `MRL` are rendered as compact measurement boxes with plain-text anchors such as `m1` above the gate.
 - pair/product/padding/herald measurement families (`MXX`, `MYY`, `MZZ`, `MPP`, `MPAD`, `HERALDED_ERASE`, and `HERALDED_PAULI_CHANNEL_1`) advance the same global measurement history used by Rust, so later `rec[-k]` sources resolve to the correct anchors.
-- sample-trace annotations render inline on supported single-qubit measurements, including loss markers such as `1[L]` and `L=1 | M=1[L]`.
+- sample-trace annotations show the recorded measurement bit inline. A physical loss adds `[L]` to that bit. Loss-visible readouts separately display the reported flag, as in `L=0 | M=0[L]` for a missed loss with a recorded zero.
 - measurement and detector/observable operators reserve extra horizontal space for their labels so dense timelines do not collide as easily.
 - circuit-top measurement and Stim-style operator labels now share a single theme clearance value so they stay above the wire instead of drifting into gate bodies.
 - `detector` and `observable_include` render inline on the circuit in a Stim-like single-wire box style.

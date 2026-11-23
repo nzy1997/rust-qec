@@ -132,9 +132,9 @@ ML(0.01) 0
 A false positive sets the observed flag and retains the measured bit. A false
 negative clears the flag and returns a fair random bit. Physical occupancy
 still governs subsequent gates, and measure-reset can replenish a lost atom
-regardless of the reported flag. The native loss-aware import and decode
-subsets have their own [input contract](../../docs/specs/loss-visible-circuit-subset-v1.md)
-for loss-visible readouts.
+regardless of the reported flag. Native loss-aware import and decoding use
+[argument-free readouts](../../docs/specs/loss-visible-circuit-subset-v1.md).
+The `renvelope prepare` reference decoder also requires ideal loss flags.
 
 ## Detectors
 

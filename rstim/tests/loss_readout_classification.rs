@@ -123,6 +123,25 @@ fn shot_trace_distinguishes_the_reported_flag_from_physical_loss() {
     assert!(!trace.measurement_events[1].loss_cause);
     assert!(!trace.measurement_events[2].bit);
     assert!(trace.measurement_events[3].loss_cause);
+
+    let snapshot = shot.view_snapshot().unwrap();
+    assert_eq!(
+        snapshot
+            .svg
+            .matches("class=\"noise-site measurement\"")
+            .count(),
+        2
+    );
+    for ids in ["m1 m2", "m3 m4"] {
+        assert!(
+            snapshot.svg.lines().any(|line| {
+                line.contains("class=\"noise-site measurement\"")
+                    && line.contains("data-noise-event-id=")
+                    && line.contains(&format!("data-measurement-ids=\"{ids}\""))
+            }),
+            "missing read-only classification hotspot for {ids}",
+        );
+    }
 }
 
 #[test]
@@ -135,10 +154,10 @@ fn zero_probability_preserves_seeded_sampling_and_invalid_arguments_are_rejected
             .map(|_| executor.run(&mut rng).unwrap().measurements)
             .collect::<Vec<_>>()
     };
-    assert_eq!(
-        run("R 0 1\nLOSS(0.2) 1\nH 0\nML 0 1\n"),
-        run("R 0 1\nLOSS(0.2) 1\nH 0\nML(0) 0 1\n"),
-    );
+    let ideal_flags = run("R 0 1\nLOSS(0.2) 1\nH 0\nML 0 1\n");
+    assert_eq!(ideal_flags, run("R 0 1\nLOSS(0.2) 1\nH 0\nML(0) 0 1\n"));
+    let ideal_values: Vec<_> = ideal_flags.iter().map(|row| vec![row[1], row[3]]).collect();
+    assert_eq!(ideal_values, run("R 0 1\nLOSS(0.2) 1\nH 0\nM 0 1\n"));
     for circuit in ["ML(-0.1) 0", "ML(1.1) 0", "MRL(0.2,0.3) 0", "MXL(NaN) 0"] {
         assert!(
             rstim::validation::parse_and_validate(circuit).is_err(),
