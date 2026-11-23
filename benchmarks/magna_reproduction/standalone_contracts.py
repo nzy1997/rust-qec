@@ -88,6 +88,192 @@ SUPPORT_SOURCES = {group: ({'rmagna/tests/support/original_gf2.rs':
                           if any(target == CAUSAL_TARGET for target, _ in witnesses) else {})
                    for group, witnesses in QUALIFICATIONS.items()}
 
+# Source-specific foundation fixtures. Trace storage remains an explicit gap.
+FOUNDATION_TARGET = "standalone_foundation_contracts"
+FOUNDATION_TESTS = {'require': ['affine_proposal_hull_and_projection',
+             'boundary_coordinate_rhs',
+             'cached_noise_law_and_weight',
+             'character_geometry_and_resource_transport',
+             'check_axis_prefix',
+             'check_composed_feedback_frames',
+             'check_incremental_history_session',
+             'check_packed_clifford_updates',
+             'check_quadratic_batches',
+             'check_reference_boundary',
+             'check_reference_coordinates',
+             'checked_primitives_preserve_padding_shapes_and_refusal',
+             'coherent_expansion_and_target_amplitude',
+             'coherent_file_pipeline_and_prepared_trace_runtime',
+             'completed_pair_sampling_and_branch_limit',
+             'consuming_and_finite_sum_contraction',
+             'dimension_changing_clifford_transport',
+             'entry_dependent_geometry_matches_finite_sums',
+             'exact_categorical_zero_channel_uses_one_caller_word',
+             'exact_file_parser',
+             'file_causal_runtime_and_enumeration',
+             'fixed_virtual_template_and_selection_offset',
+             'history_efficiency_and_paired_statistics',
+             'independent_proposal_and_exact_range_order',
+             'literal_branch_order_and_declared_controls',
+             'literal_callback_certificate_owns_signed_wire_result',
+             'literal_layout_avoids_inline_record_collisions',
+             'malformed_history_task_is_rejected_before_execution',
+             'operation_sampling_reported_input_and_terminal_mass',
+             'prepared_clifford',
+             'quadratic_radical_support',
+             'scaled_noise_model_and_categorical_law_interning',
+             'signed_affine_grouping',
+             'sparse_noise_stream_and_weight_sectors',
+             'strict_parity_representation',
+             'target_and_recovery_mapping',
+             'target_projection_keeps_seven_protocol_records_and_independent_owner',
+             'trace_purpose_preserves_dilation_axes_and_every_fault_location',
+             'true_reported_records_and_coincident_fault_order',
+             'virtual_noise_actions',
+             'wide_clifford_elimination',
+             'wide_exact_scalars_and_caller_rng',
+             'word_shifts'],
+ 'scalar_value': ['character_geometry_and_resource_transport',
+                  'check_reference_boundary',
+                  'check_incremental_history_session',
+                  'wide_exact_scalars_and_caller_rng'],
+ 'dense': ['consuming_and_finite_sum_contraction',
+           'wide_clifford_elimination',
+           'prepared_clifford',
+           'character_geometry_and_resource_transport',
+           'strict_parity_representation',
+           'dimension_changing_clifford_transport',
+           'entry_dependent_geometry_matches_finite_sums',
+           'check_reference_boundary',
+           'check_incremental_history_session',
+           'coherent_expansion_and_target_amplitude'],
+ 'finite_phase_sum': ['prepared_clifford',
+                      'character_geometry_and_resource_transport',
+                      'strict_parity_representation',
+                      'dimension_changing_clifford_transport',
+                      'entry_dependent_geometry_matches_finite_sums'],
+ 'check_transported_phase': ['prepared_clifford',
+                             'character_geometry_and_resource_transport',
+                             'strict_parity_representation',
+                             'dimension_changing_clifford_transport',
+                             'entry_dependent_geometry_matches_finite_sums'],
+ 'full_axis_sector': ['check_axis_prefix'],
+ 'check_axis_prefix': ['check_axis_prefix'],
+ 'check_reference_coordinates': ['check_reference_coordinates'],
+ 'check_packed_clifford_updates': ['check_packed_clifford_updates'],
+ 'check_quadratic_batches': ['check_quadratic_batches'],
+ 'check_composed_feedback_frames': ['check_composed_feedback_frames'],
+ 'check_reference_boundary': ['check_reference_boundary'],
+ 'check_incremental_history_session': ['check_incremental_history_session'],
+ 'main.wide-clifford-elimination': ['wide_clifford_elimination'],
+ 'main.word-shifts': ['word_shifts', 'checked_primitives_preserve_padding_shapes_and_refusal'],
+ 'main.history-efficiency': ['history_efficiency_and_paired_statistics'],
+ 'main.prepared-clifford': ['prepared_clifford'],
+ 'main.categorical-law-interning': ['scaled_noise_model_and_categorical_law_interning'],
+ 'main.virtual-noise-actions': ['virtual_noise_actions',
+                                'checked_primitives_preserve_padding_shapes_and_refusal'],
+ 'main.independent-proposal': ['independent_proposal_and_exact_range_order'],
+ 'main.paired-ratio': ['history_efficiency_and_paired_statistics'],
+ 'main.boundary-coordinate-rhs': ['boundary_coordinate_rhs'],
+ 'main.literal-assignment-and-controls': ['literal_branch_order_and_declared_controls',
+                                          'literal_layout_avoids_inline_record_collisions',
+                                          'checked_primitives_preserve_padding_shapes_and_refusal'],
+ 'main.operation-sampling': ['operation_sampling_reported_input_and_terminal_mass'],
+ 'main.true-reported-records': ['true_reported_records_and_coincident_fault_order'],
+ 'main.target-inverse': ['target_and_recovery_mapping',
+                         'target_projection_keeps_seven_protocol_records_and_independent_owner'],
+ 'main.recovery-ancilla': ['target_and_recovery_mapping'],
+ 'main.file-target': ['target_and_recovery_mapping'],
+ 'main.malformed-history-task': ['malformed_history_task_is_rejected_before_execution'],
+ 'main.file-causal-runtime': ['file_causal_runtime_and_enumeration'],
+ 'main.file-parser': ['exact_file_parser',
+                      'checked_primitives_preserve_padding_shapes_and_refusal'],
+ 'main.scaled-noise-model': ['scaled_noise_model_and_categorical_law_interning'],
+ 'main.cached-noise-law-and-weight': ['cached_noise_law_and_weight'],
+ 'main.exact-categorical': ['exact_categorical_zero_channel_uses_one_caller_word'],
+ 'main.fixed-virtual-template': ['fixed_virtual_template_and_selection_offset'],
+ 'main.selection-offset': ['fixed_virtual_template_and_selection_offset'],
+ 'main.coherent-file-pipeline': ['coherent_file_pipeline_and_prepared_trace_runtime'],
+ 'main.character-geometry': ['character_geometry_and_resource_transport',
+                             'entry_dependent_geometry_matches_finite_sums'],
+ 'main.reference-resource-transport': ['character_geometry_and_resource_transport'],
+ 'main.strict-parity-representation': ['strict_parity_representation'],
+ 'main.dimension-changing-transport': ['dimension_changing_clifford_transport',
+                                       'checked_primitives_preserve_padding_shapes_and_refusal'],
+ 'main.consuming-contraction': ['consuming_and_finite_sum_contraction'],
+ 'main.finite-sum-contraction': ['consuming_and_finite_sum_contraction'],
+ 'main.completed-pair-sampling': ['completed_pair_sampling_and_branch_limit'],
+ 'main.sparse-noise-stream': ['sparse_noise_stream_and_weight_sectors'],
+ 'main.weight-sectors': ['sparse_noise_stream_and_weight_sectors'],
+ 'main.exact-statistics': ['history_efficiency_and_paired_statistics'],
+ 'main.wide-exact-scalars': ['wide_exact_scalars_and_caller_rng'],
+ 'main.caller-rng': ['wide_exact_scalars_and_caller_rng'],
+ 'main.signed-affine-grouping': ['signed_affine_grouping',
+                                 'checked_primitives_preserve_padding_shapes_and_refusal'],
+ 'main.coherent-expansion': ['coherent_expansion_and_target_amplitude'],
+ 'main.literal-callback-certificates': ['literal_callback_certificate_owns_signed_wire_result'],
+ 'main.affine-proposal-hull': ['affine_proposal_hull_and_projection',
+                               'checked_primitives_preserve_padding_shapes_and_refusal'],
+ 'main.quadratic-radical-support': ['quadratic_radical_support']}
+QUALIFICATIONS.update({"foundation/"+group: [(FOUNDATION_TARGET, test) for test in tests]
+                       for group, tests in FOUNDATION_TESTS.items()})
+ADAPTATIONS.update({'foundation/require': 'a6638ced2241c8ba8d28e89359b35c675ce3c99ac3b50a8ccac79a115d81b139',
+ 'foundation/scalar_value': 'a6638ced2241c8ba8d28e89359b35c675ce3c99ac3b50a8ccac79a115d81b139',
+ 'foundation/dense': 'a6638ced2241c8ba8d28e89359b35c675ce3c99ac3b50a8ccac79a115d81b139',
+ 'foundation/finite_phase_sum': 'a6638ced2241c8ba8d28e89359b35c675ce3c99ac3b50a8ccac79a115d81b139',
+ 'foundation/check_transported_phase': 'a6638ced2241c8ba8d28e89359b35c675ce3c99ac3b50a8ccac79a115d81b139',
+ 'foundation/full_axis_sector': '64df42f944dcd9ed4c45051f8c795036287a46da7365095c7b094d8256747e21',
+ 'foundation/check_axis_prefix': '64df42f944dcd9ed4c45051f8c795036287a46da7365095c7b094d8256747e21',
+ 'foundation/check_reference_coordinates': '1bb6feb5af26eb55d2d4364957b8e88b59b8652c3cbf294d5bfffc02efb140a6',
+ 'foundation/check_packed_clifford_updates': '20bde27394764a23c5e94cbeaf45ffd80bb7cdc7ff33446b7bbe0832b949c64c',
+ 'foundation/check_quadratic_batches': 'e25949575ac3e1175a78aca0faccb0ae2ee209616178171e759237243a1c3edd',
+ 'foundation/check_composed_feedback_frames': '8336c992551008a1578cb08ddaa7257e537c2e10fd9f74b90fd103d52d42b2d2',
+ 'foundation/check_reference_boundary': 'b2553af1bcfa1609a7e0aed364beb86aeb3761fc5bc7a8c6fc07d150da33463f',
+ 'foundation/check_incremental_history_session': '5b97dd13c0b5168278ad2f99dc20ad929ab167ab901753f7b3747e51977dcb84',
+ 'foundation/main.wide-clifford-elimination': '434e4c6bda01f3c34b170f5ad291762a14a100b0d1a58d074391d83c590b9fd4',
+ 'foundation/main.word-shifts': '93e705db39cb98f6937106182593c40da94aa04869326d06c25a50a78e7b8ece',
+ 'foundation/main.history-efficiency': 'd425548a9d52c13ca6b327d92087dc7700a0720b24216ca1e0073d3e91f719b3',
+ 'foundation/main.prepared-clifford': '078ecb4b83a7f9504f5277d5fb9ade409e30d539825df38c744620e05e3e476b',
+ 'foundation/main.categorical-law-interning': '3b6c5f84e2dedf8782aaee88acb819bcebdaeaeb3925bbb729aa6de97483fde6',
+ 'foundation/main.virtual-noise-actions': 'bdd7f9f6ea4f2750d321cfbfb41eb46ad63e108e913fde6ded154a70b5f2769c',
+ 'foundation/main.independent-proposal': 'd6e29d02a65ce4e521e6152c36eb8906c4b654fe67756b4674d3d48b4ff10b52',
+ 'foundation/main.paired-ratio': '376906b16f350a33d0f8fab7eac7782d627d3b22c27f361a6dc1a4d97edb4940',
+ 'foundation/main.boundary-coordinate-rhs': 'ac39b5db5ca7b92c2faa677e36049dd214bb6555f2a9e59d1674868ed4ffe261',
+ 'foundation/main.literal-assignment-and-controls': '242c05d661e2f95acf09a4e495181e90fe7db9c7cd5499ac2771865db05d8e10',
+ 'foundation/main.operation-sampling': '43e4b52466c43f1d59528a4b6a0a4f242126d4b21c05cbb30ef84220e2e9aab9',
+ 'foundation/main.true-reported-records': '2db63dc3aebf83b6ec7cb51ccecea72bedb6ae49c149eaf2fb8ad3ee34e13c44',
+ 'foundation/main.target-inverse': '6b2abc6309b879c907f1cf78a09151b82d2b98ecee65866a3ad839ecfbc56066',
+ 'foundation/main.recovery-ancilla': '8685b21e3efdbda6a1d41fa812b4df8549acf9e1af4fd5878dcadb55d6ad8e28',
+ 'foundation/main.file-target': 'd8bd41c743f4aee7d4aaddb814f111ef3d5742f46e9edc344b6b3ee1514cbd21',
+ 'foundation/main.malformed-history-task': '8cc58059ba86ccebdaec989423fa192c13fd28143128c40e6ada606331941dae',
+ 'foundation/main.file-causal-runtime': 'e4d1f1456439e3da7f0a54a22bcba9ffae4a50792d42378dc964e74e4c449bcf',
+ 'foundation/main.file-parser': '431ac93f557b2e32001f8097e3b75da3dfebea667aafd9c2de1012329ce02b13',
+ 'foundation/main.scaled-noise-model': 'c6be4238ad57a2e717381c828f67c2727b94793a7af727b1c047d46e723d32cf',
+ 'foundation/main.cached-noise-law-and-weight': '77a4dc3182e57e7da5fffa5a49794a0f044a94116be153d7d8d9318e78be9c25',
+ 'foundation/main.exact-categorical': 'd96e7cafff51bf3cf5d5a01dfcc6d5b0fac917004cc07ba9f0f3a50ce40545b9',
+ 'foundation/main.fixed-virtual-template': '60956011e56b03a1bae55383f952dc31cc178365513a7e18fa5fa60992d9361d',
+ 'foundation/main.selection-offset': 'd47e2f7c37bf72749b8be7d79057b3f8af39d69ea4e09725043fe84c6b2b9aa8',
+ 'foundation/main.coherent-file-pipeline': '0606071d0086191954708218d5ae51b2e1f402f3d2ede56b585dbe62c2879b0d',
+ 'foundation/main.character-geometry': '236a408494f8a5c6ff54e86bfacd258d3e3182b1f6a28c57279e1158b92e7b65',
+ 'foundation/main.reference-resource-transport': '608ab03c4fcc4216dab42060c205231370065a68064dcf63365e98215b89b9ce',
+ 'foundation/main.strict-parity-representation': '2b1050487c5c9cccefc6dc746250310c9ac7e9699446a97926f2557adfc6308d',
+ 'foundation/main.dimension-changing-transport': '83a120862d35ff40ef91d767d78386f5ccee7d1db1cbc844d2c32e0c2f145fb8',
+ 'foundation/main.consuming-contraction': 'c9c711e49bc1f9c7a0db6f9059cbb673ced8f56b4b28a0bec975a5597d443bdd',
+ 'foundation/main.finite-sum-contraction': '88ad554aa4653308f73454b467a0fec322d3d111a577fbadcece5c7eaa000a01',
+ 'foundation/main.completed-pair-sampling': '8c84f8e8c27d6832544de822dfb079fb3d2836e3e2ceedd8bda982d8a621f496',
+ 'foundation/main.sparse-noise-stream': 'affe424ab6c01ea4f026766e51b3088ef947f18536fae507df54fd4f80ecd549',
+ 'foundation/main.weight-sectors': 'd24b335d267383f86894d6bbfda24631b29bc56987dee5387b46be11aa4ff94e',
+ 'foundation/main.exact-statistics': '1aebcccede8c9a43cd64b065ce444b02dd80298da3b9dbce00e8549fa8ef7a97',
+ 'foundation/main.wide-exact-scalars': '2cce823654eb30c8298cdfceeeb132ff55424ef5bd044da9a4619b991789c944',
+ 'foundation/main.caller-rng': '3ad3e2f476210cc5fab5b29446832b3cd6a3700bc809e253828508cfb6525e75',
+ 'foundation/main.signed-affine-grouping': '9f432d6ce0af8abda2c61737e65c58540760ee7e8a00d7fdbce6e31201511a9c',
+ 'foundation/main.coherent-expansion': '7f3d3942ae1c45b2aaf649e8c31ac70efac78100d5f5bc0b3dbc112d62cbf6b8',
+ 'foundation/main.literal-callback-certificates': '782329397eb56a31d58e465c588a19a48bc657b48654d18e060ee56375a1857b',
+ 'foundation/main.affine-proposal-hull': '1b455d4df90f4cf91a019b9a43452c861cd19cf4d77ab56432b0fadfac1d9a3d',
+ 'foundation/main.quadratic-radical-support': 'c6b0f71c164377584b466285cf93d2f095a6f9ac677273334546da5bbf3f8e6f'})
+SUPPORT_SOURCES.update({"foundation/"+group: {'rmagna/tests/support/original_gf2.rs': '64814d7a310cee97f39e74a7f6027eb7d488e165b0e51a71d131ed076099077c', 'rmagna/tests/common/mod.rs': 'ecacfdbf65863a1690414edeb9ab09364c2ae01eaf0726f50b61e6e20a4f03d9'}
+                        for group in FOUNDATION_TESTS})
+
 
 def qualification(root, group):
     require(group['id'] in QUALIFICATIONS, 'standalone group has no reviewed Rust qualification')
@@ -271,7 +457,24 @@ def check_inventory(catalogue, ledger, reference_manifest, reference_sha256, roo
     covered = bound if observed['status'] == 'PASS' else []
     unexecuted = [] if covered else bound
     unresolved = [group for group in groups if group['status'] == 'unresolved']
+    suites = {}
+    for name, found in facts.items():
+        own = [g for g in groups if g['id'].startswith(name+'/')]
+        executed = [g for g in covered if g['id'].startswith(name+'/')]
+        remaining = [g for g in unresolved if g['id'].startswith(name+'/')]
+        suites[name] = dict(
+            helpers=len(found['helpers']),
+            covered_helpers=sum(all(g in executed for g in own if g['function'] == h['name'])
+                                for h in found['helpers']),
+            groups=len(own), covered_groups=len(executed),
+            assertions=found['counts']['assertions'],
+            covered_assertions=sum(len(g['assertions']) for g in executed),
+            unresolved_assertions=sum(len(g['assertions']) for g in remaining),
+            unresolved_groups=[g['id'] for g in remaining],
+            loop_headers=found['counts']['loop_headers'],
+            covered_loop_headers=sum(len(g['loops']) for g in executed))
     return dict(status='PASS', scope=catalogue['claim'], upstream_verified=False,
+                suites=suites,
                 helpers=sum(v['counts']['functions'] for v in facts.values()),
                 groups=len(groups), covered_groups=len(covered), unresolved_groups=len(unresolved),
                 bound_groups=len(bound), unexecuted_groups=len(unexecuted),
@@ -285,3 +488,25 @@ def check_inventory(catalogue, ledger, reference_manifest, reference_sha256, roo
                 execution=observed, aggregate_declarations=declared,
                 aggregate_statuses={name: ('requires_execution' if state == 'verified' and not covered else state)
                                     for name, state in declared.items()})
+
+
+def require_complete(result):
+    """Foundation completion is distinct from causal and external consumer status.
+
+    Structural declarations alone never complete the aggregate. This function
+    consumes only check_catalogue's validated source/compiler/process result.
+    """
+    foundation = result['suites']['foundation']
+    require(result['upstream_verified'], 'foundation completion requires the actual pinned source')
+    require(not foundation['unresolved_groups'],
+            'foundation incomplete: '+str(foundation['unresolved_assertions'])+
+            ' assertions remain in '+', '.join(foundation['unresolved_groups']))
+    require(result['execution']['status'] == 'PASS'
+            and result['execution']['source_bound'] and result['execution']['compiler_bound'],
+            'foundation completion requires source/compiler/process receipts')
+    require(result['aggregate_statuses']['foundation'] == 'verified'
+            and foundation['covered_assertions'] == 192
+            and foundation['covered_groups'] == 58
+            and foundation['covered_helpers'] == 14
+            and foundation['covered_loop_headers'] == 197,
+            'foundation completion requires all192 assertions,58 groups,14 helpers and197 loops')

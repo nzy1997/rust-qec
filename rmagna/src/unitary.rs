@@ -26,6 +26,7 @@ pub use insertions::{
 };
 mod prepared;
 mod shared;
+pub use shared::{AxisSectorOptions, CommutingAxisSector};
 mod support;
 mod work;
 pub use prepared::{

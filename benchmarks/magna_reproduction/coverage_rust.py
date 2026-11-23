@@ -7,6 +7,7 @@ original compiler/process receipts alongside every evidence file for review.
 from __future__ import annotations
 
 import hashlib
+from functools import lru_cache
 import re
 from pathlib import Path
 
@@ -104,8 +105,12 @@ def rust_tokens(source: str, *, strings: bool = False) -> list[str]:
     return tokens
 
 
-def flat_tests(source: str) -> set[str]:
+@lru_cache(maxsize=32)
+def flat_tests(source: str) -> frozenset[str]:
     """Only explicit, unconditional, top-level #[test] functions are witnesses.
+
+    Cache only the exact source text, never a path or a supplied digest.
+    Returned names are immutable so callers cannot corrupt later checks.
 
     Raw/non-ASCII function identifiers, inline modules, macros, cfg/ignore
     attributes and generated tests require a future explicit extension; an
@@ -153,7 +158,7 @@ def flat_tests(source: str) -> set[str]:
                     "unbalanced Rust delimiters")
         i += 1
     require(not delimiters, "unbalanced Rust delimiters")
-    return names
+    return frozenset(names)
 
 
 def library_module(root: Path, source: Path, directory: Path, name: str) -> tuple[Path, Path]:

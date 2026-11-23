@@ -138,6 +138,8 @@ def main(argv=None):
                         help="standalone only: reuse a retained compiler/process receipt")
     parser.add_argument("--record-rust-run", type=Path,
                         help="standalone only: record execution; defaults to drafts/magna-standalone-execution.json")
+    parser.add_argument("--require-complete", action="store_true",
+                        help="standalone only: refuse unless the full foundation aggregate executes")
     args = parser.parse_args(argv)
     try:
         pinned = reference.load_manifest()
@@ -169,6 +171,8 @@ def main(argv=None):
             result = standalone_contracts.check_catalogue(
                 sources, catalogue, ledger, pinned, reference.digest(HERE / "reference.json"), ROOT,
                 rust_run=execution)
+            if args.require_complete:
+                standalone_contracts.require_complete(result)
             result['rust_run'] = dict(path=str(receipt_path.resolve()), sha256=reference.digest(receipt_path))
             result["consumer"] = (
                 dict(status="not_run", scope="catalogue_only_no_header_compilation_claim")
@@ -177,6 +181,7 @@ def main(argv=None):
             require(reference.verify_source(args.upstream, pinned) == before,
                     "standalone source inventory changed during verification")
         else:
+            require(not args.require_complete, "--require-complete requires standalone")
             require(not args.catalogue_only, "--catalogue-only requires standalone")
             require(args.rust_run is None and args.record_rust_run is None,
                     "Rust execution options require standalone")
