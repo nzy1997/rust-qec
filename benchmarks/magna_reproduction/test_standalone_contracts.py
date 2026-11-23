@@ -2,6 +2,8 @@ import copy
 import json
 from pathlib import Path
 import unittest
+from tempfile import TemporaryDirectory
+import shutil
 
 import standalone_contracts as contracts
 from standalone_consumer import consumer_lock
@@ -79,6 +81,20 @@ class StandaloneContractsTests(unittest.TestCase):
                 group['qualification']['witnesses'][0]['source_sha256'] = '0'*64
             with self.subTest(mutation=mutation), self.assertRaises(ValueError):
                 self.check(catalogue=changed)
+
+    def test_reused_input_generator_is_bound_beyond_the_root_test_file(self):
+        group = next(group for group in self.catalogue['groups'] if group['id'] == 'causal/check_finite_assignments')
+        with TemporaryDirectory() as temporary:
+            root = Path(temporary).resolve()
+            fixture = root/'rmagna/tests/standalone_causal_knowledge.rs'
+            helper = root/'rmagna/tests/support/original_gf2.rs'
+            helper.parent.mkdir(parents=True)
+            shutil.copyfile(ROOT/fixture.relative_to(root), fixture)
+            shutil.copyfile(ROOT/helper.relative_to(root), helper)
+            contracts.qualification(root, group)
+            helper.write_text(helper.read_text().replace('6364136223846793005', '6364136223846793007'))
+            with self.assertRaisesRegex(ValueError, 'fixture support source changed'):
+                contracts.qualification(root, group)
 
 
     def test_discovery_ignores_literals_and_preserves_real_nested_loops_and_helpers(self):

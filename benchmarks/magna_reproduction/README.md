@@ -4043,6 +4043,8 @@ The source-bound decomposition has 22 helpers, 66 groups, 217 assertions and
 service assertions to source-specific Rust fixtures. Structural checks report
 these as unexecuted until a matching compiler/process receipt passes. The other
 56 groups retain 187 unresolved foundation assertions and their full contexts.
+Bindings also pin reused fixture helpers, including the original random-input
+generator, so changing a transitive fixture cannot silently change its schedule.
 Existing neighboring-method passes remain ownership candidates.
 `--catalogue-only` explicitly
 skips the external consumer and makes no header-compilation claim. Ordinary

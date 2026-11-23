@@ -83,14 +83,23 @@ ADAPTATIONS = {group: ('924af70cbbedc790fa17dc5f09de8d46f05b02d35e37902db8514443
                        if group == 'foundation/main.certificate-cache' else
                        '3ba859ceb1d8ea8653df78feca9a2f44a5d15d0589530398bb3153dcf1635b98')
                for group in QUALIFICATIONS}
+SUPPORT_SOURCES = {group: ({'rmagna/tests/support/original_gf2.rs':
+                           '64814d7a310cee97f39e74a7f6027eb7d488e165b0e51a71d131ed076099077c'}
+                          if any(target == CAUSAL_TARGET for target, _ in witnesses) else {})
+                   for group, witnesses in QUALIFICATIONS.items()}
 
 
 def qualification(root, group):
     require(group['id'] in QUALIFICATIONS, 'standalone group has no reviewed Rust qualification')
     expected = QUALIFICATIONS[group['id']]
     value = group.get('qualification')
-    require(isinstance(value, dict) and set(value) == {'witnesses', 'adaptation'},
+    require(isinstance(value, dict) and set(value) == {'witnesses', 'adaptation', 'support_sources'},
             'missing source-specific standalone qualification')
+    require(value['support_sources'] == SUPPORT_SOURCES[group['id']],
+            'standalone fixture support inventory changed')
+    for path, digest in value['support_sources'].items():
+        require(rust.sha(rust.safe_file(root, path)) == digest,
+                f'standalone fixture support source changed: {path}')
     require(isinstance(value['adaptation'], str)
             and hashlib.sha256(value['adaptation'].encode()).hexdigest() == ADAPTATIONS[group['id']],
             'standalone representation adaptation changed')
