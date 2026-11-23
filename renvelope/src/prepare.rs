@@ -300,6 +300,11 @@ fn normalize_circuit(circuit: &[StimInstr]) -> Result<NormalizedCircuit, String>
         }
 
         if let Some(ordinary_name) = ordinary_measurement_name(&name) {
+            if args.iter().any(|&probability| probability > 0.0) {
+                return Err(format!(
+                    "prepare does not support loss-readout misclassification on {name}. Use ideal loss flags."
+                ));
+            }
             let target_count = targets
                 .iter()
                 .filter(|target| matches!(target, StimTarget::Qubit(_) | StimTarget::QubitInv(_)))
@@ -321,7 +326,7 @@ fn normalize_circuit(circuit: &[StimInstr]) -> Result<NormalizedCircuit, String>
             instructions.push(StimInstr::Op {
                 name: ordinary_name.to_string(),
                 tag,
-                args,
+                args: Vec::new(),
                 targets,
             });
             continue;

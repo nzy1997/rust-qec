@@ -820,12 +820,11 @@ fn emits_measurement_bits(name: &str) -> bool {
 }
 
 fn format_measurement_label(event: &MeasurementEvent) -> String {
+    let bit = if event.bit { "1" } else { "0" };
     if event.loss_cause {
-        "1[L]".to_string()
-    } else if event.bit {
-        "1".to_string()
+        format!("{bit}[L]")
     } else {
-        "0".to_string()
+        bit.to_string()
     }
 }
 

@@ -111,6 +111,31 @@ Output:
 The two measurement outcomes in each shot will always agree (`00` or `11`),
 because H + CNOT creates the Bell state (|00> + |11>) / sqrt(2).
 
+## Atom-loss readout
+
+`LOSS(p)` models physical atom loss. The loss-visible measurements `ML`,
+`MZL`, `MXL`, and `MYL`, and their measure-reset variants, emit two bits per
+target in the order `flag,value`. The optional argument to these readouts is
+the probability of misclassifying the target's occupancy. An omitted argument
+or zero gives perfect loss classification.
+
+For the symmetric channel in [Pauli Envelope section VII.1](https://arxiv.org/html/2603.04156v3#S7.SS1),
+use `p_readout / 2` as the instruction argument. This circuit uses a physical
+loss probability of 0.02 and a readout misclassification probability of 0.01.
+
+```stim
+R 0
+LOSS(0.02) 0
+ML(0.01) 0
+```
+
+A false positive sets the observed flag and retains the measured bit. A false
+negative clears the flag and returns a fair random bit. Physical occupancy
+still governs subsequent gates, and measure-reset can replenish a lost atom
+regardless of the reported flag. Native loss-aware import and decoding use
+[argument-free readouts](../../docs/specs/loss-visible-circuit-subset-v1.md).
+The `renvelope prepare` reference decoder also requires ideal loss flags.
+
 ## Detectors
 
 Detectors are parity checks on measurement results. They fire (produce a `1`)

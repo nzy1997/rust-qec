@@ -13,6 +13,10 @@ impl Recorder {
         *bit = !*bit;
     }
 
+    pub(crate) fn set_last(&mut self, value: bool) {
+        *self.bits.last_mut().expect("measurement was recorded") = value;
+    }
+
     pub fn len(&self) -> usize {
         self.bits.len()
     }

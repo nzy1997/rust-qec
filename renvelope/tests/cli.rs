@@ -473,6 +473,53 @@ fn prepare_rejects_loss_flag_detector_before_creating_output() {
 }
 
 #[test]
+fn prepare_rejects_readout_misclassification_before_creating_output() {
+    let directory = tempfile::tempdir().unwrap();
+    let circuit_path = directory.path().join("circuit.stim");
+    let calibration_path = directory.path().join("calibration.b8");
+    let shots_path = directory.path().join("shots.b8");
+    fs::write(&calibration_path, [0x03]).unwrap();
+    fs::write(&shots_path, [0x00]).unwrap();
+
+    for (probability, supported) in [("0.2", false), ("0", true)] {
+        let prepared_path = directory.path().join(format!("prepared-{probability}"));
+        fs::write(
+            &circuit_path,
+            format!(
+                "R 0\nX_ERROR(0.1) 0\nLOSS(0.02) 0\nML({probability}) 0\n\
+                 DETECTOR rec[-1]\nOBSERVABLE_INCLUDE(0) rec[-1]\n"
+            ),
+        )
+        .unwrap();
+
+        let output = Command::new(env!("CARGO_BIN_EXE_renvelope"))
+            .args(["prepare", "--circuit"])
+            .arg(&circuit_path)
+            .arg("--calibration_in")
+            .arg(&calibration_path)
+            .args(["--calibration_shots", "1", "--in"])
+            .arg(&shots_path)
+            .args(["--shots", "1", "--out"])
+            .arg(&prepared_path)
+            .output()
+            .unwrap();
+
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        if supported {
+            assert!(output.status.success(), "stderr: {stderr}");
+            assert!(prepared_path.join("matching.json").is_file());
+        } else {
+            assert_eq!(output.status.code(), Some(1));
+            assert!(
+                stderr.contains("does not support loss-readout misclassification on ML"),
+                "{stderr}",
+            );
+            assert!(!prepared_path.exists());
+        }
+    }
+}
+
+#[test]
 fn prepare_rejects_truncated_b8_before_creating_output() {
     let directory = tempfile::tempdir().unwrap();
     let calibration_path = directory.path().join("calibration.b8");

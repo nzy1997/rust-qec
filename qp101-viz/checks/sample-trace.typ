@@ -96,6 +96,11 @@
 #assert.eq(loss_visible_entry.measurement_targets.at(0).gate, "MRL")
 #assert.eq(marker-info-for-slot(entry-annotations(loss_visible_entry), 0).label, "L=0 | M=1")
 #assert.eq(loss_visible_box.labels.len(), 2)
+#let missed_loss_entry = gate-entry("ML")
+#let missed_loss_targets = missed_loss_entry.measurement_targets
+#assert.eq(missed_loss_targets.len(), 1)
+#assert.eq(missed_loss_targets.first().target_index, 1)
+#assert.eq(marker-info-for-slot(entry-annotations(missed_loss_entry), 1).label, "flip L=0 | M=0[L]")
 #assert.eq(repr(detector_box.fill), "rgb(\"#dbeafe\")")
 #assert.eq(detector_box.labels.len(), 1)
 
