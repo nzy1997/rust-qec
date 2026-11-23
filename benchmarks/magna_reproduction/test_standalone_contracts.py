@@ -2,6 +2,8 @@ import copy
 import json
 from pathlib import Path
 import unittest
+from tempfile import TemporaryDirectory
+import shutil
 
 import standalone_contracts as contracts
 from standalone_consumer import consumer_lock
@@ -28,10 +30,11 @@ class StandaloneContractsTests(unittest.TestCase):
         self.assertEqual((result['helpers'], result['groups'], result['assertions'], result['loop_headers']),
                          (22, 66, 217, 226))
         self.assertEqual((result['covered_groups'], result['covered_assertions']), (0, 0))
-        self.assertEqual((result['unresolved_groups'], result['unresolved_assertions']), (66, 217))
-        self.assertEqual(result['aggregate_statuses'], dict(causal='unmapped', foundation='unmapped'))
-        self.assertEqual(result['assessments'], dict(validation_gap=47, helper_context=9,
-                                                   implementation_gap=6, representation_difference=4))
+        self.assertEqual((result['unresolved_groups'], result['unresolved_assertions']), (56, 187))
+        self.assertEqual((result['unexecuted_groups'], result['unexecuted_assertions']), (10, 30))
+        self.assertEqual(result['aggregate_statuses'], dict(causal='requires_execution', foundation='unmapped'))
+        self.assertEqual(result['assessments'], dict(validation_gap=47, helper_context=5,
+                                                   source_bound_witness=10, representation_difference=4))
 
     def test_missing_group_helper_loop_and_forged_coverage_all_fail(self):
         changes = [
@@ -51,8 +54,9 @@ class StandaloneContractsTests(unittest.TestCase):
                 change(altered)
                 with self.assertRaises(ValueError):
                     self.check(catalogue=altered)
-        for method in contracts.AGGREGATES.values():
-            for status in ['verified', 'architecture_specific', 'partial']:
+        for name, method in contracts.AGGREGATES.items():
+            invalid = ['architecture_specific', 'partial', 'unmapped' if name == 'causal' else 'verified']
+            for status in invalid:
                 altered = copy.deepcopy(self.ledger)
                 next(r for r in altered['cases'] if r['id'] == method)['status'] = status
                 with self.assertRaisesRegex(ValueError, 'aggregate cannot be promoted'):
@@ -62,6 +66,35 @@ class StandaloneContractsTests(unittest.TestCase):
                 dict(causal='int main() {}', foundation='int main() {}'),
                 self.catalogue, self.ledger, self.manifest,
                 self.catalogue['reference_sha256'], ROOT)
+
+    def test_qualified_groups_require_exact_fixtures_and_explicit_adaptations(self):
+        for mutation in ('missing', 'adjacent', 'adaptation', 'stale_source'):
+            changed = copy.deepcopy(self.catalogue)
+            group = next(group for group in changed['groups'] if group['status'] == 'bound')
+            if mutation == 'missing':
+                del group['qualification']
+            elif mutation == 'adjacent':
+                group['qualification']['witnesses'][0]['test'] = 'unknown_high_pivots_stop_reduction_and_word_admission_is_atomic'
+            elif mutation == 'adaptation':
+                group['qualification']['adaptation'] = 'Use a rank-only basis instead of affine values.'
+            else:
+                group['qualification']['witnesses'][0]['source_sha256'] = '0'*64
+            with self.subTest(mutation=mutation), self.assertRaises(ValueError):
+                self.check(catalogue=changed)
+
+    def test_reused_input_generator_is_bound_beyond_the_root_test_file(self):
+        group = next(group for group in self.catalogue['groups'] if group['id'] == 'causal/check_finite_assignments')
+        with TemporaryDirectory() as temporary:
+            root = Path(temporary).resolve()
+            fixture = root/'rmagna/tests/standalone_causal_knowledge.rs'
+            helper = root/'rmagna/tests/support/original_gf2.rs'
+            helper.parent.mkdir(parents=True)
+            shutil.copyfile(ROOT/fixture.relative_to(root), fixture)
+            shutil.copyfile(ROOT/helper.relative_to(root), helper)
+            contracts.qualification(root, group)
+            helper.write_text(helper.read_text().replace('6364136223846793005', '6364136223846793007'))
+            with self.assertRaisesRegex(ValueError, 'fixture support source changed'):
+                contracts.qualification(root, group)
 
 
     def test_discovery_ignores_literals_and_preserves_real_nested_loops_and_helpers(self):
