@@ -2,6 +2,8 @@
 
 pub mod cancellation;
 pub mod catalogue;
+pub mod causal;
+pub mod certificate_cache;
 pub mod circuit;
 pub mod clifford;
 pub mod compact;
