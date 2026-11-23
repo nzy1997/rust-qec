@@ -1187,3 +1187,67 @@ fn gen_si1000_emits_native_cz_without_custom_noise_flags() {
     assert!(!conflict.status.success());
     assert!(String::from_utf8_lossy(&conflict.stderr).contains("cannot be used with"));
 }
+
+#[test]
+fn run_si1000_rejects_programmatic_noise_without_touching_output() {
+    use clap::Parser;
+    use rstim::cli::{Cli, Commands, run};
+
+    let dir = tempfile::tempdir().unwrap();
+    let out = dir.path().join("existing.stim");
+    std::fs::write(&out, "keep me").unwrap();
+    let mut cli = Cli::try_parse_from([
+        "rstim",
+        "gen",
+        "--code",
+        "surface_code",
+        "--task",
+        "rotated_memory_z",
+        "--distance",
+        "3",
+        "--rounds",
+        "2",
+        "--si1000",
+        "0.002",
+        "--out",
+        out.to_str().unwrap(),
+    ])
+    .unwrap();
+    let Some(Commands::Gen { noise, .. }) = cli.command.as_mut() else {
+        unreachable!("expected a generation command");
+    };
+    *noise = 0.5;
+
+    let error = run(cli).unwrap_err();
+    assert!(error.contains("--si1000 cannot be used with --after_clifford_depolarization"));
+    assert_eq!(std::fs::read_to_string(out).unwrap(), "keep me");
+}
+
+#[cfg(unix)]
+#[test]
+fn gen_si1000_reports_a_buffered_output_write_failure() {
+    use std::os::{fd::OwnedFd, unix::net::UnixStream};
+    use std::process::Stdio;
+
+    let (stdout, reader) = UnixStream::pair().unwrap();
+    drop(reader);
+    let output = rstim_cmd()
+        .args([
+            "gen",
+            "--code",
+            "surface_code",
+            "--task",
+            "rotated_memory_z",
+            "--distance",
+            "2",
+            "--rounds",
+            "1",
+            "--si1000",
+            "0.002",
+        ])
+        .stdout(Stdio::from(OwnedFd::from(stdout)))
+        .output()
+        .unwrap();
+    assert!(!output.status.success());
+    assert!(String::from_utf8_lossy(&output.stderr).contains("write error:"));
+}

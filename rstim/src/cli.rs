@@ -634,17 +634,6 @@ fn run_command(command: Option<Commands>) -> Result<(), String> {
         }) => {
             #[cfg(not(feature = "codegen-css"))]
             let _ = (&hx, &hz, &basis, &schedule, &observables);
-            if let Some(p) = si1000 {
-                let distance = distance
-                    .ok_or_else(|| "distance is required for common generators".to_string())?;
-                let circuit = crate::operations::generate_si1000_circuit_text(
-                    &code, &task, distance, rounds, p,
-                )?;
-                let mut writer = open_output(out.as_deref())?;
-                return writer
-                    .write_all(circuit.as_bytes())
-                    .map_err(|error| format!("write error: {error}"));
-            }
             for (name, value) in [
                 ("after_clifford_depolarization", noise),
                 (
@@ -670,6 +659,21 @@ fn run_command(command: Option<Commands>) -> Result<(), String> {
                 if !value.is_finite() || !(0.0..=1.0).contains(&value) {
                     return Err(format!("{name} must be finite and in [0, 1], got {value}"));
                 }
+                if si1000.is_some() && value != 0.0 {
+                    return Err(format!("--si1000 cannot be used with --{name}"));
+                }
+            }
+            if let Some(p) = si1000 {
+                let distance = distance
+                    .ok_or_else(|| "distance is required for common generators".to_string())?;
+                let circuit = crate::operations::generate_si1000_circuit_text(
+                    &code, &task, distance, rounds, p,
+                )?;
+                let mut writer = open_output(out.as_deref())?;
+                return writer
+                    .write_all(circuit.as_bytes())
+                    .and_then(|()| writer.flush())
+                    .map_err(|error| format!("write error: {error}"));
             }
             let params = NoiseParams {
                 before_round_data_depolarization,
