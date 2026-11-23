@@ -141,6 +141,30 @@ pub(crate) fn generate_common_circuit_text_with_params(
     Ok(crate::ir::circuit_to_string(&instructions))
 }
 
+/// Generate a standard Stim circuit for a rotated surface-code memory task
+/// using the native-CZ SI1000 schedule.
+pub fn generate_si1000_circuit_text(
+    code: &str,
+    task: &str,
+    distance: usize,
+    rounds: usize,
+    p: f64,
+) -> Result<String, String> {
+    use crate::codegen::surface_code::{rotated_memory_x_si1000, rotated_memory_z_si1000};
+
+    let circuit = match (code, task) {
+        ("surface_code", "rotated_memory_x") => rotated_memory_x_si1000(distance, rounds, p)?,
+        ("surface_code", "rotated_memory_z") => rotated_memory_z_si1000(distance, rounds, p)?,
+        _ => {
+            return Err(
+                "SI1000 requires surface_code/rotated_memory_x or surface_code/rotated_memory_z"
+                    .to_string(),
+            );
+        }
+    };
+    Ok(crate::ir::circuit_to_string(&circuit))
+}
+
 pub fn run_gen(
     code: &str,
     task: &str,

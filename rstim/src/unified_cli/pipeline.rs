@@ -42,6 +42,7 @@ pub struct GenOptions {
     pub task: String,
     pub distance: usize,
     pub rounds: usize,
+    pub si1000: Option<f64>,
     pub after_clifford_depolarization: f64,
     pub before_round_data_depolarization: f64,
     pub before_round_data_loss_probability: f64,
@@ -585,7 +586,17 @@ pub fn run_gen(
         ));
     }
     let mut buffer = Vec::new();
-    if is_midswap {
+    if let Some(p) = options.si1000 {
+        let circuit = rstim::operations::generate_si1000_circuit_text(
+            &options.code,
+            &options.task,
+            options.distance,
+            options.rounds,
+            p,
+        )
+        .map_err(|message| command_error(CIRCUIT_GEN_COMMAND, "invalid_arguments", message, json))?;
+        buffer.extend_from_slice(circuit.as_bytes());
+    } else if is_midswap {
         if options.after_clifford_loss_probability != 0.0 {
             return Err(command_error(
                 CIRCUIT_GEN_COMMAND,
