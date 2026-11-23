@@ -1,5 +1,5 @@
 {
-  "schema": "rmagna.standalone-contracts.v1",
+  "schema": "rmagna.standalone-contracts.v2",
   "sources": {
     "causal": {
       "source_sha256": "feaf54e6fe1648e70e68cb95b5bd1326a3375d2a338834b4f535977ed1f11837",
@@ -2957,12 +2957,46 @@
       "end_line": 9,
       "assertions": [],
       "loops": [],
-      "status": "unresolved",
-      "reason": "Assertion-free orchestration or independent oracle helper. Its complete source hash, loops and helper calls remain required context for dependent groups; candidate Rust code is not evidence of translation of this helper.",
-      "assessment": "helper_context",
-      "candidate_owners": [],
+      "status": "bound",
+      "reason": "Complete pinned source group is bound to the reviewed Rust fixture; executable qualification requires matching compiler and process receipts.",
+      "assessment": "source_bound_witness",
+      "candidate_owners": [
+        {
+          "path": "rmagna/src/causal.rs",
+          "anchor": "pub struct CausalKnowledge"
+        }
+      ],
       "candidate_witnesses": [],
-      "follow_up_issue": 1319
+      "follow_up_issue": 1319,
+      "qualification": {
+        "witnesses": [
+          {
+            "package": "rmagna",
+            "target": "standalone_causal_knowledge",
+            "test": "check_pending_semantics",
+            "source_sha256": "42ff31103f099d541fbe17a42f0172d24e16996fdf5878480a09a650ba74174c"
+          },
+          {
+            "package": "rmagna",
+            "target": "standalone_causal_knowledge",
+            "test": "check_finite_assignments",
+            "source_sha256": "42ff31103f099d541fbe17a42f0172d24e16996fdf5878480a09a650ba74174c"
+          },
+          {
+            "package": "rmagna",
+            "target": "standalone_causal_knowledge",
+            "test": "check_large_request_order",
+            "source_sha256": "42ff31103f099d541fbe17a42f0172d24e16996fdf5878480a09a650ba74174c"
+          },
+          {
+            "package": "rmagna",
+            "target": "standalone_causal_knowledge",
+            "test": "check_dense_spans",
+            "source_sha256": "42ff31103f099d541fbe17a42f0172d24e16996fdf5878480a09a650ba74174c"
+          }
+        ],
+        "adaptation": "Explicit physical-width BitVector masks replace trimmed Native Bits and a hash index replaces the small/large sorted indexes. Pending order, highest-unknown-pivot stopping, complete original schedules and ordered contradiction partial updates are preserved. Dense-span masks reserve width+65 for the original unseen-high-pivot probe; the original mt19937_64 stream helper is reused."
+      }
     },
     {
       "id": "causal/scalar_parity",
@@ -2973,12 +3007,46 @@
       "loops": [
         0
       ],
-      "status": "unresolved",
-      "reason": "Assertion-free orchestration or independent oracle helper. Its complete source hash, loops and helper calls remain required context for dependent groups; candidate Rust code is not evidence of translation of this helper.",
-      "assessment": "helper_context",
-      "candidate_owners": [],
+      "status": "bound",
+      "reason": "Complete pinned source group is bound to the reviewed Rust fixture; executable qualification requires matching compiler and process receipts.",
+      "assessment": "source_bound_witness",
+      "candidate_owners": [
+        {
+          "path": "rmagna/src/causal.rs",
+          "anchor": "pub struct CausalKnowledge"
+        }
+      ],
       "candidate_witnesses": [],
-      "follow_up_issue": 1319
+      "follow_up_issue": 1319,
+      "qualification": {
+        "witnesses": [
+          {
+            "package": "rmagna",
+            "target": "standalone_causal_knowledge",
+            "test": "check_pending_semantics",
+            "source_sha256": "42ff31103f099d541fbe17a42f0172d24e16996fdf5878480a09a650ba74174c"
+          },
+          {
+            "package": "rmagna",
+            "target": "standalone_causal_knowledge",
+            "test": "check_finite_assignments",
+            "source_sha256": "42ff31103f099d541fbe17a42f0172d24e16996fdf5878480a09a650ba74174c"
+          },
+          {
+            "package": "rmagna",
+            "target": "standalone_causal_knowledge",
+            "test": "check_large_request_order",
+            "source_sha256": "42ff31103f099d541fbe17a42f0172d24e16996fdf5878480a09a650ba74174c"
+          },
+          {
+            "package": "rmagna",
+            "target": "standalone_causal_knowledge",
+            "test": "check_dense_spans",
+            "source_sha256": "42ff31103f099d541fbe17a42f0172d24e16996fdf5878480a09a650ba74174c"
+          }
+        ],
+        "adaptation": "Explicit physical-width BitVector masks replace trimmed Native Bits and a hash index replaces the small/large sorted indexes. Pending order, highest-unknown-pivot stopping, complete original schedules and ordered contradiction partial updates are preserved. Dense-span masks reserve width+65 for the original unseen-high-pivot probe; the original mt19937_64 stream helper is reused."
+      }
     },
     {
       "id": "causal/same_request",
@@ -2987,12 +3055,46 @@
       "end_line": 17,
       "assertions": [],
       "loops": [],
-      "status": "unresolved",
-      "reason": "Assertion-free orchestration or independent oracle helper. Its complete source hash, loops and helper calls remain required context for dependent groups; candidate Rust code is not evidence of translation of this helper.",
-      "assessment": "helper_context",
-      "candidate_owners": [],
+      "status": "bound",
+      "reason": "Complete pinned source group is bound to the reviewed Rust fixture; executable qualification requires matching compiler and process receipts.",
+      "assessment": "source_bound_witness",
+      "candidate_owners": [
+        {
+          "path": "rmagna/src/causal.rs",
+          "anchor": "pub struct CausalKnowledge"
+        }
+      ],
       "candidate_witnesses": [],
-      "follow_up_issue": 1319
+      "follow_up_issue": 1319,
+      "qualification": {
+        "witnesses": [
+          {
+            "package": "rmagna",
+            "target": "standalone_causal_knowledge",
+            "test": "check_pending_semantics",
+            "source_sha256": "42ff31103f099d541fbe17a42f0172d24e16996fdf5878480a09a650ba74174c"
+          },
+          {
+            "package": "rmagna",
+            "target": "standalone_causal_knowledge",
+            "test": "check_finite_assignments",
+            "source_sha256": "42ff31103f099d541fbe17a42f0172d24e16996fdf5878480a09a650ba74174c"
+          },
+          {
+            "package": "rmagna",
+            "target": "standalone_causal_knowledge",
+            "test": "check_large_request_order",
+            "source_sha256": "42ff31103f099d541fbe17a42f0172d24e16996fdf5878480a09a650ba74174c"
+          },
+          {
+            "package": "rmagna",
+            "target": "standalone_causal_knowledge",
+            "test": "check_dense_spans",
+            "source_sha256": "42ff31103f099d541fbe17a42f0172d24e16996fdf5878480a09a650ba74174c"
+          }
+        ],
+        "adaptation": "Explicit physical-width BitVector masks replace trimmed Native Bits and a hash index replaces the small/large sorted indexes. Pending order, highest-unknown-pivot stopping, complete original schedules and ordered contradiction partial updates are preserved. Dense-span masks reserve width+65 for the original unseen-high-pivot probe; the original mt19937_64 stream helper is reused."
+      }
     },
     {
       "id": "causal/check_pending_semantics",
@@ -3014,12 +3116,28 @@
       "loops": [
         0
       ],
-      "status": "unresolved",
-      "reason": "No full incremental value-aware highest-pivot request/observe service was identified. The rank-only diagnostics basis and quantum RuntimePathState conditions do not provide readonly first-seen pending requests, consistent/contradictory observations and ordered history.",
-      "assessment": "implementation_gap",
-      "candidate_owners": [],
+      "status": "bound",
+      "reason": "Complete pinned source group is bound to the reviewed Rust fixture; executable qualification requires matching compiler and process receipts.",
+      "assessment": "source_bound_witness",
+      "candidate_owners": [
+        {
+          "path": "rmagna/src/causal.rs",
+          "anchor": "pub struct CausalKnowledge"
+        }
+      ],
       "candidate_witnesses": [],
-      "follow_up_issue": 1319
+      "follow_up_issue": 1319,
+      "qualification": {
+        "witnesses": [
+          {
+            "package": "rmagna",
+            "target": "standalone_causal_knowledge",
+            "test": "check_pending_semantics",
+            "source_sha256": "42ff31103f099d541fbe17a42f0172d24e16996fdf5878480a09a650ba74174c"
+          }
+        ],
+        "adaptation": "Explicit physical-width BitVector masks replace trimmed Native Bits and a hash index replaces the small/large sorted indexes. Pending order, highest-unknown-pivot stopping, complete original schedules and ordered contradiction partial updates are preserved. Dense-span masks reserve width+65 for the original unseen-high-pivot probe; the original mt19937_64 stream helper is reused."
+      }
     },
     {
       "id": "causal/check_finite_assignments",
@@ -3051,12 +3169,28 @@
         14,
         15
       ],
-      "status": "unresolved",
-      "reason": "No full incremental value-aware highest-pivot request/observe service was identified. The rank-only diagnostics basis and quantum RuntimePathState conditions do not provide readonly first-seen pending requests, consistent/contradictory observations and ordered history.",
-      "assessment": "implementation_gap",
-      "candidate_owners": [],
+      "status": "bound",
+      "reason": "Complete pinned source group is bound to the reviewed Rust fixture; executable qualification requires matching compiler and process receipts.",
+      "assessment": "source_bound_witness",
+      "candidate_owners": [
+        {
+          "path": "rmagna/src/causal.rs",
+          "anchor": "pub struct CausalKnowledge"
+        }
+      ],
       "candidate_witnesses": [],
-      "follow_up_issue": 1319
+      "follow_up_issue": 1319,
+      "qualification": {
+        "witnesses": [
+          {
+            "package": "rmagna",
+            "target": "standalone_causal_knowledge",
+            "test": "check_finite_assignments",
+            "source_sha256": "42ff31103f099d541fbe17a42f0172d24e16996fdf5878480a09a650ba74174c"
+          }
+        ],
+        "adaptation": "Explicit physical-width BitVector masks replace trimmed Native Bits and a hash index replaces the small/large sorted indexes. Pending order, highest-unknown-pivot stopping, complete original schedules and ordered contradiction partial updates are preserved. Dense-span masks reserve width+65 for the original unseen-high-pivot probe; the original mt19937_64 stream helper is reused."
+      }
     },
     {
       "id": "causal/check_large_request_order",
@@ -3077,12 +3211,28 @@
         2,
         3
       ],
-      "status": "unresolved",
-      "reason": "No full incremental value-aware highest-pivot request/observe service was identified. The rank-only diagnostics basis and quantum RuntimePathState conditions do not provide readonly first-seen pending requests, consistent/contradictory observations and ordered history.",
-      "assessment": "implementation_gap",
-      "candidate_owners": [],
+      "status": "bound",
+      "reason": "Complete pinned source group is bound to the reviewed Rust fixture; executable qualification requires matching compiler and process receipts.",
+      "assessment": "source_bound_witness",
+      "candidate_owners": [
+        {
+          "path": "rmagna/src/causal.rs",
+          "anchor": "pub struct CausalKnowledge"
+        }
+      ],
       "candidate_witnesses": [],
-      "follow_up_issue": 1319
+      "follow_up_issue": 1319,
+      "qualification": {
+        "witnesses": [
+          {
+            "package": "rmagna",
+            "target": "standalone_causal_knowledge",
+            "test": "check_large_request_order",
+            "source_sha256": "42ff31103f099d541fbe17a42f0172d24e16996fdf5878480a09a650ba74174c"
+          }
+        ],
+        "adaptation": "Explicit physical-width BitVector masks replace trimmed Native Bits and a hash index replaces the small/large sorted indexes. Pending order, highest-unknown-pivot stopping, complete original schedules and ordered contradiction partial updates are preserved. Dense-span masks reserve width+65 for the original unseen-high-pivot probe; the original mt19937_64 stream helper is reused."
+      }
     },
     {
       "id": "causal/check_dense_spans",
@@ -3104,12 +3254,28 @@
         5,
         6
       ],
-      "status": "unresolved",
-      "reason": "No full incremental value-aware highest-pivot request/observe service was identified. The rank-only diagnostics basis and quantum RuntimePathState conditions do not provide readonly first-seen pending requests, consistent/contradictory observations and ordered history.",
-      "assessment": "implementation_gap",
-      "candidate_owners": [],
+      "status": "bound",
+      "reason": "Complete pinned source group is bound to the reviewed Rust fixture; executable qualification requires matching compiler and process receipts.",
+      "assessment": "source_bound_witness",
+      "candidate_owners": [
+        {
+          "path": "rmagna/src/causal.rs",
+          "anchor": "pub struct CausalKnowledge"
+        }
+      ],
       "candidate_witnesses": [],
-      "follow_up_issue": 1319
+      "follow_up_issue": 1319,
+      "qualification": {
+        "witnesses": [
+          {
+            "package": "rmagna",
+            "target": "standalone_causal_knowledge",
+            "test": "check_dense_spans",
+            "source_sha256": "42ff31103f099d541fbe17a42f0172d24e16996fdf5878480a09a650ba74174c"
+          }
+        ],
+        "adaptation": "Explicit physical-width BitVector masks replace trimmed Native Bits and a hash index replaces the small/large sorted indexes. Pending order, highest-unknown-pivot stopping, complete original schedules and ordered contradiction partial updates are preserved. Dense-span masks reserve width+65 for the original unseen-high-pivot probe; the original mt19937_64 stream helper is reused."
+      }
     },
     {
       "id": "causal/main",
@@ -3118,12 +3284,46 @@
       "end_line": 228,
       "assertions": [],
       "loops": [],
-      "status": "unresolved",
-      "reason": "Assertion-free orchestration or independent oracle helper. Its complete source hash, loops and helper calls remain required context for dependent groups; candidate Rust code is not evidence of translation of this helper.",
-      "assessment": "helper_context",
-      "candidate_owners": [],
+      "status": "bound",
+      "reason": "Complete pinned source group is bound to the reviewed Rust fixture; executable qualification requires matching compiler and process receipts.",
+      "assessment": "source_bound_witness",
+      "candidate_owners": [
+        {
+          "path": "rmagna/src/causal.rs",
+          "anchor": "pub struct CausalKnowledge"
+        }
+      ],
       "candidate_witnesses": [],
-      "follow_up_issue": 1319
+      "follow_up_issue": 1319,
+      "qualification": {
+        "witnesses": [
+          {
+            "package": "rmagna",
+            "target": "standalone_causal_knowledge",
+            "test": "check_pending_semantics",
+            "source_sha256": "42ff31103f099d541fbe17a42f0172d24e16996fdf5878480a09a650ba74174c"
+          },
+          {
+            "package": "rmagna",
+            "target": "standalone_causal_knowledge",
+            "test": "check_finite_assignments",
+            "source_sha256": "42ff31103f099d541fbe17a42f0172d24e16996fdf5878480a09a650ba74174c"
+          },
+          {
+            "package": "rmagna",
+            "target": "standalone_causal_knowledge",
+            "test": "check_large_request_order",
+            "source_sha256": "42ff31103f099d541fbe17a42f0172d24e16996fdf5878480a09a650ba74174c"
+          },
+          {
+            "package": "rmagna",
+            "target": "standalone_causal_knowledge",
+            "test": "check_dense_spans",
+            "source_sha256": "42ff31103f099d541fbe17a42f0172d24e16996fdf5878480a09a650ba74174c"
+          }
+        ],
+        "adaptation": "Explicit physical-width BitVector masks replace trimmed Native Bits and a hash index replaces the small/large sorted indexes. Pending order, highest-unknown-pivot stopping, complete original schedules and ordered contradiction partial updates are preserved. Dense-span masks reserve width+65 for the original unseen-high-pivot probe; the original mt19937_64 stream helper is reused."
+      }
     },
     {
       "id": "foundation/require",
@@ -3717,17 +3917,28 @@
         "main/require-015"
       ],
       "loops": [],
-      "status": "unresolved",
-      "reason": "OriginalTraceCache is bounded by entry count, not Native CertificateCache payload bytes and named certificates. Probability value-cache byte quotas store different objects. No equivalent certificate-byte eviction/clear contract has been qualified.",
-      "assessment": "implementation_gap",
+      "status": "bound",
+      "reason": "Complete pinned source group is bound to the reviewed Rust fixture; executable qualification requires matching compiler and process receipts.",
+      "assessment": "source_bound_witness",
       "candidate_owners": [
         {
-          "path": "rmagna/src/instrument/original_trace_cache.rs",
-          "anchor": "pub struct OriginalTraceCache"
+          "path": "rmagna/src/certificate_cache.rs",
+          "anchor": "pub struct CertificateCache"
         }
       ],
       "candidate_witnesses": [],
-      "follow_up_issue": 1320
+      "follow_up_issue": 1320,
+      "qualification": {
+        "witnesses": [
+          {
+            "package": "rmagna",
+            "target": "standalone_certificate_snapshots",
+            "test": "foundation_certificate_cache",
+            "source_sha256": "a2adb314aacf8a2a84d6a880e135631ef36779d4514acc684557562f028b76f5"
+          }
+        ],
+        "adaptation": "Owned Rust key/blob/scalar snapshots use a VecDeque LRU and exclusive mutable access. Charges are declared serialized bytes; clear resets all original counters and saved-cost totals."
+      }
     },
     {
       "id": "foundation/main.categorical-law-interning",
@@ -4065,17 +4276,28 @@
         "main/require-056"
       ],
       "loops": [],
-      "status": "unresolved",
-      "reason": "The diagnostics basis computes rank only. Native request/observe affine values, pending labels and contradiction semantics need a dedicated Rust counterpart.",
-      "assessment": "implementation_gap",
+      "status": "bound",
+      "reason": "Complete pinned source group is bound to the reviewed Rust fixture; executable qualification requires matching compiler and process receipts.",
+      "assessment": "source_bound_witness",
       "candidate_owners": [
         {
-          "path": "rmagna/src/task/evaluate/diagnostics.rs",
-          "anchor": "pub struct TaskSampleDiagnosticOptions"
+          "path": "rmagna/src/causal.rs",
+          "anchor": "pub struct CausalKnowledge"
         }
       ],
       "candidate_witnesses": [],
-      "follow_up_issue": 1319
+      "follow_up_issue": 1319,
+      "qualification": {
+        "witnesses": [
+          {
+            "package": "rmagna",
+            "target": "standalone_causal_knowledge",
+            "test": "foundation_online_classical_knowledge",
+            "source_sha256": "42ff31103f099d541fbe17a42f0172d24e16996fdf5878480a09a650ba74174c"
+          }
+        ],
+        "adaptation": "Explicit physical-width BitVector masks replace trimmed Native Bits and a hash index replaces the small/large sorted indexes. Pending order, highest-unknown-pivot stopping, complete original schedules and ordered contradiction partial updates are preserved. Dense-span masks reserve width+65 for the original unseen-high-pivot probe; the original mt19937_64 stream helper is reused."
+      }
     },
     {
       "id": "foundation/main.file-parser",
@@ -4809,7 +5031,7 @@
       "follow_up_issue": 1321
     }
   ],
-  "claim": "decomposition_only_not_verified_parity",
+  "claim": "source_bound_rust_obligations",
   "reference_sha256": "c49203a586f5a451e3183b435793df693dd486857356aed8826df5dc723e5454",
   "upstream_commit": "56847478c840395735146ef1e1ccdc3d8aedc10f"
 }

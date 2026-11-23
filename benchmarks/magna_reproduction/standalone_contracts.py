@@ -53,7 +53,8 @@ MAIN = [(771, 'wide-clifford-elimination'),
  (1717, 'affine-proposal-hull'),
  (1774, 'quadratic-radical-support')]
 
-SCHEMA = 'rmagna.standalone-contracts.v1'
+SCHEMA = 'rmagna.standalone-contracts.v2'
+CLAIM = 'source_bound_rust_obligations'
 SOURCES = {'causal': 'tests/native/causal.cpp',
            'foundation': 'tests/native/foundation.cpp'}
 AGGREGATES = {
@@ -66,6 +67,39 @@ DISCOVERY_DIGESTS = {
 }
 
 ASSESSMENTS = {'validation_gap', 'implementation_gap', 'representation_difference', 'helper_context'}
+ASSESSMENTS.add('source_bound_witness')
+
+CAUSAL_TARGET = 'standalone_causal_knowledge'
+CAUSAL_TESTS = ['check_pending_semantics', 'check_finite_assignments',
+                'check_large_request_order', 'check_dense_spans']
+QUALIFICATIONS = {
+    **{f'causal/{name}': [(CAUSAL_TARGET, name)] for name in CAUSAL_TESTS},
+    **{f'causal/{name}': [(CAUSAL_TARGET, test) for test in CAUSAL_TESTS]
+       for name in ('require', 'scalar_parity', 'same_request', 'main')},
+    'foundation/main.online-classical-knowledge': [(CAUSAL_TARGET, 'foundation_online_classical_knowledge')],
+    'foundation/main.certificate-cache': [('standalone_certificate_snapshots', 'foundation_certificate_cache')],
+}
+ADAPTATIONS = {group: ('924af70cbbedc790fa17dc5f09de8d46f05b02d35e37902db8514443d4f5d0cf'
+                       if group == 'foundation/main.certificate-cache' else
+                       '3ba859ceb1d8ea8653df78feca9a2f44a5d15d0589530398bb3153dcf1635b98')
+               for group in QUALIFICATIONS}
+
+
+def qualification(root, group):
+    require(group['id'] in QUALIFICATIONS, 'standalone group has no reviewed Rust qualification')
+    expected = QUALIFICATIONS[group['id']]
+    value = group.get('qualification')
+    require(isinstance(value, dict) and set(value) == {'witnesses', 'adaptation'},
+            'missing source-specific standalone qualification')
+    require(isinstance(value['adaptation'], str)
+            and hashlib.sha256(value['adaptation'].encode()).hexdigest() == ADAPTATIONS[group['id']],
+            'standalone representation adaptation changed')
+    witnesses = value['witnesses']
+    require(isinstance(witnesses, list) and len(witnesses) == len(expected),
+            'standalone qualification witness inventory changed')
+    require([rust.witness(root, witness) for witness in witnesses] == expected,
+            'standalone fixture requires its source-specific witnesses')
+    return witnesses
 
 
 def require(condition, message):
@@ -115,29 +149,28 @@ def group_bindings(sources):
     return facts, bindings_from_facts(facts)
 
 
-def check_catalogue(sources, catalogue, ledger, reference_manifest, reference_sha256, root):
+def check_catalogue(sources, catalogue, ledger, reference_manifest, reference_sha256, root, *, rust_run=None):
     require(set(sources) == set(SOURCES), 'missing standalone source suite')
     facts, _ = group_bindings(sources)
     for name, path in SOURCES.items():
         require(facts[name]['source_sha256'] == reference_manifest['upstream']['files'][path],
                 f'standalone pinned source changed: {path}')
     require(catalogue.get('sources') == facts, 'standalone helper/assertion/loop inventory changed')
-    result = check_inventory(catalogue, ledger, reference_manifest, reference_sha256, root)
+    result = check_inventory(catalogue, ledger, reference_manifest, reference_sha256, root, rust_run=rust_run)
     result['upstream_verified'] = True
     return result
 
 
-def check_inventory(catalogue, ledger, reference_manifest, reference_sha256, root):
+def check_inventory(catalogue, ledger, reference_manifest, reference_sha256, root, *, rust_run=None):
     """Offline structural check of the exact retained discovery snapshot.
 
     Snapshot digests bind the complete original discovery, including empty
-    helpers and loop-only oracles. The standalone command additionally parses
-    the actual source again; this offline path never claims source execution
-    or executable Rust coverage.
+    helpers and loop-only oracles. Bound groups require their reviewed fixtures.
+    Executable coverage additionally requires a source/compiler/process receipt;
+    structural-only callers report those groups as unexecuted.
     """
     require(catalogue.get('schema') == SCHEMA, 'unsupported standalone schema')
-    require(catalogue.get('claim') == 'decomposition_only_not_verified_parity',
-            'standalone catalogue cannot certify aggregate parity')
+    require(catalogue.get('claim') == CLAIM, 'standalone qualification scope changed')
     require(catalogue.get('reference_sha256') == reference_sha256,
             'standalone reference identity changed')
     require(catalogue.get('upstream_commit') == reference_manifest['upstream']['commit'],
@@ -162,8 +195,12 @@ def check_inventory(catalogue, ledger, reference_manifest, reference_sha256, roo
     for group in groups:
         require(all(group.get(key) == value for key, value in expected[group['id']].items()),
                 f'standalone assertion/loop partition changed: {group["id"]}')
-        require(group.get('status') == 'unresolved',
+        require(group.get('status') in {'unresolved', 'bound'},
                 'standalone groups require source-specific executable qualification before promotion')
+        if group['status'] == 'bound':
+            qualification(root, group)
+        else:
+            require('qualification' not in group, 'unresolved standalone group has a qualification')
         require(group.get('assessment') in ASSESSMENTS, 'unknown standalone assessment')
         require(type(group.get('follow_up_issue')) is int and group['follow_up_issue'] > 0,
                 'missing standalone unresolved follow-up issue')
@@ -193,8 +230,16 @@ def check_inventory(catalogue, ledger, reference_manifest, reference_sha256, roo
             rust.witness(root, witness)
     statuses = {row['id']: row['status'] for row in ledger['cases']}
     require(len(statuses) == len(ledger['cases']), 'duplicate ledger method')
-    require(all(statuses.get(method) == 'unmapped' for method in AGGREGATES.values()),
-            'unresolved standalone aggregate cannot be promoted')
+    declared = {}
+    for name, method in AGGREGATES.items():
+        own = [group for group in groups if group['id'].startswith(name+'/')]
+        declared[name] = 'verified' if all(group['status'] == 'bound' for group in own) else 'unmapped'
+        require(statuses.get(method) == declared[name], 'unresolved standalone aggregate cannot be promoted')
+        if declared[name] == 'verified':
+            expected_witnesses = set(witness for group in own for witness in QUALIFICATIONS[group['id']])
+            row = next(row for row in ledger['cases'] if row['id'] == method)
+            require({rust.witness(root, witness) for witness in row['rust_tests']} == expected_witnesses,
+                    'standalone aggregate witness inventory changed')
     # Explicit partitions also protect assertion-free helpers and loop-only
     # oracles, which a require()-only scanner would otherwise silently lose.
     for name, found in facts.items():
@@ -208,13 +253,26 @@ def check_inventory(catalogue, ledger, reference_manifest, reference_sha256, roo
             require(sorted(assigned) == list(range(len(helper['loops']))),
                     'standalone loop partition incomplete')
             require(set(helper['helper_calls']) <= set(helpers), 'missing standalone source helper')
+    bound = [group for group in groups if group['status'] == 'bound']
+    observed = dict(status='not_run', source_bound=False, compiler_bound=False)
+    if rust_run is not None:
+        from standalone_execution import validate
+        witnesses = [witness for group in bound for witness in qualification(root, group)]
+        observed = validate(root, rust_run, witnesses)
+    covered = bound if observed['status'] == 'PASS' else []
+    unexecuted = [] if covered else bound
+    unresolved = [group for group in groups if group['status'] == 'unresolved']
     return dict(status='PASS', scope=catalogue['claim'], upstream_verified=False,
                 helpers=sum(v['counts']['functions'] for v in facts.values()),
-                groups=len(groups), covered_groups=0, unresolved_groups=len(groups),
+                groups=len(groups), covered_groups=len(covered), unresolved_groups=len(unresolved),
+                bound_groups=len(bound), unexecuted_groups=len(unexecuted),
                 assertions=sum(v['counts']['assertions'] for v in facts.values()),
-                covered_assertions=0,
-                unresolved_assertions=sum(v['counts']['assertions'] for v in facts.values()),
+                covered_assertions=sum(len(group['assertions']) for group in covered),
+                unresolved_assertions=sum(len(group['assertions']) for group in unresolved),
+                unexecuted_assertions=sum(len(group['assertions']) for group in unexecuted),
                 loop_headers=sum(v['counts']['loop_headers'] for v in facts.values()),
                 assessments=dict(sorted(Counter(g['assessment'] for g in groups).items())),
-                follow_up_issues=sorted({g['follow_up_issue'] for g in groups}),
-                aggregate_statuses={name: statuses[method] for name, method in AGGREGATES.items()})
+                follow_up_issues=sorted({g['follow_up_issue'] for g in unresolved}),
+                execution=observed, aggregate_declarations=declared,
+                aggregate_statuses={name: ('requires_execution' if state == 'verified' and not covered else state)
+                                    for name, state in declared.items()})

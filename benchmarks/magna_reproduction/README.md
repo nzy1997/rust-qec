@@ -4015,14 +4015,23 @@ receipts bind every new witness to the final source and executed binary.
 ```sh
 python3 benchmarks/magna_reproduction/remaining_contracts.py standalone \
   --upstream "$MAGNA_UPSTREAM"
+python3 benchmarks/magna_reproduction/remaining_contracts.py standalone \
+  --upstream "$MAGNA_UPSTREAM" --catalogue-only \
+  --rust-run drafts/magna-standalone-execution.json
+cargo test --locked -p rmagna --test standalone_causal_knowledge \
+  --test standalone_certificate_snapshots
 cargo test --locked -p rmagna --test standalone_headers
 ```
 
 The first command verifies the pinned source inventory, discovers every function,
 `require` assertion and loop header in `causal.cpp` and `foundation.cpp`, checks
-their complete semantic partition, then creates only three temporary consumer
-files and runs `cargo check --locked --offline`. It reuses the caller's Cargo
-cache/target and removes the temporary consumer. Python orchestrates this check;
+their complete semantic partition, and qualifies bound groups with compiler and
+test-process receipts. Fresh execution records `drafts/magna-standalone-execution.json`;
+`--record-rust-run PATH` selects another receipt, and `--rust-run PATH` reuses
+one after checking its source, binary, compiler-artifact and test-result identities.
+The command then creates only three temporary consumer files and runs
+`cargo check --locked --offline`. It reuses the caller's Cargo cache/target and
+removes the temporary consumer. Python orchestrates this check;
 the four separate consumer modules import only public Rust types and have no
 Python dependency. They cover reference-network probability, affine proposals,
 file execution and file enumeration. The checked-in consumer is also the flat
@@ -4030,12 +4039,12 @@ Rust compilation witness. This qualifies the original header-availability method
 not either aggregate's numerical behavior.
 
 The source-bound decomposition has 22 helpers, 66 groups, 217 assertions and
-226 loop headers. All groups remain explicitly unresolved for aggregate semantic
-qualification. There are 47 existing-owner candidates, six groups identifying
-two missing services, four representation decisions and nine helper/oracle
-contexts. Six groups do not mean six missing algorithms. Sixteen existing Rust
-witness declarations are reused as ownership candidates, without turning their
-neighboring-method passes into aggregate coverage. `--catalogue-only` explicitly
+226 loop headers. Ten groups bind all 25 causal assertions and five foundation
+service assertions to source-specific Rust fixtures. Structural checks report
+these as unexecuted until a matching compiler/process receipt passes. The other
+56 groups retain 187 unresolved foundation assertions and their full contexts.
+Existing neighboring-method passes remain ownership candidates.
+`--catalogue-only` explicitly
 skips the external consumer and makes no header-compilation claim. Ordinary
 `remaining_contracts.py check` validates the retained discovery snapshot offline;
 only the standalone command re-discovers the actual pinned C++ source.
@@ -4051,10 +4060,13 @@ only the standalone command re-discovers the actual pinned C++ source.
   persistent boundary-session state and target-inverse representation need explicit
   Rust contracts and full original fixtures.
 
-Both causal/foundation aggregate methods stay `unmapped`; a fabricated promotion,
-missing entire group/helper/loop, nonexistent owner or missing follow-up fails.
-The current ledger is 341 verified / 7 partial / 4 unmapped, with 11 outstanding
-methods. R12 completes a decomposition and consumer contract, not full parity.
+The causal aggregate has a complete Rust binding; its execution status requires
+the retained process evidence. The foundation aggregate stays `unmapped` until
+#1321 qualifies every group. Missing entire groups/helpers/loops, adjacent fixture
+substitutions, stale source/binary identities, incomplete compiler/run observations
+and unsupported promotions fail the gate. The current ledger is 342 verified /
+7 partial / 3 unmapped, with 10 outstanding methods. These bindings do not establish
+full Python/private-container parity or paper performance.
 
 ### B03 Bravyi-Haah paper campaign
 
