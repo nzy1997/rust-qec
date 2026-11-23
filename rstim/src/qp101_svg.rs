@@ -1168,9 +1168,12 @@ fn measurement_flip_target_slots(
         return Vec::new();
     }
     match gate {
-        "MPAD" | "ML" | "MZL" | "MXL" | "MYL" | "MRL" | "MRZL" | "MRXL" | "MRYL" => {
-            (0..raw_targets.map_or(targets.len(), <[_]>::len))
-                .map(|slot| vec![slot])
+        "MPAD" => (0..raw_targets.map_or(targets.len(), <[_]>::len))
+            .map(|slot| vec![slot])
+            .collect(),
+        "ML" | "MZL" | "MXL" | "MYL" | "MRL" | "MRZL" | "MRXL" | "MRYL" => {
+            qubit_target_slots(targets, raw_targets)
+                .map(|(slot, _)| vec![slot])
                 .collect()
         }
         "MXX" | "MYY" | "MZZ" => (0..targets.len() / 2)
@@ -1724,6 +1727,7 @@ fn measurement_targets(
                 &mut measurement_targets,
                 state,
                 targets,
+                raw_targets,
                 1,
                 num_qubits,
                 gate,
@@ -1734,6 +1738,7 @@ fn measurement_targets(
                 &mut measurement_targets,
                 state,
                 targets,
+                raw_targets,
                 2,
                 num_qubits,
                 gate,
@@ -1769,15 +1774,33 @@ fn record_target_measurements(
     measurement_targets: &mut Vec<MeasurementTarget>,
     state: &mut RenderState,
     targets: &[u32],
+    raw_targets: Option<&[Qp101TargetRef]>,
     output_count: usize,
     num_qubits: usize,
     gate: &str,
 ) -> Result<(), String> {
-    for (target_slot, &target) in targets.iter().enumerate() {
+    for (target_slot, target) in qubit_target_slots(targets, raw_targets) {
         let lane = validate_lane(target, num_qubits, gate)?;
         record_measurement_target(measurement_targets, state, lane, target_slot, output_count);
     }
     Ok(())
+}
+
+fn qubit_target_slots<'a>(
+    targets: &'a [u32],
+    raw_targets: Option<&'a [Qp101TargetRef]>,
+) -> impl Iterator<Item = (usize, u32)> + 'a {
+    let raw_targets = raw_targets.filter(|targets| !targets.is_empty());
+    let plain_targets = if raw_targets.is_some() { &[] } else { targets };
+    let raw_qubits = raw_targets
+        .into_iter()
+        .flatten()
+        .enumerate()
+        .filter_map(|(slot, target)| match target {
+            Qp101TargetRef::Qubit { index, .. } => Some((slot, *index)),
+            _ => None,
+        });
+    plain_targets.iter().copied().enumerate().chain(raw_qubits)
 }
 
 fn record_pair_measurements(
@@ -1818,6 +1841,7 @@ fn record_mpp_measurements(
             measurement_targets,
             state,
             targets,
+            None,
             1,
             num_qubits,
             gate,
@@ -1894,7 +1918,7 @@ fn record_raw_target_measurements(
         return Ok(());
     }
 
-    record_target_measurements(measurement_targets, state, targets, 1, num_qubits, gate)
+    record_target_measurements(measurement_targets, state, targets, None, 1, num_qubits, gate)
 }
 
 fn validated_target_ref_lane(

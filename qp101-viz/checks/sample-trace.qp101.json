@@ -121,10 +121,14 @@
       "gate": "ML",
       "params": [1.0],
       "targets": [0],
+      "raw_targets": [
+        { "kind": "sweep", "index": 0 },
+        { "kind": "qubit", "index": 0 }
+      ],
       "annotations": [
         {
           "kind": "marker",
-          "target_slots": [0],
+          "target_slots": [1],
           "label": "flip",
           "style": { "preset": "danger", "color": "red", "highlight": true },
           "tags": ["sample-trace", "query-result"],
@@ -140,7 +144,7 @@
         },
         {
           "kind": "marker",
-          "target_slots": [0],
+          "target_slots": [1],
           "label": "L=0 | M=0[L]",
           "tags": ["sample-trace", "query-result"],
           "context": {

@@ -145,6 +145,30 @@ fn shot_trace_distinguishes_the_reported_flag_from_physical_loss() {
 }
 
 #[test]
+fn classification_hotspots_use_qubit_slots_in_mixed_target_lists() {
+    let circuit = "R 0 1\nML(1) sweep[0] 0 sweep[1] !1\n";
+    let mut shot = EditableShot::open(circuit, ExpansionLimits::default(), 42).unwrap();
+    shot.sample(42).unwrap();
+    let svg = shot.view_snapshot().unwrap().svg;
+    let events = shot.session().catalog().events();
+    assert_eq!(events.len(), 2);
+
+    for ((slot, record_ids), event) in [(1, "m1 m2"), (3, "m3 m4")].into_iter().zip(events) {
+        assert_eq!(event.id.site.target_slots, [slot]);
+        let event_id = event.id.encode();
+        assert!(
+            svg.lines().any(|line| {
+                line.contains(&format!("data-noise-event-id=\"{event_id}\""))
+                    && line.contains(&format!("data-measurement-ids=\"{record_ids}\""))
+            }),
+            "incorrect event on {record_ids}",
+        );
+    }
+    assert!(svg.contains(">L=1 | M=0</text>"));
+    assert!(svg.contains(">L=1 | M=1</text>"));
+}
+
+#[test]
 fn zero_probability_preserves_seeded_sampling_and_invalid_arguments_are_rejected() {
     let run = |circuit| {
         let instructions = parse_lines(circuit).unwrap();

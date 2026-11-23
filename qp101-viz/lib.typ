@@ -738,8 +738,16 @@
   let raw-targets = op.at("raw_targets", default: ())
 
   if spec.target_mode == "each" {
-    for (target_index, qubit) in plain-targets.enumerate() {
-      out.push(make-target(target_index, qubit))
+    if raw-targets.len() == 0 {
+      for (target_index, qubit) in plain-targets.enumerate() {
+        out.push(make-target(target_index, qubit))
+      }
+    } else {
+      for (target_index, target) in raw-targets.enumerate() {
+        if target.at("kind", default: "") == "qubit" {
+          out.push(make-target(target_index, target.at("index")))
+        }
+      }
     }
   } else if spec.target_mode == "pairs" {
     for pair-index in range(calc.floor(plain-targets.len() / 2)) {
