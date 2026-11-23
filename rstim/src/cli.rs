@@ -130,6 +130,18 @@ pub enum Commands {
         distance: Option<usize>,
         #[arg(long)]
         rounds: usize,
+        /// SI1000 base probability for native-CZ rotated surface-code memory
+        #[arg(long, value_name = "P", conflicts_with_all = [
+            "noise",
+            "before_round_data_depolarization",
+            "before_round_data_loss_probability",
+            "before_measure_flip_probability",
+            "after_reset_flip_probability",
+            "after_clifford_loss_probability",
+            "operation_loss_probability",
+            "measurement_loss_probability",
+        ])]
+        si1000: Option<f64>,
         #[arg(long = "after_clifford_depolarization", default_value = "0")]
         noise: f64,
         /// Depolarization applied to data qubits at the start of each round.
@@ -604,6 +616,7 @@ fn run_command(command: Option<Commands>) -> Result<(), String> {
             task,
             distance,
             rounds,
+            si1000,
             noise,
             before_round_data_depolarization,
             before_round_data_loss_probability,
@@ -646,6 +659,21 @@ fn run_command(command: Option<Commands>) -> Result<(), String> {
                 if !value.is_finite() || !(0.0..=1.0).contains(&value) {
                     return Err(format!("{name} must be finite and in [0, 1], got {value}"));
                 }
+                if si1000.is_some() && value != 0.0 {
+                    return Err(format!("--si1000 cannot be used with --{name}"));
+                }
+            }
+            if let Some(p) = si1000 {
+                let distance = distance
+                    .ok_or_else(|| "distance is required for common generators".to_string())?;
+                let circuit = crate::operations::generate_si1000_circuit_text(
+                    &code, &task, distance, rounds, p,
+                )?;
+                let mut writer = open_output(out.as_deref())?;
+                return writer
+                    .write_all(circuit.as_bytes())
+                    .and_then(|()| writer.flush())
+                    .map_err(|error| format!("write error: {error}"));
             }
             let params = NoiseParams {
                 before_round_data_depolarization,
@@ -4010,6 +4038,7 @@ mod tests {
                 task: "memory".to_string(),
                 distance: None,
                 rounds: 2,
+                si1000: None,
                 noise: 0.0,
                 before_round_data_depolarization: 0.0,
                 before_round_data_loss_probability: 0.0,
@@ -4217,6 +4246,7 @@ mod tests {
                 task: "memory".to_string(),
                 distance: None,
                 rounds: 1,
+                si1000: None,
                 noise: 0.0,
                 before_round_data_depolarization: 0.0,
                 before_round_data_loss_probability: 0.0,

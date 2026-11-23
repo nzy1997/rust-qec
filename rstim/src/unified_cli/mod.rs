@@ -182,6 +182,18 @@ enum CircuitCommand {
         /// Number of syndrome-extraction rounds
         #[arg(long)]
         rounds: usize,
+        /// SI1000 base probability for native-CZ rotated surface-code memory
+        #[arg(long, value_name = "P", conflicts_with_all = [
+            "after_clifford_depolarization",
+            "before_round_data_depolarization",
+            "before_round_data_loss_probability",
+            "before_measure_flip_probability",
+            "after_reset_flip_probability",
+            "after_clifford_loss_probability",
+            "operation_loss_probability",
+            "measurement_loss_probability",
+        ])]
+        si1000: Option<f64>,
         /// After-Clifford depolarization probability
         #[arg(
             long,
@@ -527,6 +539,7 @@ where
                     task,
                     distance,
                     rounds,
+                    si1000,
                     after_clifford_depolarization,
                     before_round_data_depolarization,
                     before_round_data_loss_probability,
@@ -544,6 +557,7 @@ where
                 task,
                 distance,
                 rounds,
+                si1000,
                 after_clifford_depolarization,
                 before_round_data_depolarization,
                 before_round_data_loss_probability,
@@ -1341,6 +1355,13 @@ fn write_capabilities(
                             flag: "--rounds",
                             required: true,
                             values: vec!["non_negative_integer"],
+                            default: None,
+                        },
+                        ArgumentCapability {
+                            name: "si1000",
+                            flag: "--si1000",
+                            required: false,
+                            values: vec!["probability"],
                             default: None,
                         },
                         ArgumentCapability {

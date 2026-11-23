@@ -860,3 +860,49 @@ fn unknown_output_format_is_invalid_arguments_not_execution_error() {
     );
     assert!(!out.exists());
 }
+
+#[test]
+fn circuit_gen_si1000_writes_the_preset_and_rejects_unsupported_tasks() {
+    let dir = tempfile::tempdir().unwrap();
+    let out = dir.path().join("si1000.stim");
+    let input = [
+        "circuit",
+        "gen",
+        "--code",
+        "surface_code",
+        "--distance",
+        "3",
+        "--rounds",
+        "2",
+        "--si1000",
+        "0.002",
+        "--out",
+        out.to_str().unwrap(),
+    ];
+    let denied = rustqec_cmd()
+        .args(input)
+        .args(["--task", "unrotated_memory_x"])
+        .output()
+        .unwrap();
+    assert!(!denied.status.success());
+    let error = stderr_json(&denied);
+    assert!(error.to_string().contains("SI1000 requires"));
+    assert!(!out.exists());
+
+    let generated = rustqec_cmd()
+        .args(input)
+        .args(["--task", "rotated_memory_x"])
+        .output()
+        .unwrap();
+    let report = stdout_json(&generated);
+    assert_eq!(report["result"]["task"], "rotated_memory_x");
+    let expected = rstim::operations::generate_si1000_circuit_text(
+        "surface_code",
+        "rotated_memory_x",
+        3,
+        2,
+        0.002,
+    )
+    .unwrap();
+    assert_eq!(std::fs::read_to_string(&out).unwrap(), expected);
+}
