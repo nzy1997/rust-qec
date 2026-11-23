@@ -1,6 +1,8 @@
 use crate::ir::{circuit_to_string, StimInstr, StimTarget};
 use super::NoiseParams;
 
+mod si1000;
+
 /// Generate a rotated surface code memory-X experiment circuit.
 pub fn rotated_memory_x(distance: usize, rounds: usize, noise: f64) -> Vec<StimInstr> {
     rotated_memory_x_with_params(distance, rounds, NoiseParams::uniform(noise))
@@ -13,12 +15,74 @@ pub fn rotated_memory_z(distance: usize, rounds: usize, noise: f64) -> Vec<StimI
 
 /// Generate a rotated surface code memory-X experiment circuit with per-channel noise.
 pub fn rotated_memory_x_with_params(distance: usize, rounds: usize, params: NoiseParams) -> Vec<StimInstr> {
-    rotated_surface_code(distance, rounds, params, true)
+    rotated_surface_code(
+        distance,
+        rounds,
+        RotatedNoise::Standard(params),
+        true,
+    )
 }
 
 /// Generate a rotated surface code memory-Z experiment circuit with per-channel noise.
 pub fn rotated_memory_z_with_params(distance: usize, rounds: usize, params: NoiseParams) -> Vec<StimInstr> {
-    rotated_surface_code(distance, rounds, params, false)
+    rotated_surface_code(
+        distance,
+        rounds,
+        RotatedNoise::Standard(params),
+        false,
+    )
+}
+
+/// Generate a native-CZ rotated memory-X circuit with stacked SI1000 noise.
+///
+/// Requires distance at least 2, at least one round, and a finite `p` in `[0, 0.2]`.
+pub fn rotated_memory_x_si1000(
+    distance: usize,
+    rounds: usize,
+    p: f64,
+) -> Result<Vec<StimInstr>, String> {
+    rotated_memory_si1000(distance, rounds, p, true)
+}
+
+/// Generate a native-CZ rotated memory-Z circuit with stacked SI1000 noise.
+///
+/// Requires distance at least 2, at least one round, and a finite `p` in `[0, 0.2]`.
+pub fn rotated_memory_z_si1000(
+    distance: usize,
+    rounds: usize,
+    p: f64,
+) -> Result<Vec<StimInstr>, String> {
+    rotated_memory_si1000(distance, rounds, p, false)
+}
+
+fn rotated_memory_si1000(
+    distance: usize,
+    rounds: usize,
+    p: f64,
+    memory_x: bool,
+) -> Result<Vec<StimInstr>, String> {
+    if distance < 2 {
+        return Err(format!("distance must be at least 2, got {distance}"));
+    }
+    if rounds == 0 {
+        return Err("rounds must be positive".to_string());
+    }
+    if !p.is_finite() || !(0.0..=0.2).contains(&p) {
+        return Err(format!(
+            "SI1000 base probability must be finite and in [0, 0.2], got {p}"
+        ));
+    }
+    Ok(rotated_surface_code(
+        distance,
+        rounds,
+        RotatedNoise::Si1000(p),
+        memory_x,
+    ))
+}
+
+enum RotatedNoise {
+    Standard(NoiseParams),
+    Si1000(f64),
 }
 
 const Z_ORDER: [(i32, i32); 4] = [(1, 1), (1, -1), (-1, 1), (-1, -1)];
@@ -140,10 +204,23 @@ fn rotated_layout(d: usize) -> RotatedLayout {
     }
 }
 
-fn rotated_surface_code(d: usize, rounds: usize, params: NoiseParams, is_memory_x: bool) -> Vec<StimInstr> {
+fn rotated_surface_code(
+    d: usize,
+    rounds: usize,
+    noise: RotatedNoise,
+    is_memory_x: bool,
+) -> Vec<StimInstr> {
     assert!(d >= 2, "distance must be >= 2");
     assert!(rounds >= 1, "rounds must be >= 1");
 
+    let layout = rotated_layout(d);
+    let (params, native) = match noise {
+        RotatedNoise::Standard(params) => (params, None),
+        RotatedNoise::Si1000(p) => (
+            NoiseParams::none(),
+            Some(si1000::Schedule::new(&layout, is_memory_x, p)),
+        ),
+    };
     let RotatedLayout {
         data_coords,
         x_measure_coords,
@@ -156,7 +233,7 @@ fn rotated_surface_code(d: usize, rounds: usize, params: NoiseParams, is_memory_
         x_observable,
         z_observable,
         cnot_layers,
-    } = rotated_layout(d);
+    } = layout;
 
     let chosen_measure_coords: &Vec<(i32, i32)> = if is_memory_x { &x_measure_coords } else { &z_measure_coords };
     let chosen_observable: &Vec<(i32, i32)> = if is_memory_x { &x_observable } else { &z_observable };
@@ -169,24 +246,36 @@ fn rotated_surface_code(d: usize, rounds: usize, params: NoiseParams, is_memory_
         instrs.push(op("QUBIT_COORDS", &[cx as f64, cy as f64], &[StimTarget::Qubit(q)]));
     }
 
-    // Reset data qubits in chosen basis
-    let data_reset_op = if is_memory_x { "RX" } else { "R" };
-    for &q in &data_qubits {
-        instrs.push(op(data_reset_op, &[], &[StimTarget::Qubit(q)]));
-    }
-    if params.after_reset_flip_probability > 0.0 {
+    if let Some(native) = &native {
+        instrs.extend_from_slice(&native.initialization);
+    } else {
+        // Reset data qubits in chosen basis
+        let data_reset_op = if is_memory_x { "RX" } else { "R" };
         for &q in &data_qubits {
-            instrs.push(op("X_ERROR", &[params.after_reset_flip_probability], &[StimTarget::Qubit(q)]));
+            instrs.push(op(data_reset_op, &[], &[StimTarget::Qubit(q)]));
         }
-    }
+        if params.after_reset_flip_probability > 0.0 {
+            for &q in &data_qubits {
+                instrs.push(op(
+                    "X_ERROR",
+                    &[params.after_reset_flip_probability],
+                    &[StimTarget::Qubit(q)],
+                ));
+            }
+        }
 
-    // Reset all ancilla
-    for &q in &measure_qubits {
-        instrs.push(op("R", &[], &[StimTarget::Qubit(q)]));
-    }
-    if params.after_reset_flip_probability > 0.0 {
+        // Reset all ancilla
         for &q in &measure_qubits {
-            instrs.push(op("X_ERROR", &[params.after_reset_flip_probability], &[StimTarget::Qubit(q)]));
+            instrs.push(op("R", &[], &[StimTarget::Qubit(q)]));
+        }
+        if params.after_reset_flip_probability > 0.0 {
+            for &q in &measure_qubits {
+                instrs.push(op(
+                    "X_ERROR",
+                    &[params.after_reset_flip_probability],
+                    &[StimTarget::Qubit(q)],
+                ));
+            }
         }
     }
 
@@ -202,6 +291,11 @@ fn rotated_surface_code(d: usize, rounds: usize, params: NoiseParams, is_memory_
 
     // Helper: emit one stabilizer round (H, 4 CX layers, H, MR)
     let emit_round = |instrs: &mut Vec<StimInstr>| {
+        if let Some(native) = &native {
+            instrs.extend_from_slice(&native.round);
+            return;
+        }
+
         instrs.push(op("TICK", &[], &[]));
 
         // before_round_data_depolarization at start of round
@@ -316,16 +410,24 @@ fn rotated_surface_code(d: usize, rounds: usize, params: NoiseParams, is_memory_
         }
     }
 
-    // Tail: measure data qubits in chosen basis
-    instrs.push(op("TICK", &[], &[]));
-    if params.before_measure_flip_probability > 0.0 {
-        for &q in &data_qubits {
-            instrs.push(op("X_ERROR", &[params.before_measure_flip_probability], &[StimTarget::Qubit(q)]));
+    if let Some(native) = &native {
+        instrs.extend_from_slice(&native.readout);
+    } else {
+        // Tail: measure data qubits in chosen basis
+        instrs.push(op("TICK", &[], &[]));
+        if params.before_measure_flip_probability > 0.0 {
+            for &q in &data_qubits {
+                instrs.push(op(
+                    "X_ERROR",
+                    &[params.before_measure_flip_probability],
+                    &[StimTarget::Qubit(q)],
+                ));
+            }
         }
-    }
-    let data_meas_op = if is_memory_x { "MX" } else { "M" };
-    for &q in &data_qubits {
-        instrs.push(op(data_meas_op, &[], &[StimTarget::Qubit(q)]));
+        let data_meas_op = if is_memory_x { "MX" } else { "M" };
+        for &q in &data_qubits {
+            instrs.push(op(data_meas_op, &[], &[StimTarget::Qubit(q)]));
+        }
     }
 
     // Tail detectors

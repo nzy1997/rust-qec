@@ -305,6 +305,25 @@ rstim gen \
   --out conventional-loss.stim
 ```
 
+Use `--si1000 P` to generate native-CZ rotated surface-code memory circuits:
+
+```sh
+rstim circuit gen --code surface_code --task rotated_memory_x \
+  --distance 3 --rounds 3 --si1000 0.002 --out memory-x.stim
+```
+
+The preset supports `rotated_memory_x` and `rotated_memory_z` with distance at
+least 2 and at least one round. The base probability `P` is in `[0, 0.2]`,
+where `0` selects the noiseless native-CZ schedule. The preset has its own
+rates and is mutually exclusive with the per-channel noise and loss flags.
+The same option is available on the Stim-compatible `rstim gen` command.
+
+The generator applies depolarization at `P` after CZ and at `P/10` after
+single-qubit Cliffords and on idle qubits. Z measurement and reset are
+separate moments with bit flips at `5P` and `2P`, respectively. Spectators
+receive an additional depolarizing channel at `2P` during each of those
+moments, following [AlphaQubit 2, section B.3.2](https://arxiv.org/html/2512.07737v1).
+
 The native Mid-SWAP rotated-memory generator is selected by its dedicated
 surface-code task. It requires an odd distance of at least 3 and emits
 loss-visible `MRL`/`ML` records in `loss_flag,value_bit` order:

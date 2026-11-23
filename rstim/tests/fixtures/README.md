@@ -27,6 +27,22 @@ pip install stim==1.16.0
 python3 tools/annotate_loss_visible.py
 ```
 
+## SI1000 surface-code references
+
+`si1000/` contains complete distance-3, three-round memory-X and memory-Z
+circuits and their undecomposed detector error models at `p=0.002`.
+`generate.py` takes the noiseless geometry, CX layers, and detector records
+from Stim 1.15.0, converts the interactions to native CZ, and applies the
+stacked idle channels and separate measurement and reset moments from
+[AlphaQubit 2, section B.3.2](https://arxiv.org/html/2512.07737v1). It orders
+qubits and measurement records by coordinates for direct comparison. Stim
+computes the corresponding DEMs. The integration test uses the files offline.
+
+```sh
+python3 -m pip install stim==1.15.0
+python3 rstim/tests/fixtures/si1000/generate.py
+```
+
 ## Current RStim atom-loss fixtures
 
 `current_rstim_atom_loss/{conventional,midswap}/` are complete two-shot public
