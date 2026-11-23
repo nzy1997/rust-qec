@@ -1704,6 +1704,127 @@ fn scaled_noise_model_and_categorical_law_interning() {
     assert_eq!(plan.statistics().sites, 4);
     assert_ne!(actions[0], actions[1]);
 }
+// Literal per-lane comparison against the raw rational law. Unlike the
+// production packed kernel, this oracle keeps a separate comparison state per
+// site. The source fixture has the fixed conditional integer weights1:2:3.
+fn literal_small_range(bound: u64, rng: &mut impl RandomSource) -> u64 {
+    let bits = 64 - (bound - 1).leading_zeros();
+    if bits == 0 {
+        return 0;
+    }
+    loop {
+        let value = rng.next_u64() & ((1u64 << bits) - 1);
+        if value < bound {
+            return value;
+        }
+    }
+}
+fn literal_prepared_choices(
+    rows: &[Vec<BigRational>],
+    rng: &mut impl RandomSource,
+) -> (Vec<Option<usize>>, usize, usize) {
+    use num_traits::{ToPrimitive, Zero};
+    let mut groups: Vec<(BigRational, Vec<usize>)> = vec![];
+    for (site, row) in rows.iter().enumerate() {
+        let total = rational(1, 1) - &row[0];
+        if let Some((_, sites)) = groups.iter_mut().find(|(law, _)| *law == total) {
+            sites.push(site);
+        } else {
+            groups.push((total, vec![site]));
+        }
+    }
+    let mut selected = vec![false; rows.len()];
+    let mut planes = 0;
+    let mut tails = 0;
+    for (total, sites) in groups {
+        if total == rational(0, 1) {
+            continue;
+        }
+        if total == rational(1, 1) {
+            for site in sites {
+                selected[site] = true;
+            }
+            continue;
+        }
+        let scaled = total.numer() << 64usize;
+        let cutoff = (&scaled / total.denom()).to_u64().unwrap();
+        let residual = BigRational::new(scaled % total.denom(), total.denom().clone());
+        for block in sites.chunks(64) {
+            let mut equal = vec![true; block.len()];
+            for position in 0..64 {
+                if !equal.iter().any(|&v| v) {
+                    break;
+                }
+                // A dyadic equality can reject after the last one bit, because
+                // all future cutoff bits and the residual are zero.
+                if residual.is_zero() && (cutoff << position) == 0 {
+                    break;
+                }
+                let plane = rng.next_u64();
+                planes += 1;
+                let threshold = cutoff >> (63 - position) & 1;
+                for (lane, &site) in block.iter().enumerate() {
+                    if !equal[lane] {
+                        continue;
+                    }
+                    let random = plane >> lane & 1;
+                    if random != threshold {
+                        selected[site] = random < threshold;
+                        equal[lane] = false;
+                    }
+                }
+            }
+            if !residual.is_zero() {
+                let denominator = residual.denom().to_u64().unwrap();
+                let numerator = residual.numer().to_u64().unwrap();
+                for (lane, &site) in block.iter().enumerate() {
+                    if equal[lane] {
+                        // The scalar residual uses an identity-first category.
+                        selected[site] =
+                            literal_small_range(denominator, rng) >= denominator - numerator;
+                        tails += 1;
+                    }
+                }
+            }
+        }
+    }
+    let choices = selected
+        .into_iter()
+        .map(|yes| {
+            if yes {
+                let value = literal_small_range(6, rng);
+                Some(if value < 1 {
+                    0
+                } else if value < 3 {
+                    1
+                } else {
+                    2
+                })
+            } else {
+                None
+            }
+        })
+        .collect();
+    (choices, planes, tails)
+}
+#[derive(Clone)]
+struct PreparedLawWords {
+    prefix: std::collections::VecDeque<u64>,
+    fallback: Mt19937,
+    draws: usize,
+    fingerprint: u64,
+}
+impl RandomSource for PreparedLawWords {
+    fn next_u64(&mut self) -> u64 {
+        let value = self
+            .prefix
+            .pop_front()
+            .unwrap_or_else(|| self.fallback.next());
+        self.draws += 1;
+        self.fingerprint = self.fingerprint.rotate_left(7) ^ value;
+        value
+    }
+}
 #[test]
 fn cached_noise_law_and_weight() {
     let mut channels = vec![
@@ -1825,6 +1946,21 @@ fn cached_noise_law_and_weight() {
                 *expected
             );
         }
+        let prepared_channels = (0..41)
+            .map(|j| q.probabilities(j).unwrap()[1..].to_vec())
+            .collect::<Vec<_>>();
+        let prepared =
+            PreparedNoiseSchedule::new(&prepared_channels, &actions, &factors, Default::default())
+                .unwrap();
+        let prepared_stats = prepared.statistics();
+        assert_eq!(prepared_stats.sites, 41);
+        assert_eq!(prepared_stats.conditional_models, 1);
+        assert_eq!(prepared_stats.endpoint_groups, 2);
+        let totals = expected_q
+            .iter()
+            .map(|row| rational(1, 1) - &row[0])
+            .collect::<BTreeSet<_>>();
+        assert_eq!(prepared_stats.occurrence_groups, totals.len());
         let expected = model(&expected_q);
         let full = NoiseSampler::importance(p, q.clone(), Default::default()).unwrap();
         let fresh =
@@ -1840,7 +1976,84 @@ fn cached_noise_law_and_weight() {
         )
         .unwrap();
         let weights = PreparedNoiseWeights::new(&factors, Default::default()).unwrap();
-        for seed in 0..32 {
+        for seed in 0..34 {
+            use num_traits::ToPrimitive;
+            let mut prefix = std::collections::VecDeque::new();
+            if seed >= 32 {
+                // Force U==floor(p*2^64) on every lane in the first shared
+                // group, then alternate exact residual accepts/rejects. MT
+                // schedules virtually never hit this equality by chance.
+                let total = rational(1, 1) - &expected_q[0][0];
+                let scaled = total.numer() << 64usize;
+                let cutoff = (&scaled / total.denom()).to_u64().unwrap();
+                let residual = BigRational::new(scaled % total.denom(), total.denom().clone());
+                let denominator = residual.denom().to_u64().unwrap();
+                let lanes = expected_q
+                    .iter()
+                    .filter(|row| rational(1, 1) - &row[0] == total)
+                    .count();
+                for bit in (0..64).rev() {
+                    prefix.push_back(if cutoff >> bit & 1 != 0 { u64::MAX } else { 0 });
+                }
+                for lane in 0..lanes {
+                    prefix.push_back(if (lane + seed as usize) % 2 == 0 {
+                        denominator - 1
+                    } else {
+                        0
+                    });
+                }
+            }
+            let mut actual_rng = PreparedLawWords {
+                prefix,
+                fallback: Mt19937::new(seed),
+                draws: 0,
+                fingerprint: 0,
+            };
+            let mut expected_rng = actual_rng.clone();
+            let (expected_choices, planes, tails) =
+                literal_prepared_choices(&expected_q, &mut expected_rng);
+            let draw = prepared.draw(&mut actual_rng).unwrap();
+            assert_eq!(draw.choices, expected_choices);
+            assert_eq!(
+                (draw.occurrence_planes, draw.exact_tail_evaluations),
+                (planes, tails)
+            );
+            assert_eq!(draw.entropy_words, actual_rng.draws);
+            assert_eq!(
+                (actual_rng.draws, actual_rng.fingerprint),
+                (expected_rng.draws, expected_rng.fingerprint)
+            );
+            assert_eq!(actual_rng.prefix, expected_rng.prefix);
+            if seed >= 32 {
+                assert!(tails >= 3);
+            }
+            let mut expected_actions = vec![];
+            let mut p_mass = rational(1, 1);
+            let mut q_mass = rational(1, 1);
+            for (site, choice) in expected_choices.iter().enumerate() {
+                let column = choice.map_or(0, |j| j + 1);
+                p_mass *= &independent_p[site][column];
+                q_mass *= &expected_q[site][column];
+                if let Some(alternative) = choice {
+                    expected_actions.push(SparseNoiseAction::Pauli {
+                        operation: format!("op{}", site + 1),
+                        factors: vec![(site % 3, [Basis::X, Basis::Y, Basis::Z][*alternative])],
+                    });
+                }
+            }
+            assert_eq!(draw.actions, expected_actions);
+            assert_eq!(draw.physical_probability, q_mass);
+            let ratio = BigRational::new(
+                draw.raw_weight.numerator().clone().into(),
+                draw.raw_weight.denominator().clone().into(),
+            );
+            assert_eq!(&ratio * &q_mass, p_mass);
+            assert_eq!(prepared.statistics(), prepared_stats);
+            // Packed and ordinary scalar paths intentionally have different
+            // streams. Each is compared with its own exact input/RNG oracle.
+            if seed >= 32 {
+                continue;
+            }
             let mut reused_rng = Mt19937::new(seed);
             let mut fresh_rng = reused_rng.clone();
             let observed = full.draw(&mut reused_rng).unwrap();

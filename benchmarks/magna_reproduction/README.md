@@ -4091,6 +4091,17 @@ storage gap is not waived by any of these adaptations. Root and transitive fixtu
 sources, including the original MT generator and literal dense-gate helper, are
 identity-bound.
 
+The full41-site cached-noise fixture executes the actual shared
+`PreparedNoiseSchedule` path for four scales and32 MT seeds, plus eight forced
+non-dyadic threshold-equality cases. A literal per-lane rational comparison and
+independent integer1:2:3 channel selection predict choices, original actions,
+word counts/fingerprints, tail work and exact physical/proposal weights. This
+oracle calls neither the packed threshold kernel nor the conditional sampler.
+The constant-true source guard retains its proposal-scale exclusion. Packed and
+ordinary scalar streams intentionally differ; each has a separate exact oracle.
+The prepared owner holds the proposal law in this adapter, so its
+`physical_probability` field is q; supplied p/q factors must recover p exactly.
+
 [#1319](https://github.com/nzy1997/rust-qec/issues/1319) and
 [#1320](https://github.com/nzy1997/rust-qec/issues/1320) are merged: they provide
 value-aware incremental classical knowledge and complete certificate snapshots.

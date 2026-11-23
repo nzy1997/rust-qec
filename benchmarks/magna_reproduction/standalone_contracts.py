@@ -249,7 +249,7 @@ ADAPTATIONS.update({'foundation/require': 'a6638ced2241c8ba8d28e89359b35c675ce3c
  'foundation/main.file-causal-runtime': 'e4d1f1456439e3da7f0a54a22bcba9ffae4a50792d42378dc964e74e4c449bcf',
  'foundation/main.file-parser': '431ac93f557b2e32001f8097e3b75da3dfebea667aafd9c2de1012329ce02b13',
  'foundation/main.scaled-noise-model': 'c6be4238ad57a2e717381c828f67c2727b94793a7af727b1c047d46e723d32cf',
- 'foundation/main.cached-noise-law-and-weight': 'ea8acc6034ae8b003a429d68548e22c976be972f03566dd069d8ed599d20a4ad',
+ 'foundation/main.cached-noise-law-and-weight': '77a4dc3182e57e7da5fffa5a49794a0f044a94116be153d7d8d9318e78be9c25',
  'foundation/main.exact-categorical': 'd96e7cafff51bf3cf5d5a01dfcc6d5b0fac917004cc07ba9f0f3a50ce40545b9',
  'foundation/main.fixed-virtual-template': '60956011e56b03a1bae55383f952dc31cc178365513a7e18fa5fa60992d9361d',
  'foundation/main.selection-offset': 'd47e2f7c37bf72749b8be7d79057b3f8af39d69ea4e09725043fe84c6b2b9aa8',
