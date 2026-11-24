@@ -4124,8 +4124,8 @@ follow-up [#1335](https://github.com/nzy1997/rust-qec/issues/1335) have complete
 source-specific foundation bindings, subject to the execution gate above.
 Missing entire groups/helpers/loops, adjacent fixture substitutions, stale
 source/binary identities, incomplete compiler/run observations and unsupported
-promotions fail validation. The current ledger records343 verified /7 partial /
-2 unmapped, with9 outstanding methods. This does not establish full352-method
+promotions fail validation. The current ledger records344 verified /6 partial /
+2 unmapped, with8 outstanding methods. This does not establish full352-method
 parity, Python/private-container identity or paper performance.
 
 ### B03 Bravyi-Haah paper campaign
@@ -4412,3 +4412,54 @@ retain separate repeats and host identities. Cultivation retains positive-error
 counts, relative standard errors and worker time for each precision point,
 separate from the sampling time table. The broader #794 and #601
 publication protocols have their own readiness checks.
+
+
+### F1 installed fixed-reference reuse
+
+[#1339](https://github.com/nzy1997/rust-qec/issues/1339) completes the installed
+conditional-noise method through a statically linked public Rust consumer run
+outside the checkout with an empty inherited environment and a rejecting local
+source-package stub. It uses the pinned five-operation circuit, output2, ideal
+zero target,64 shots and seed3. The existing installed CLI numerical checks stay
+in place. Both compiler strategies and both history samplers now qualify reuse
+within one process and one `CompiledFileTask`, using three narrow read-only
+getters for actual retained source/target work, structure and numeric assignments.
+
+The Rust representation has one source insertion program and one captured ideal
+target, with query families attached to the source. Unlike Native's private count
+of three parents, it explicitly configures `QueryPreparation::Native` and calls
+`prepare_sampling` before the qualified draw interval. The default cold-query
+policy is preserved and separately observed: a successful preparation receipt
+with cold families does not certify full retention. No warmup is hidden.
+
+For this fixture, the source/target physical widths are5/1, with one distinct
+reference boundary apiece. Exact-marginal preparation constructs4 closures,
+4 geometries,4 phase maps and4 resources; affine-support preparation constructs
+2 closures/geometries/maps/resources plus one support parent (2 contractions).
+The target needs no query factories. The64 draws add zero factories or source
+compilations, retain the same full structural inventory (including weak slots
+and capacity), observe128 history groups, and increase source numeric assignments
+by320 or192 respectively. These are measured roles and dimensions, not process
+RSS, allocator bytes, private object identity or universal fixture constants.
+Exact enumeration runs after the captured draw snapshots and establishes
+acceptance1/error1/12 for every combination.
+
+```sh
+cargo test --locked -p rmagna --test installed_cli_contracts -- --show-output
+python3 -B benchmarks/magna_reproduction/remaining_contracts.py check
+python3 -I -m unittest discover -s benchmarks/magna_reproduction -p 'test_*.py'
+```
+
+The consumer requires present, unsaturated diagnostics and observes real factory
+and assignment/evaluation growth across stages, so missing or constant-zero
+snapshots cannot qualify. An actual compiled probability-service mutation that
+reconstructs an equivalent Native resource for each query still passes the exact
+acceptance1/error1/12 checks, then fails the captured hot-factory assertion
+(4 to324 closures/maps/resources). The production source is restored byte for
+byte before positive verification. This promotion covers the original method
+under the explicit Rust representation above; the denominator remains352.
+
+Follow-ups [F2 #1340](https://github.com/nzy1997/rust-qec/issues/1340) (opt-in
+fallback with captured-input ownership) and
+[F3 #1341](https://github.com/nzy1997/rust-qec/issues/1341) (metadata/tooling
+compatibility decisions) have no hard dependency on F1 and remain separate work.
