@@ -1,0 +1,586 @@
+{
+  "schema": "rmagna.compatibility-boundaries.v1",
+  "issue": 1341,
+  "parity_claim": "decisions_only_no_promotions",
+  "reference_sha256": "c49203a586f5a451e3183b435793df693dd486857356aed8826df5dc723e5454",
+  "upstream_commit": "56847478c840395735146ef1e1ccdc3d8aedc10f",
+  "original_inventory_sha256": "e8658757f4931ba266ef1bdc336778f6e47b704097718ae34fb41cec631432e9",
+  "policies": {
+    "product": "independent_rust_plus_paper_experiments",
+    "selection": "retain_current_typed_boundaries",
+    "original_parity": "unresolved_obligations_remain",
+    "metadata_domain": {
+      "implemented": "typed_operations_owned_labels_and_owned_result_values",
+      "annotation_graph_api": "not_implemented",
+      "json_tree_annotation_api": "not_implemented",
+      "arbitrary_python_object_compatibility": "not_implemented"
+    },
+    "graph_model_if_selected": {
+      "status": "prospective_not_implemented",
+      "representation": "budgeted_node_arena_with_reference_edges_for_aliases_and_cycles",
+      "public_copy": "memoized_old_to_new_node_map_preserves_internal_aliases_cycles_and_source_isolation",
+      "owned_transfer": "consume_graph_owner_without_copy_and_require_caller_relinquishment",
+      "custom_objects": "define_supported_scalar_key_and_custom_object_domain_or_use_a_python_compatibility_layer",
+      "rust_feasibility": "cycles_and_aliases_are_possible_with_an_explicit_model"
+    },
+    "certificate_identity": {
+      "arbitrary_annotations_participate": false,
+      "typed_identity": "explicit_source_sessions_and_captured_input_labels_not_nested_annotation_invalidation",
+      "current_probability_cache": "exact_probability_values_keyed_by_source_session_and_compiled_physical_state",
+      "current_certificate_json": "owned_export_not_a_metadata_keyed_branch_certificate_cache",
+      "metadata_certificate_lru": "not_implemented",
+      "if_selected": "define_graph_identity_and_nested_mutation_invalidation_before_caching_owned_branch_certificates"
+    },
+    "source_navigation": {
+      "current": "manifest_relative_exact_paths_with_existence_hash_and_symlink_checks",
+      "duplicate_basename": "distinct_explicit_paths_remain_valid",
+      "upstream": "recursive_basename_zero_unique_ambiguous_resolution",
+      "rust_recursive_lookup": "not_implemented"
+    },
+    "installation": {
+      "current": "independent_rust_executable_and_public_api",
+      "missing_executable": "operating_system_error_observed_and_diagnosed_by_caller_or_launcher",
+      "diagnostic_inside_missing_program": false,
+      "cpython_extension_loader": "not_implemented",
+      "python_wrapper_added": false
+    }
+  },
+  "implementation_plan": {
+    "G1": {
+      "capability": "explicit_metadata_graph_domain_alias_cycle_identity_and_budgets",
+      "depends_on": []
+    },
+    "G2": {
+      "capability": "public_copy_owned_transfer_nested_mutation_and_prepared_matching",
+      "depends_on": [
+        "G1"
+      ]
+    },
+    "G3": {
+      "capability": "metadata_keyed_certificate_identity_lru_and_returned_graph_isolation",
+      "depends_on": [
+        "G1",
+        "G2"
+      ]
+    },
+    "S1": {
+      "capability": "zero_unique_ambiguous_recursive_source_lookup_if_exact_compatibility_is_selected",
+      "depends_on": []
+    },
+    "I1": {
+      "capability": "explicit_cpython_distribution_loader_and_build_diagnostics_if_selected",
+      "depends_on": []
+    }
+  },
+  "methods": [
+    {
+      "id": "test_native_source_tools.NativeSourceToolsTests.test_source_resolution_rejects_absent_and_ambiguous_hooks",
+      "original_status": "unmapped",
+      "source": {
+        "path": "tests/core/test_native_source_tools.py",
+        "source_sha256": "d1932aaf901dbbaeac479a53244615995340a303bbe952076ecaf3c0cbaba23e",
+        "line": 16,
+        "end_line": 24
+      },
+      "method": {
+        "method_sha256": "2c9ec3d041e62efe01041270daf174d1a11e8871aa5609ed6b022d15e34dc588",
+        "required_checks": [
+          "self.assertEqual(native_source(root, 'probe.hpp'), root / 'probe.hpp')",
+          "self.assertRaises(ValueError)",
+          "self.assertRaises(ValueError)"
+        ],
+        "loops": [],
+        "module_helpers": [],
+        "module_imports": [
+          "from pathlib import Path",
+          "from scripts.native_sources import native_source",
+          "import importlib",
+          "import shutil",
+          "import subprocess",
+          "import sysconfig",
+          "import tempfile",
+          "import unittest"
+        ]
+      },
+      "helper_sources": {
+        "scripts/native_sources.py": "121cd9367a622f7000b7b952f784d17ac0647ae988260702f634f6ba1e8854a7"
+      },
+      "original_obligations": [
+        {
+          "id": "recursive_lookup",
+          "requirement": "Recursive basename lookup rejects zero/multiple matches and returns the sole match.",
+          "status": "not_implemented"
+        }
+      ],
+      "boundary": "additional_compatibility_scope_not_selected",
+      "support_status": "source_bound_subset_not_original_parity",
+      "implementation_dependencies": [
+        "S1"
+      ],
+      "rust_witnesses": [],
+      "installed_boundary_witnesses": [],
+      "supported_contract": "Reference tooling admits explicit manifest-relative paths, checks existence/content hashes and rejects symlinks/escape. Distinct explicit paths with the same basename are valid.",
+      "unsupported_behavior": "No Rust native_source recursive basename service resolves zero/one/multiple hooks.",
+      "rationale": "An independent Rust distribution has no C++ source-tree layout requirement. Exact paths are intentional and cannot establish recursive-search parity.",
+      "support_sources": [
+        {
+          "path": "benchmarks/magna_reproduction/reference.py",
+          "anchor": "def relative_file(",
+          "sha256": "0a4c22d19ae1cad5bf7956fb77a997ceeb8b78c3740aef4185e4ab4da7b70d7d"
+        },
+        {
+          "path": "benchmarks/magna_reproduction/reference.py",
+          "anchor": "def verify_files(",
+          "sha256": "0a4c22d19ae1cad5bf7956fb77a997ceeb8b78c3740aef4185e4ab4da7b70d7d"
+        }
+      ]
+    },
+    {
+      "id": "test_query_reuse.OwnershipAndDependencies.test_deferred_public_graph_isolation_and_owned_transfer",
+      "original_status": "partial",
+      "source": {
+        "path": "tests/core/test_query_reuse.py",
+        "source_sha256": "4f62065a0e8cf3aca70a30cc484b8bd7d6e67d58d9589304668c96ee603f1f30",
+        "line": 44,
+        "end_line": 58
+      },
+      "method": {
+        "method_sha256": "598e48ad4fb40a7f8518a2a38411c92a8b47dcbf6946dc25b83f1c331e705ec5",
+        "required_checks": [
+          "self.assertIs(owned.ir.operations[0]['extra'], ir.operations[0]['extra'])",
+          "self.assertIs(public.ir.operations[0]['extra'], public.ir.operations[1]['extra'])",
+          "self.assertIs(public.ir.operations[0]['extra']['cycle'], public.ir.operations[0]['extra'])",
+          "self.assertEqual(public.ir.operations[0]['extra']['values'], [1])",
+          "self.assertEqual(public.ir.operations[0]['qubits'], [0])"
+        ],
+        "loops": [],
+        "module_helpers": [
+          "QueryReuse.make"
+        ],
+        "module_imports": [
+          "from concurrent.futures import ThreadPoolExecutor",
+          "from copy import deepcopy",
+          "from magna import compile_circuit, run",
+          "from magna.circuit_file import ControllerRegistry, parse_circuit",
+          "from magna.deferred_feedback import defer_affine_feedback, _defer_affine_feedback_owned",
+          "from magna.file_api import NoiseDraw",
+          "from magna.file_api import ResourceLimit",
+          "from magna.ir import PreparedInstrument",
+          "from magna.operations import InstrumentIR, NativeBoundaryTrace, StabilizerKet",
+          "from magna.scalar import ExactScalar",
+          "from random import Random",
+          "from test_boundary_sampling import HAS_NATIVE",
+          "from tests.support import file_hooks as hooks",
+          "from tests.support.readout_target import ZERO_TARGET",
+          "import unittest"
+        ]
+      },
+      "helper_sources": {
+        "core/magna/ir.py": "7faf4d1b00f9296a81f368db6adad9f956caf17e8d5dd561303b9f8fb243e6d8",
+        "core/magna/deferred_feedback.py": "ab5fa1cb433eba38940f7cc44c2ac691cb33d74670287489d664801ea14f01ff",
+        "core/magna/native/compile/deferred.cpp": "5f0a7803065d08f3550f9917560322a970b9fa7c333b994916776c4eb63e479c"
+      },
+      "original_obligations": [
+        {
+          "id": "public_graph_copy",
+          "requirement": "Public deferral copies the entire annotation graph, preserving internal aliases/cycles while isolating caller mutation.",
+          "status": "not_implemented"
+        },
+        {
+          "id": "owned_graph_transfer",
+          "requirement": "Owned deferral transfers mutable annotation leaves under an explicit caller-relinquishment contract.",
+          "status": "not_implemented"
+        }
+      ],
+      "boundary": "additional_compatibility_scope_not_selected",
+      "support_status": "source_bound_subset_not_original_parity",
+      "implementation_dependencies": [
+        "G1",
+        "G2"
+      ],
+      "rust_witnesses": [
+        {
+          "package": "rmagna",
+          "target": "rust_snapshot_contracts",
+          "test": "original_borrowed_and_owned_traces_keep_all_sixty_four_control_fault_event_queries",
+          "source_sha256": "6744df624a2896924dfac527223c685d4c6bf28cad9194931ffdabdc87a13dab"
+        }
+      ],
+      "installed_boundary_witnesses": [],
+      "supported_contract": "Borrowed preparation clones typed operations; owned preparation moves them. Captured traces survive source replacement/drop and match all64 control/fault/event queries.",
+      "unsupported_behavior": "There is no annotation graph API, public graph-deepcopy memo, or transferred mutable annotation leaf identity. The existing typed API alone does not exercise aliases/cycles.",
+      "rationale": "Keep physical ownership supported and keep graph compatibility separate. Rust can implement a budgeted alias/cycle arena; that model and its copy/transfer rules have not been implemented.",
+      "support_sources": [
+        {
+          "path": "rmagna/src/instrument/original_assignment_plan.rs",
+          "anchor": "pub fn from_owned(",
+          "sha256": "52b515fd06da585c50199ff85c6ce8b13bcd6fb2ca70b4b5806d527a4bd806e4"
+        },
+        {
+          "path": "rmagna/src/instrument/original.rs",
+          "anchor": "pub fn with_operations(",
+          "sha256": "b014cf0e94f41b1de8937e5be6e807afdc0276ad93248f2f3606288e356e6315"
+        }
+      ]
+    },
+    {
+      "id": "test_query_reuse.OwnershipAndDependencies.test_lowered_operations_are_owned_even_for_guarded_noise",
+      "original_status": "partial",
+      "source": {
+        "path": "tests/core/test_query_reuse.py",
+        "source_sha256": "4f62065a0e8cf3aca70a30cc484b8bd7d6e67d58d9589304668c96ee603f1f30",
+        "line": 60,
+        "end_line": 68
+      },
+      "method": {
+        "method_sha256": "b4f087b4ca8b91e57f1b29adf861f7e8cc18847fcb74eee8881dbd11b000fe7d",
+        "required_checks": [
+          "self.assertEqual(ir.operations, before)"
+        ],
+        "loops": [],
+        "module_helpers": [
+          "QueryReuse.make"
+        ],
+        "module_imports": [
+          "from concurrent.futures import ThreadPoolExecutor",
+          "from copy import deepcopy",
+          "from magna import compile_circuit, run",
+          "from magna.circuit_file import ControllerRegistry, parse_circuit",
+          "from magna.deferred_feedback import defer_affine_feedback, _defer_affine_feedback_owned",
+          "from magna.file_api import NoiseDraw",
+          "from magna.file_api import ResourceLimit",
+          "from magna.ir import PreparedInstrument",
+          "from magna.operations import InstrumentIR, NativeBoundaryTrace, StabilizerKet",
+          "from magna.scalar import ExactScalar",
+          "from random import Random",
+          "from test_boundary_sampling import HAS_NATIVE",
+          "from tests.support import file_hooks as hooks",
+          "from tests.support.readout_target import ZERO_TARGET",
+          "import unittest"
+        ]
+      },
+      "helper_sources": {
+        "core/magna/ir.py": "7faf4d1b00f9296a81f368db6adad9f956caf17e8d5dd561303b9f8fb243e6d8",
+        "tests/support/file_hooks.py": "8aaaad575c7bebfa4f9220049e83a5022e7ccde58451490dce50862b8ee7783c",
+        "core/magna/native/bindings/file_lowering_bindings.hpp": "74a67d2cb3dde54168c797cf9a25a120dff9c046dff6b7d317fb5ef6f3f24aea",
+        "core/magna/native/compile/file_lowering.cpp": "abceaa164606e052f34d25e602ffaf383c53fcd01a345cd7b8bf3ecebbc50010"
+      },
+      "original_obligations": [
+        {
+          "id": "noise_extra_copy",
+          "requirement": "Lowering snapshots arbitrary nested gate extra metadata as well as physical guarded-noise actions.",
+          "status": "not_implemented"
+        }
+      ],
+      "boundary": "additional_compatibility_scope_not_selected",
+      "support_status": "source_bound_subset_not_original_parity",
+      "implementation_dependencies": [
+        "G1",
+        "G2"
+      ],
+      "rust_witnesses": [
+        {
+          "package": "rmagna",
+          "target": "rust_snapshot_contracts",
+          "test": "original_guarded_supplied_noise_retains_owned_actions_after_inputs_are_dropped",
+          "source_sha256": "6744df624a2896924dfac527223c685d4c6bf28cad9194931ffdabdc87a13dab"
+        }
+      ],
+      "installed_boundary_witnesses": [],
+      "supported_contract": "Both causal strategies retain owned supplied categorical fault actions after caller replacement and program/source drop, preserving the exact physical -Z result.",
+      "unsupported_behavior": "Arbitrary gate dictionaries and nested Python extra annotations are not accepted or copied by the typed noise API.",
+      "rationale": "Physical fault identity/action ownership and arbitrary annotation ownership are distinct contracts; a new graph/domain adapter would be needed for the latter.",
+      "support_sources": [
+        {
+          "path": "rmagna/tests/rust_snapshot_contracts.rs",
+          "anchor": "fn original_guarded_supplied_noise_retains_owned_actions_after_inputs_are_dropped(",
+          "sha256": "6744df624a2896924dfac527223c685d4c6bf28cad9194931ffdabdc87a13dab"
+        }
+      ]
+    },
+    {
+      "id": "test_query_reuse.OwnershipAndDependencies.test_public_ir_still_copies_arbitrary_graph_and_prepared_snapshot",
+      "original_status": "partial",
+      "source": {
+        "path": "tests/core/test_query_reuse.py",
+        "source_sha256": "4f62065a0e8cf3aca70a30cc484b8bd7d6e67d58d9589304668c96ee603f1f30",
+        "line": 28,
+        "end_line": 42
+      },
+      "method": {
+        "method_sha256": "39d3e20e9b47b89f0b926b31b601ad92e41c14a4eaa50f0974802dd451c7d9d5",
+        "required_checks": [
+          "self.assertIs(ir.operations[0]['qubits'], ir.operations[1]['qubits'])",
+          "self.assertIs(ir.operations[0]['extra'], ir.operations[0]['extra']['self'])",
+          "self.assertEqual(ir.operations[0]['qubits'], [0])",
+          "self.assertEqual(prepared.ir.operations[0]['qubits'], [0])",
+          "self.assertFalse(prepared.matches(plain))"
+        ],
+        "loops": [],
+        "module_helpers": [
+          "QueryReuse.make"
+        ],
+        "module_imports": [
+          "from concurrent.futures import ThreadPoolExecutor",
+          "from copy import deepcopy",
+          "from magna import compile_circuit, run",
+          "from magna.circuit_file import ControllerRegistry, parse_circuit",
+          "from magna.deferred_feedback import defer_affine_feedback, _defer_affine_feedback_owned",
+          "from magna.file_api import NoiseDraw",
+          "from magna.file_api import ResourceLimit",
+          "from magna.ir import PreparedInstrument",
+          "from magna.operations import InstrumentIR, NativeBoundaryTrace, StabilizerKet",
+          "from magna.scalar import ExactScalar",
+          "from random import Random",
+          "from test_boundary_sampling import HAS_NATIVE",
+          "from tests.support import file_hooks as hooks",
+          "from tests.support.readout_target import ZERO_TARGET",
+          "import unittest"
+        ]
+      },
+      "helper_sources": {
+        "core/magna/ir.py": "7faf4d1b00f9296a81f368db6adad9f956caf17e8d5dd561303b9f8fb243e6d8"
+      },
+      "original_obligations": [
+        {
+          "id": "constructor_graph_copy",
+          "requirement": "Public IR construction preserves cross-operation aliases/cycles inside an isolated graph snapshot.",
+          "status": "not_implemented"
+        },
+        {
+          "id": "mutable_prepared_matches",
+          "requirement": "Prepared snapshots detect nested mutable operation/initial/control changes in the public source.",
+          "status": "not_implemented"
+        }
+      ],
+      "boundary": "additional_compatibility_scope_not_selected",
+      "support_status": "source_bound_subset_not_original_parity",
+      "implementation_dependencies": [
+        "G1",
+        "G2"
+      ],
+      "rust_witnesses": [
+        {
+          "package": "rmagna",
+          "target": "rust_snapshot_contracts",
+          "test": "original_borrowed_and_owned_traces_keep_all_sixty_four_control_fault_event_queries",
+          "source_sha256": "6744df624a2896924dfac527223c685d4c6bf28cad9194931ffdabdc87a13dab"
+        }
+      ],
+      "installed_boundary_witnesses": [],
+      "supported_contract": "Typed constructors own operation values. Explicit replacement creates a new source/session, while existing borrowed/owned traces keep their captured operations and query values.",
+      "unsupported_behavior": "No arbitrary Python graph constructor deepcopy, cross-operation annotation aliases/cycles or mutable prepared.matches source comparison exists.",
+      "rationale": "Immutable typed ownership is a supported replacement discipline, not an implementation of mutable public-object matching. An explicit graph can represent cycles in Rust if selected.",
+      "support_sources": [
+        {
+          "path": "rmagna/src/instrument/original_assignment_plan.rs",
+          "anchor": "pub fn new(",
+          "sha256": "52b515fd06da585c50199ff85c6ce8b13bcd6fb2ca70b4b5806d527a4bd806e4"
+        },
+        {
+          "path": "rmagna/src/instrument/original.rs",
+          "anchor": "pub enum OriginalGate",
+          "sha256": "b014cf0e94f41b1de8937e5be6e807afdc0276ad93248f2f3606288e356e6315"
+        }
+      ]
+    },
+    {
+      "id": "test_simulator_optimization.OptimizationTests.test_prepared_ir_nested_mutation_and_returned_snapshot",
+      "original_status": "partial",
+      "source": {
+        "path": "tests/core/test_simulator_optimization.py",
+        "source_sha256": "2391f35f00a33244677f0a903bbdb34a0ab4448da7cc454850e2b27e33596d3d",
+        "line": 107,
+        "end_line": 124
+      },
+      "method": {
+        "method_sha256": "0fc7af4f1adc5542403984889856a41fe58dce8650d898d43481a29d6283c6ee",
+        "required_checks": [
+          "self.assertEqual(sim.probability(a), ExactScalar((1, 0, 0, 0), -1))",
+          "self.assertTrue(hit.cache_hit)",
+          "self.assertEqual(hit.branch.operations[0]['qubits'], [0])",
+          "self.assertEqual(hit.branch.operations[0]['metadata']['marks'], [1])",
+          "self.assertEqual(sim.probability(a), ExactScalar((1, 0, 0, 0)))",
+          "self.assertFalse(sim.compile(a).cache_hit)",
+          "self.assertEqual(sim.compile(a).branch.operations[0]['metadata']['marks'], [2])",
+          "self.assertEqual(sim.probability(a), ExactScalar())"
+        ],
+        "loops": [],
+        "module_helpers": [
+          "quadratic",
+          "tensor"
+        ],
+        "module_imports": [
+          "from fractions import Fraction",
+          "from magna.file_api import ResourceLimit",
+          "from magna.gf2 import image_basis",
+          "from magna.operations import InstrumentIR, StabilizerKet, Simulator, SampleAssignment, ControlNode, Options",
+          "from magna.operations import NoiseModel, NoiseSite",
+          "from magna.scalar import ExactScalar",
+          "from tests.support.operation_hooks import cache_clear, cache_info, cache_probabilities, cache_store, overlap, restrict, right_inverse_columns, scalar, solve",
+          "import random",
+          "import unittest"
+        ]
+      },
+      "helper_sources": {
+        "core/magna/ir.py": "7faf4d1b00f9296a81f368db6adad9f956caf17e8d5dd561303b9f8fb243e6d8",
+        "core/magna/simulator.py": "b6f49aba41e3d444b845e2126f22d17ed5690a97e9093dc1817af5ca519ed6fc",
+        "core/magna/native/runtime/certificate_cache.hpp": "6974c0123c8a66417d09dfd6ca11b8e811f8d6ee84ea12085237fa78ae99d28d",
+        "core/magna/native/bindings/certificate_cache_bindings.hpp": "67bc88c46cb9068542ba8ad0628a6c703b91dce993960a73d3f61d7f32c431d6"
+      },
+      "original_obligations": [
+        {
+          "id": "nested_metadata",
+          "requirement": "Public operations/branches retain arbitrary nested metadata, with a declared alias/cycle domain.",
+          "status": "not_implemented"
+        },
+        {
+          "id": "metadata_identity",
+          "requirement": "Metadata-only edits participate in preparation/certificate identity and invalidate old metadata-bearing hits.",
+          "status": "not_implemented"
+        },
+        {
+          "id": "certificate_graph_copy",
+          "requirement": "Returned cached branch certificates preserve metadata and isolate caller mutation, including aliases/cycles.",
+          "status": "not_implemented"
+        },
+        {
+          "id": "certificate_lru",
+          "requirement": "A bounded metadata-keyed branch-certificate LRU returns cache_hit and fresh metadata; a probability-value LRU is insufficient.",
+          "status": "not_implemented"
+        }
+      ],
+      "boundary": "additional_compatibility_scope_not_selected",
+      "support_status": "source_bound_subset_not_original_parity",
+      "implementation_dependencies": [
+        "G1",
+        "G2",
+        "G3"
+      ],
+      "rust_witnesses": [
+        {
+          "package": "rmagna",
+          "target": "rust_snapshot_contracts",
+          "test": "original_probability_queries_generate_no_input_key_but_explicit_compile_does",
+          "source_sha256": "6744df624a2896924dfac527223c685d4c6bf28cad9194931ffdabdc87a13dab"
+        },
+        {
+          "package": "rmagna",
+          "target": "rust_snapshot_contracts",
+          "test": "original_lazy_batches_capture_one_source_while_next_single_query_uses_replacement",
+          "source_sha256": "6744df624a2896924dfac527223c685d4c6bf28cad9194931ffdabdc87a13dab"
+        },
+        {
+          "package": "rmagna",
+          "target": "rust_snapshot_contracts",
+          "test": "original_borrowed_and_owned_traces_keep_all_sixty_four_control_fault_event_queries",
+          "source_sha256": "6744df624a2896924dfac527223c685d4c6bf28cad9194931ffdabdc87a13dab"
+        }
+      ],
+      "installed_boundary_witnesses": [],
+      "supported_contract": "Returned certificate JSON is an owned export; explicit operation/initial replacements affect new sessions. OriginalProbabilityCache stores exact probability values for source-session/compiled-state keys while constructing fresh branches/callbacks.",
+      "unsupported_behavior": "No arbitrary annotation payload, metadata-only nested mutation invalidation, metadata-bearing branch-certificate LRU or original cache_hit dictionary semantics is implemented.",
+      "rationale": "Probability-value reuse and returned JSON isolation do not certify a metadata-sensitive certificate cache. Define graph identity/mutation and copy semantics before adding such a cache.",
+      "support_sources": [
+        {
+          "path": "rmagna/src/instrument/original_probability_cache.rs",
+          "anchor": "pub struct OriginalProbabilityCache",
+          "sha256": "8986e46b24a50a77049a57a6dfb6bef5b76b2a3b4ba2d92db9d9735de7d60958"
+        },
+        {
+          "path": "rmagna/src/instrument/original_assignment_certificate.rs",
+          "anchor": "pub fn to_json(",
+          "sha256": "dd4525758de639f386735223b4b3942577db84dadfa6e45ec2e86838ef47e7f2"
+        },
+        {
+          "path": "rmagna/src/instrument/original_assignment_plan.rs",
+          "anchor": "pub fn from_owned(",
+          "sha256": "52b515fd06da585c50199ff85c6ce8b13bcd6fb2ca70b4b5806d527a4bd806e4"
+        }
+      ]
+    },
+    {
+      "id": "test_user_interface.MissingExtensionTests.test_import_without_native_extension_explains_how_to_build",
+      "original_status": "unmapped",
+      "source": {
+        "path": "tests/core/test_user_interface.py",
+        "source_sha256": "79384caafc7fafa504e9b6d0f155311f3b37583d810f6a69c008b930a3e8e3c2",
+        "line": 185,
+        "end_line": 196
+      },
+      "method": {
+        "method_sha256": "2a35f363a1758dc89c08ca7d3d01429b24609c17788147b15668c2b4cf7908d5",
+        "required_checks": [
+          "self.assertNotEqual(process.returncode, 0)",
+          "self.assertIn(\"magna's compiled extension is missing\", process.stderr)",
+          "self.assertIn('scripts/build_native_core.py', process.stderr)",
+          "self.assertNotIn('circular import', process.stderr)"
+        ],
+        "loops": [],
+        "module_helpers": [
+          "CommandLineTests.cli"
+        ],
+        "module_imports": [
+          "from contextlib import redirect_stderr, redirect_stdout",
+          "from inspect import signature",
+          "from io import StringIO",
+          "from magna import ControllerRegistry",
+          "from magna import compare_samplers",
+          "from magna import compile_circuit, parse_circuit, run",
+          "from magna import operations",
+          "from magna.file_api import PACKAGE_VERSION, main",
+          "from magna.operations import Simulator",
+          "from pathlib import Path",
+          "from time import sleep",
+          "import json",
+          "import magna",
+          "import shutil",
+          "import subprocess",
+          "import sys",
+          "import tempfile",
+          "import unittest"
+        ]
+      },
+      "helper_sources": {
+        "core/magna/__init__.py": "ec9e2f5ca5079450d0c79e0aae9fd5feb1ac1896e24f81bdd43d77124f7b5ac5",
+        "scripts/build_native_core.py": "f305bf3fd88f8475e7985beaf2036e2717ad3b0fdd0a5b3c055b31dc1411da13"
+      },
+      "original_obligations": [
+        {
+          "id": "extension_import",
+          "requirement": "Import of the CPython package without its compiled extension fails through the package loader.",
+          "status": "not_implemented"
+        },
+        {
+          "id": "extension_build_hint",
+          "requirement": "The loader gives the original missing-extension/build-script diagnostic without misleading circular-import text.",
+          "status": "not_implemented"
+        }
+      ],
+      "boundary": "additional_compatibility_scope_not_selected",
+      "support_status": "source_bound_subset_not_original_parity",
+      "implementation_dependencies": [
+        "I1"
+      ],
+      "rust_witnesses": [],
+      "installed_boundary_witnesses": [
+        {
+          "package": "rmagna",
+          "target": "installed_cli_contracts",
+          "test": "downstream_rust_consumer_executes_both_tutorial_apis_and_embedded_catalogue",
+          "source_sha256": "aaaca56babeff5eedbc018389452cb122122892d0142eca5f41af99ea9260557"
+        }
+      ],
+      "supported_contract": "The installed Rust executable/public API has an independently tested artifact boundary. A caller observes OS NotFound when attempting to execute a removed/missing artifact.",
+      "unsupported_behavior": "No CPython package/extension import boundary or original missing-extension/build-script/circular-import diagnostic exists in the Rust distribution.",
+      "rationale": "A missing executable cannot run its own diagnostic. Its caller or a separate launcher owns that message. A CPython wrapper/distribution is additional scope, not added to relabel this method.",
+      "support_sources": [
+        {
+          "path": "rmagna/tests/installed_cli_contracts.rs",
+          "anchor": "fn downstream_rust_consumer_executes_both_tutorial_apis_and_embedded_catalogue(",
+          "sha256": "aaaca56babeff5eedbc018389452cb122122892d0142eca5f41af99ea9260557"
+        }
+      ]
+    }
+  ]
+}

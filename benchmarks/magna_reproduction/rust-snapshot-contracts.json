@@ -478,7 +478,7 @@
       "method_sha256": "598e48ad4fb40a7f8518a2a38411c92a8b47dcbf6946dc25b83f1c331e705ec5",
       "status": "partial",
       "contract": "Borrowed preparation clones typed operations and owned preparation moves them; both survive explicit source replacement/drop and all64 control/fault/event queries agree.",
-      "remaining_gap": "Arbitrary cyclic/aliased Python annotation graphs and deepcopy alias identity are not representable in the typed OriginalGate API. No graph arena or Python-object compatibility has been implemented.",
+      "remaining_gap": "The current typed OriginalGate API has no arbitrary annotation graph,cycle/alias deepcopy or transferred Python-object identity. Rust can represent such graphs through an explicit arena or compatibility layer,but neither is implemented here.",
       "rust_tests": [
         {
           "package": "rmagna",

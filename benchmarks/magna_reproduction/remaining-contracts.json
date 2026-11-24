@@ -1220,7 +1220,7 @@
           "import unittest"
         ]
       },
-      "remaining_requirement": "Arbitrary cyclic/aliased Python annotation graphs and deepcopy alias identity are not representable in the typed OriginalGate API. No graph arena or Python-object compatibility has been implemented.",
+      "remaining_requirement": "The current typed OriginalGate API has no arbitrary annotation graph,cycle/alias deepcopy or transferred Python-object identity. Rust can represent such graphs through an explicit arena or compatibility layer,but neither is implemented here.",
       "assessment": "Borrowed preparation clones typed operations and owned preparation moves them; both survive explicit source replacement/drop and all64 control/fault/event queries agree.",
       "rust_owners": [
         {

@@ -3870,7 +3870,7 @@
           "source_sha256": "6744df624a2896924dfac527223c685d4c6bf28cad9194931ffdabdc87a13dab"
         }
       ],
-      "remaining_gap": "Arbitrary cyclic/aliased Python annotation graphs and deepcopy alias identity are not representable in the typed OriginalGate API. No graph arena or Python-object compatibility has been implemented."
+      "remaining_gap": "The current typed OriginalGate API has no arbitrary annotation graph,cycle/alias deepcopy or transferred Python-object identity. Rust can represent such graphs through an explicit arena or compatibility layer,but neither is implemented here."
     },
     {
       "id": "test_query_reuse.OwnershipAndDependencies.test_lowered_operations_are_owned_even_for_guarded_noise",
