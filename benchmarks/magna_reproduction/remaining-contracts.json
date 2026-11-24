@@ -4,15 +4,15 @@
   "upstream_commit": "56847478c840395735146ef1e1ccdc3d8aedc10f",
   "parity_claim": "static_requirements_only",
   "ledger_snapshot": {
-    "verified": 343,
-    "partial": 7,
+    "verified": 344,
+    "partial": 6,
     "unmapped": 2
   },
   "category_counts": {
     "G": 0,
     "P": 0,
     "V": 0,
-    "E": 9,
+    "E": 8,
     "U": 0
   },
   "category_meanings": {
@@ -1126,45 +1126,6 @@
     }
   },
   "methods": [
-    {
-      "id": "test_installed_interface.InstalledInterfaceTests.test_installed_conditional_noise_fixed_reference_networks",
-      "ledger_status": "partial",
-      "category": "E",
-      "issue": "R05",
-      "source": {
-        "path": "tests/core/test_installed_interface.py",
-        "source_sha256": "d42494ea253a85a4e004eae2d219233caccff004a7e00a9c79a36dbb5323169d",
-        "line": 89,
-        "end_line": 107
-      },
-      "method": {
-        "method_sha256": "0c396a3968537aef59f5ebcb5a921709ec04bbcf9cdb1cf5aa455814976977ee",
-        "required_checks": [],
-        "loops": [],
-        "module_helpers": [
-          "InstalledInterfaceTests.python",
-          "InstalledInterfaceTests.setUp"
-        ],
-        "module_imports": [
-          "from pathlib import Path",
-          "import json",
-          "import os",
-          "import re",
-          "import shutil",
-          "import subprocess",
-          "import tempfile",
-          "import unittest"
-        ]
-      },
-      "remaining_requirement": "The Native private execution-state assertions (three fixed reference preparations,no later compilations,and zero reference resource/coordinate constructions) are not established by this installed CLI witness. R09 #1299 must provide corresponding reuse counters or retain this explicit gap.",
-      "assessment": "The installed binary executes the complete guarded-noise source for64 draws and independently enumerates acceptance1/error1/12 without source imports.",
-      "rust_owners": [
-        {
-          "path": "rmagna/tests/installed_cli_contracts.rs",
-          "anchor": "original_installed_scenarios_run_from_one_binary_without_checkout_imports"
-        }
-      ]
-    },
     {
       "id": "test_native_global_ownership.NativeGlobalOwnershipTests.test_compile_counts_preparation_fallback_once",
       "ledger_status": "partial",

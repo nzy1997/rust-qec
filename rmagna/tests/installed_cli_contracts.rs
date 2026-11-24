@@ -18,6 +18,61 @@ struct Installed {
     binary: PathBuf,
     calls: usize,
 }
+
+#[test]
+fn installed_conditional_noise_reuses_actual_reference_owners_in_one_process() {
+    let installed = Installed::new();
+    installed.put(
+        "conditional.magna",
+        "H 0\nM 0\nX_ERROR(1/3) rec[-1] 1\nM 1\nX_ERROR(1/2) rec[-1] 2\n",
+    );
+    installed.put(
+        "conditional.json",
+        r#"{"outputs":[2],"ideal_state":"basic/zero.magna"}"#,
+    );
+    installed.put(
+        "reference_consumer.rs",
+        include_str!("fixtures/installed_reference_consumer.rs"),
+    );
+    let artifacts = build_artifacts::rmagna().unwrap();
+    assert!(!installed.root.starts_with(&artifacts.profile));
+    let binary = installed
+        .root
+        .join("reference-consumer".to_owned() + std::env::consts::EXE_SUFFIX);
+    let compile = installed
+        .compiler(&artifacts)
+        .arg("--crate-name=installed_reference_consumer")
+        .arg(installed.root.join("reference_consumer.rs"))
+        .arg("-o")
+        .arg(&binary)
+        .output()
+        .unwrap();
+    assert!(
+        compile.status.success(),
+        "{}",
+        String::from_utf8_lossy(&compile.stderr)
+    );
+    println!(
+        "installed public consumer sha256={:x}; library sha256={:x}",
+        Sha256::digest(std::fs::read(&binary).unwrap()),
+        Sha256::digest(std::fs::read(&artifacts.library).unwrap())
+    );
+    let run = installed.command(&binary).output().unwrap();
+    let stdout = String::from_utf8(run.stdout).unwrap();
+    println!("{stdout}");
+    assert!(
+        run.status.success(),
+        "{}",
+        String::from_utf8_lossy(&run.stderr)
+    );
+    assert_eq!(
+        stdout
+            .matches("hot factories=0 source recompilations=0")
+            .count(),
+        4
+    );
+    assert!(stdout.contains("default-cold before="));
+}
 impl Installed {
     fn new() -> Self {
         static NEXT: AtomicUsize = AtomicUsize::new(0);
@@ -476,7 +531,7 @@ fn installed_conditional_noise(installed: &mut Installed) {
     assert_eq!(number(&result["result"]["masses"]["accepted"]), 1.0);
     close(number(&result["result"]["masses"]["error"]), 1.0 / 12.0);
     eprintln!(
-        "installed:conditional64-shot run;exact acceptance1,error1/12;private Native preparation counters are separate R09 scope"
+        "installed:conditional64-shot run;exact acceptance1,error1/12;same-owner reuse is checked by the separate installed public consumer"
     );
 }
 

@@ -460,6 +460,27 @@ impl fmt::Debug for CompiledFileTask {
     }
 }
 impl CompiledFileTask {
+    /// Actual factory/evaluation observations for this task's retained source
+    /// and target owners. Inspection performs no compilation, query, callback
+    /// or RNG work. Cold transient owners and bare phase operations are outside
+    /// this scope; an unavailable owner remains `None`, never a fabricated zero.
+    pub fn query_work_statistics(&self) -> crate::task::TaskQueryWorkStatistics {
+        self.evaluator.query_work_statistics()
+    }
+    /// Quiescent structural inventories of the retained source/target programs.
+    /// Caller-held plans and draw-local workspaces are separate. These are real
+    /// dimensions and slot capacities, not Native parent counts or process RSS.
+    pub fn reference_storage_statistics(
+        &self,
+    ) -> Result<crate::task::TaskReferenceStorageStatistics, FileApiError> {
+        Ok(self.evaluator.reference_storage_statistics()?)
+    }
+    /// Numeric assignments on the retained source, independent of query/factory
+    /// counts. History sampling can use multiple assignments per draw. A cold
+    /// route with no retained reference returns `None`.
+    pub fn source_insertion_assignments(&self) -> Option<u64> {
+        self.evaluator.source_insertion_assignments()
+    }
     pub fn inspect(&self, run: &TaskRunOptions) -> Result<Value, FileApiError> {
         let mut value = self.task.descriptor(run)?;
         add_snapshot(

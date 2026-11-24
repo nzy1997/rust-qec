@@ -1847,13 +1847,13 @@
           "package": "rmagna",
           "target": "installed_cli_contracts",
           "test": "original_installed_scenarios_run_from_one_binary_without_checkout_imports",
-          "source_sha256": "8769a84e3f3b68d8744bda07bc0d8c20b97a68911ee4e1132900c2bd7e604145"
+          "source_sha256": "aaaca56babeff5eedbc018389452cb122122892d0142eca5f41af99ea9260557"
         },
         {
           "package": "rmagna",
           "target": "installed_cli_contracts",
           "test": "downstream_rust_consumer_executes_both_tutorial_apis_and_embedded_catalogue",
-          "source_sha256": "8769a84e3f3b68d8744bda07bc0d8c20b97a68911ee4e1132900c2bd7e604145"
+          "source_sha256": "aaaca56babeff5eedbc018389452cb122122892d0142eca5f41af99ea9260557"
         }
       ]
     },
@@ -1866,23 +1866,28 @@
           "package": "rmagna",
           "target": "installed_cli_contracts",
           "test": "original_installed_scenarios_run_from_one_binary_without_checkout_imports",
-          "source_sha256": "8769a84e3f3b68d8744bda07bc0d8c20b97a68911ee4e1132900c2bd7e604145"
+          "source_sha256": "aaaca56babeff5eedbc018389452cb122122892d0142eca5f41af99ea9260557"
         }
       ]
     },
     {
       "id": "test_installed_interface.InstalledInterfaceTests.test_installed_conditional_noise_fixed_reference_networks",
-      "status": "partial",
-      "contract": "The installed binary executes the complete guarded-noise source for64 draws and independently enumerates acceptance1/error1/12 without source imports.",
+      "status": "verified",
+      "contract": "Installed Rust representation: the complete guarded-noise source runs64 seed3 draws and exact enumeration acceptance1/error1/12 outside the checkout. A statically linked public consumer retains one compiled source/ideal-target owner across explicit Native-family preparation and64 draws for both compiler strategies and both history samplers. Actual closure/geometry/phase-map/resource factories and full retained inventories remain unchanged during draws, source compilations stay zero, and numeric assignments/evaluations grow. Default cold-family execution is separately observed, without a warm-reuse claim. Rust source/query-family/target roles replace Native private three-parent identity; allocator/RSS and CPython ABI are not claimed.",
       "rust_tests": [
         {
           "package": "rmagna",
           "target": "installed_cli_contracts",
           "test": "original_installed_scenarios_run_from_one_binary_without_checkout_imports",
-          "source_sha256": "8769a84e3f3b68d8744bda07bc0d8c20b97a68911ee4e1132900c2bd7e604145"
+          "source_sha256": "aaaca56babeff5eedbc018389452cb122122892d0142eca5f41af99ea9260557"
+        },
+        {
+          "package": "rmagna",
+          "target": "installed_cli_contracts",
+          "test": "installed_conditional_noise_reuses_actual_reference_owners_in_one_process",
+          "source_sha256": "aaaca56babeff5eedbc018389452cb122122892d0142eca5f41af99ea9260557"
         }
-      ],
-      "remaining_gap": "The Native private execution-state assertions (three fixed reference preparations,no later compilations,and zero reference resource/coordinate constructions) are not established by this installed CLI witness. R09 #1299 must provide corresponding reuse counters or retain this explicit gap."
+      ]
     },
     {
       "id": "test_installed_interface.InstalledInterfaceTests.test_installed_console_commands_and_seed_reproducibility",
@@ -1893,7 +1898,7 @@
           "package": "rmagna",
           "target": "installed_cli_contracts",
           "test": "original_installed_scenarios_run_from_one_binary_without_checkout_imports",
-          "source_sha256": "8769a84e3f3b68d8744bda07bc0d8c20b97a68911ee4e1132900c2bd7e604145"
+          "source_sha256": "aaaca56babeff5eedbc018389452cb122122892d0142eca5f41af99ea9260557"
         }
       ]
     },
@@ -1906,7 +1911,7 @@
           "package": "rmagna",
           "target": "installed_cli_contracts",
           "test": "original_installed_scenarios_run_from_one_binary_without_checkout_imports",
-          "source_sha256": "8769a84e3f3b68d8744bda07bc0d8c20b97a68911ee4e1132900c2bd7e604145"
+          "source_sha256": "aaaca56babeff5eedbc018389452cb122122892d0142eca5f41af99ea9260557"
         }
       ]
     },
@@ -1919,7 +1924,7 @@
           "package": "rmagna",
           "target": "installed_cli_contracts",
           "test": "original_installed_scenarios_run_from_one_binary_without_checkout_imports",
-          "source_sha256": "8769a84e3f3b68d8744bda07bc0d8c20b97a68911ee4e1132900c2bd7e604145"
+          "source_sha256": "aaaca56babeff5eedbc018389452cb122122892d0142eca5f41af99ea9260557"
         }
       ]
     },
@@ -1932,7 +1937,7 @@
           "package": "rmagna",
           "target": "installed_cli_contracts",
           "test": "original_installed_scenarios_run_from_one_binary_without_checkout_imports",
-          "source_sha256": "8769a84e3f3b68d8744bda07bc0d8c20b97a68911ee4e1132900c2bd7e604145"
+          "source_sha256": "aaaca56babeff5eedbc018389452cb122122892d0142eca5f41af99ea9260557"
         }
       ]
     },
@@ -1945,7 +1950,7 @@
           "package": "rmagna",
           "target": "installed_cli_contracts",
           "test": "original_installed_scenarios_run_from_one_binary_without_checkout_imports",
-          "source_sha256": "8769a84e3f3b68d8744bda07bc0d8c20b97a68911ee4e1132900c2bd7e604145"
+          "source_sha256": "aaaca56babeff5eedbc018389452cb122122892d0142eca5f41af99ea9260557"
         }
       ]
     },
@@ -1958,7 +1963,7 @@
           "package": "rmagna",
           "target": "installed_cli_contracts",
           "test": "original_installed_scenarios_run_from_one_binary_without_checkout_imports",
-          "source_sha256": "8769a84e3f3b68d8744bda07bc0d8c20b97a68911ee4e1132900c2bd7e604145"
+          "source_sha256": "aaaca56babeff5eedbc018389452cb122122892d0142eca5f41af99ea9260557"
         }
       ]
     },
@@ -1971,7 +1976,7 @@
           "package": "rmagna",
           "target": "installed_cli_contracts",
           "test": "original_installed_scenarios_run_from_one_binary_without_checkout_imports",
-          "source_sha256": "8769a84e3f3b68d8744bda07bc0d8c20b97a68911ee4e1132900c2bd7e604145"
+          "source_sha256": "aaaca56babeff5eedbc018389452cb122122892d0142eca5f41af99ea9260557"
         }
       ]
     },
@@ -1984,7 +1989,7 @@
           "package": "rmagna",
           "target": "installed_cli_contracts",
           "test": "original_installed_scenarios_run_from_one_binary_without_checkout_imports",
-          "source_sha256": "8769a84e3f3b68d8744bda07bc0d8c20b97a68911ee4e1132900c2bd7e604145"
+          "source_sha256": "aaaca56babeff5eedbc018389452cb122122892d0142eca5f41af99ea9260557"
         }
       ]
     },
@@ -1997,13 +2002,13 @@
           "package": "rmagna",
           "target": "installed_cli_contracts",
           "test": "original_installed_scenarios_run_from_one_binary_without_checkout_imports",
-          "source_sha256": "8769a84e3f3b68d8744bda07bc0d8c20b97a68911ee4e1132900c2bd7e604145"
+          "source_sha256": "aaaca56babeff5eedbc018389452cb122122892d0142eca5f41af99ea9260557"
         },
         {
           "package": "rmagna",
           "target": "installed_cli_contracts",
           "test": "downstream_rust_consumer_executes_both_tutorial_apis_and_embedded_catalogue",
-          "source_sha256": "8769a84e3f3b68d8744bda07bc0d8c20b97a68911ee4e1132900c2bd7e604145"
+          "source_sha256": "aaaca56babeff5eedbc018389452cb122122892d0142eca5f41af99ea9260557"
         }
       ]
     },
@@ -5198,7 +5203,7 @@
           "package": "rmagna",
           "target": "installed_cli_contracts",
           "test": "original_installed_scenarios_run_from_one_binary_without_checkout_imports",
-          "source_sha256": "8769a84e3f3b68d8744bda07bc0d8c20b97a68911ee4e1132900c2bd7e604145"
+          "source_sha256": "aaaca56babeff5eedbc018389452cb122122892d0142eca5f41af99ea9260557"
         }
       ]
     },
@@ -5294,7 +5299,7 @@
           "package": "rmagna",
           "target": "installed_cli_contracts",
           "test": "downstream_rust_consumer_executes_both_tutorial_apis_and_embedded_catalogue",
-          "source_sha256": "8769a84e3f3b68d8744bda07bc0d8c20b97a68911ee4e1132900c2bd7e604145"
+          "source_sha256": "aaaca56babeff5eedbc018389452cb122122892d0142eca5f41af99ea9260557"
         }
       ]
     },
@@ -5307,7 +5312,7 @@
           "package": "rmagna",
           "target": "installed_cli_contracts",
           "test": "downstream_rust_consumer_executes_both_tutorial_apis_and_embedded_catalogue",
-          "source_sha256": "8769a84e3f3b68d8744bda07bc0d8c20b97a68911ee4e1132900c2bd7e604145"
+          "source_sha256": "aaaca56babeff5eedbc018389452cb122122892d0142eca5f41af99ea9260557"
         }
       ]
     },
