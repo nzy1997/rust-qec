@@ -4465,8 +4465,8 @@ under the explicit Rust representation above; the denominator remains352.
 Follow-ups [F2 #1340](https://github.com/nzy1997/rust-qec/issues/1340) (opt-in
 fallback with captured-input ownership) and
 [F3 #1341](https://github.com/nzy1997/rust-qec/issues/1341) (metadata/tooling
-compatibility decisions) have no hard dependency on F1. F2 is implemented below;
-F3 remains separate work.
+compatibility decisions) have no hard dependency on F1. Their implementation
+and decision scopes are documented below.
 
 
 ### F2 captured-input preparation fallback
@@ -4533,3 +4533,97 @@ with the original352-method denominator unchanged. The six remaining methods
 belong to [F3 #1341](https://github.com/nzy1997/rust-qec/issues/1341); no unrelated
 method is promoted and no full Python/private-object or paper-performance parity
 is asserted by F2.
+
+### F3 explicit compatibility boundaries
+
+[#1341](https://github.com/nzy1997/rust-qec/issues/1341) records the six remaining
+whole original-method contracts in `compatibility-boundaries.json`. The checked
+product choice remains an independent Rust simulator plus paper experiments.
+The report separates source-bound supported subsets from twelve unimplemented
+original obligations. The ledger remains346 verified /4 partial /2 unmapped,
+with all352 original IDs retained. Completing this decision issue does not
+establish full original-method, Python/private-object or paper-performance parity.
+
+```sh
+python3 -B benchmarks/magna_reproduction/remaining_contracts.py compatibility \
+  --upstream "$MAGNA_UPSTREAM"
+python3 -B benchmarks/magna_reproduction/remaining_contracts.py check
+python3 -I -m unittest discover -s benchmarks/magna_reproduction -p 'test_*.py'
+```
+
+The compatibility command verifies the complete pinned source inventory,
+method/helper contexts and required helper files, approved typed subset witnesses,
+current source owners, all352 IDs and the closed decision/obligation schemas.
+The ordinary `check` command includes this gate too. Reports calculate current
+ledger counts rather than assuming F1/F2 were promoted. Rust witnesses are
+source-bound declarations in this command; it explicitly reports no Rust
+execution. Compiler/process receipts and actual supported-subset replay are
+separate evidence and never turn a policy decision into original parity.
+
+| Original area | Supported boundary | Unimplemented original capability |
+| --- | --- | --- |
+| Public/deferred IR ownership (two methods) | Typed operation ownership; borrowed snapshots and owned transfer; explicit source replacement | Arbitrary annotation aliases/cycles, graph-preserving public deepcopy, mutable-leaf identity and nested prepared matching |
+| Guarded-noise lowering | Owned physical categorical actions and fault identities, distinct from the pinned inspection hook | Python NoiseDraw/hook projection/validation and anchor-only lowered-output interface; the hook discards extra rather than retaining it |
+| Prepared mutation/certificate caching | Owned returned JSON, explicit immutable source sessions and exact probability-value LRU | Scoped acyclic nested metadata mutation detection, metadata-keyed branch-certificate LRU and metadata-preserving cached branch copies; pinned prepared fingerprints reject cycles |
+| Source navigation | Explicit manifest-relative paths, existence/hash/symlink admission | Unique recursive basename lookup with zero/one/multiple-match semantics |
+| Installation | Independent Rust executable/API; missing-program OS error belongs to caller/launcher | CPython extension-import/build-script diagnostic and circular-import behavior |
+
+Typed labels/operations remain part of explicit source/input identity. There is
+no arbitrary annotation metadata API whose edits could participate in identity.
+`OriginalProbabilityCache` stores exact scalar values for source-session and
+compiled physical-state keys; it still constructs fresh branches and executes
+callbacks. That is distinct from caching metadata-bearing branch certificates.
+An owned certificate JSON export is not an annotation graph snapshot API.
+
+Rust can represent aliases and cycles. If graph compatibility is selected,
+G1 first defines a budgeted node arena with reference edges and an explicit
+scalar/key/custom-object domain. G2 defines memoized public copies preserving
+internal aliases/cycles and caller isolation, consumed-owner transfer requiring
+caller relinquishment, and nested mutation/prepared-match behavior. G3 then
+adds metadata-sensitive identity/invalidation, bounded certificate LRU and
+returned graph isolation. These are prospective requirements, not implemented
+Rust or JSON-tree APIs. Exact arbitrary Python custom-object/copy-hook behavior
+may require a declared compatibility layer rather than only a container arena.
+
+N1 (literal Python NoiseDraw/test-hook projection, validation and anchor-only
+lowering), S1 (recursive source lookup) and I1 (explicit CPython distribution/loader
+compatibility) have no graph dependency and are additional, unselected scope.
+No wrapper is added merely to relabel coverage. A missing executable cannot
+execute its own diagnostic: its OS-level failure is observed by the caller,
+which may choose a launcher/build hint as a separate product feature.
+
+The pinned guarded-noise hook passes only kind/first-qubit pairs to Native;
+`extra` never crosses that boundary. Its C++ lowering ignores those supplied
+actions and retains an assignment anchor. The original mutation-equality test
+therefore establishes stable output, not retention of extra or compilation of
+the supplied action. N1 records that literal interface separately from the
+stronger Rust physical-action ownership witness. No metadata graph is required
+to implement this projection.
+
+Public IR/defer copies preserve aliases/cycles, but prepared initialization
+computes a JSON fingerprint that rejects cyclic containers. The scoped cache
+test uses acyclic `metadata={"marks": [1]}` and asserts returned-copy isolation
+and metadata-only invalidation, not alias identity or cyclic certificates. The
+prospective graph model above is additional scope; it must not be attributed to
+that original prepared/cache path.
+
+The compatibility probe executes selected pinned pure-source functions without
+importing Native: it captures the hook projection before a recording Native
+boundary, confirms dropped nested/cyclic extras and captured-payload isolation,
+and runs the original fingerprint on acyclic metadata, metadata-only edits,
+shared/unshared equal values and cyclic dict/list rejection. It does not execute
+Native lowering, Simulator preparation or cached certificates. It also actually
+exercises missing, unique and duplicate
+basenames through exact-path admission; with pinned source it also runs the
+original pure-Python `native_source` helper's zero/unique/ambiguous cases.
+Duplicate basenames remain distinct through explicit paths, so that observation
+does not certify recursive-lookup parity. The missing-executable probe observes
+caller-side `FileNotFoundError`; no CPython import is exercised or qualified.
+
+Corruption tests reject removed records, original/helper obligations, source
+identity drift, coordinated method-context deletion, adjacent witness/owner
+substitution, unimplemented graph/cache/loader promotions, dependency reordering,
+architecture exclusions and unsupported IDs dropped from the denominator. Full
+method-context digests prevent paired editable catalogues from hiding an
+assertion/helper. Existing numerical/physical ownership evidence remains valid;
+Native rebuilds and paper campaigns are not needed for this decision report.

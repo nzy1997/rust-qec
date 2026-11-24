@@ -51,7 +51,7 @@ def method_details(source, case_id):
                 required_checks=checks, loops=loops, module_helpers=helpers, module_imports=imports)
 
 
-def check_contracts(catalog, ledger, manifest, *, root=ROOT, upstream=None):
+def check_contracts(catalog, ledger, manifest, *, root=ROOT, upstream=None, compatibility=None):
     require(catalog.get("schema") == "rmagna.remaining-contracts.v1", "unsupported contract schema")
     require(catalog.get("reference_sha256") == reference.digest(HERE / "reference.json"),
             "contract reference manifest changed")
@@ -119,7 +119,12 @@ def check_contracts(catalog, ledger, manifest, *, root=ROOT, upstream=None):
     standalone_contracts.check_inventory(
         read_json(HERE / "standalone-contracts.json"), ledger, manifest,
         reference.digest(HERE / "reference.json"), root)
-    return dict(status="PASS", scope=catalog["parity_claim"], outstanding=len(rows),
+    import compatibility_boundaries
+    boundaries = compatibility_boundaries.check_catalogue(
+        read_json(HERE / "compatibility-boundaries.json") if compatibility is None else compatibility,
+        ledger, manifest, catalog, root=root, upstream=upstream)
+    return dict(status="PASS", compatibility_boundaries=boundaries,
+                scope=catalog["parity_claim"], outstanding=len(rows),
                 ledger_snapshot=snapshot, categories=catalog["category_counts"],
                 tasks=len(catalog["packaged_tasks"]), paper_files=len(paper["files"]),
                 source_files=len(catalog["helper_source_scope"]),
@@ -128,7 +133,7 @@ def check_contracts(catalog, ledger, manifest, *, root=ROOT, upstream=None):
 
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("command", choices=["check", "standalone"])
+    parser.add_argument("command", choices=["check", "standalone", "compatibility"])
     parser.add_argument("--manifest", type=Path,
                         help="contract catalogue; defaults to the selected command's catalogue")
     parser.add_argument("--upstream", type=Path)
@@ -180,6 +185,21 @@ def main(argv=None):
                     ROOT, ROOT / "rmagna/tests/fixtures/standalone_consumer.rs"))
             require(reference.verify_source(args.upstream, pinned) == before,
                     "standalone source inventory changed during verification")
+        elif args.command == "compatibility":
+            import compatibility_boundaries
+            require(args.upstream is not None, "compatibility requires --upstream with the pinned source")
+            require(not args.require_complete and not args.catalogue_only
+                    and args.rust_run is None and args.record_rust_run is None,
+                    "standalone execution options cannot qualify compatibility decisions")
+            before = reference.verify_source(args.upstream, pinned)
+            result = check_contracts(
+                read_json(HERE / "remaining-contracts.json"), ledger, pinned,
+                upstream=args.upstream,
+                compatibility=read_json(args.manifest or HERE / "compatibility-boundaries.json"))[
+                    "compatibility_boundaries"]
+            result["boundary_observations"] = compatibility_boundaries.probe_boundaries(args.upstream)
+            require(reference.verify_source(args.upstream, pinned) == before,
+                    "compatibility source inventory changed during verification")
         else:
             require(not args.require_complete, "--require-complete requires standalone")
             require(not args.catalogue_only, "--catalogue-only requires standalone")
