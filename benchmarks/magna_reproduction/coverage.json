@@ -2819,8 +2819,310 @@
     },
     {
       "id": "test_native_standalone.NativeStandaloneTest.test_foundation_without_cpython",
-      "status": "unmapped",
-      "reason": "The complete192-assertion foundation fixture is partitioned source-specifically. Source/compiler/process receipts can qualify179 assertions in56 groups; the two trace-purpose/runtime groups (13 assertions) remain unresolved because Rust retains raw/query AffineKet amplitude boundaries. #1335 must complete observable trace-storage release before aggregate promotion; numerical equality and existing neighboring tests cannot qualify those groups."
+      "status": "verified",
+      "contract": "Complete pinned foundation standalone fixture: all14 helper contexts,192 assertions,58 semantic groups and197 loop headers. Original random schedules and independent exact oracles are retained. Sealed opt-in trace owners omit the open query projection and release actual raw/query/program payloads while preserving full dilation, original-location phased frames, rotation metadata, closed scalar maps and exact record sampling. Explicit representation adaptations are bound in standalone-contracts.json; ordinary amplitude-capable evaluators remain separate. Source/compiler/process receipts are required for executable qualification; this does not claim private Native ABI, RSS or paper-performance parity.",
+      "rust_tests": [
+        {
+          "package": "rmagna",
+          "target": "standalone_causal_knowledge",
+          "test": "foundation_online_classical_knowledge",
+          "source_sha256": "42ff31103f099d541fbe17a42f0172d24e16996fdf5878480a09a650ba74174c"
+        },
+        {
+          "package": "rmagna",
+          "target": "standalone_certificate_snapshots",
+          "test": "foundation_certificate_cache",
+          "source_sha256": "a2adb314aacf8a2a84d6a880e135631ef36779d4514acc684557562f028b76f5"
+        },
+        {
+          "package": "rmagna",
+          "target": "standalone_foundation_contracts",
+          "test": "affine_proposal_hull_and_projection",
+          "source_sha256": "7e4d76f21cf80dd38ec6e0b6e05d5cca04d77d22378c2e9290aaf71e4cae930c"
+        },
+        {
+          "package": "rmagna",
+          "target": "standalone_foundation_contracts",
+          "test": "boundary_coordinate_rhs",
+          "source_sha256": "7e4d76f21cf80dd38ec6e0b6e05d5cca04d77d22378c2e9290aaf71e4cae930c"
+        },
+        {
+          "package": "rmagna",
+          "target": "standalone_foundation_contracts",
+          "test": "cached_noise_law_and_weight",
+          "source_sha256": "7e4d76f21cf80dd38ec6e0b6e05d5cca04d77d22378c2e9290aaf71e4cae930c"
+        },
+        {
+          "package": "rmagna",
+          "target": "standalone_foundation_contracts",
+          "test": "character_geometry_and_resource_transport",
+          "source_sha256": "7e4d76f21cf80dd38ec6e0b6e05d5cca04d77d22378c2e9290aaf71e4cae930c"
+        },
+        {
+          "package": "rmagna",
+          "target": "standalone_foundation_contracts",
+          "test": "check_axis_prefix",
+          "source_sha256": "7e4d76f21cf80dd38ec6e0b6e05d5cca04d77d22378c2e9290aaf71e4cae930c"
+        },
+        {
+          "package": "rmagna",
+          "target": "standalone_foundation_contracts",
+          "test": "check_composed_feedback_frames",
+          "source_sha256": "7e4d76f21cf80dd38ec6e0b6e05d5cca04d77d22378c2e9290aaf71e4cae930c"
+        },
+        {
+          "package": "rmagna",
+          "target": "standalone_foundation_contracts",
+          "test": "check_incremental_history_session",
+          "source_sha256": "7e4d76f21cf80dd38ec6e0b6e05d5cca04d77d22378c2e9290aaf71e4cae930c"
+        },
+        {
+          "package": "rmagna",
+          "target": "standalone_foundation_contracts",
+          "test": "check_packed_clifford_updates",
+          "source_sha256": "7e4d76f21cf80dd38ec6e0b6e05d5cca04d77d22378c2e9290aaf71e4cae930c"
+        },
+        {
+          "package": "rmagna",
+          "target": "standalone_foundation_contracts",
+          "test": "check_quadratic_batches",
+          "source_sha256": "7e4d76f21cf80dd38ec6e0b6e05d5cca04d77d22378c2e9290aaf71e4cae930c"
+        },
+        {
+          "package": "rmagna",
+          "target": "standalone_foundation_contracts",
+          "test": "check_reference_boundary",
+          "source_sha256": "7e4d76f21cf80dd38ec6e0b6e05d5cca04d77d22378c2e9290aaf71e4cae930c"
+        },
+        {
+          "package": "rmagna",
+          "target": "standalone_foundation_contracts",
+          "test": "check_reference_coordinates",
+          "source_sha256": "7e4d76f21cf80dd38ec6e0b6e05d5cca04d77d22378c2e9290aaf71e4cae930c"
+        },
+        {
+          "package": "rmagna",
+          "target": "standalone_foundation_contracts",
+          "test": "checked_primitives_preserve_padding_shapes_and_refusal",
+          "source_sha256": "7e4d76f21cf80dd38ec6e0b6e05d5cca04d77d22378c2e9290aaf71e4cae930c"
+        },
+        {
+          "package": "rmagna",
+          "target": "standalone_foundation_contracts",
+          "test": "coherent_expansion_and_target_amplitude",
+          "source_sha256": "7e4d76f21cf80dd38ec6e0b6e05d5cca04d77d22378c2e9290aaf71e4cae930c"
+        },
+        {
+          "package": "rmagna",
+          "target": "standalone_foundation_contracts",
+          "test": "coherent_file_pipeline_and_prepared_trace_runtime",
+          "source_sha256": "7e4d76f21cf80dd38ec6e0b6e05d5cca04d77d22378c2e9290aaf71e4cae930c"
+        },
+        {
+          "package": "rmagna",
+          "target": "standalone_foundation_contracts",
+          "test": "completed_pair_sampling_and_branch_limit",
+          "source_sha256": "7e4d76f21cf80dd38ec6e0b6e05d5cca04d77d22378c2e9290aaf71e4cae930c"
+        },
+        {
+          "package": "rmagna",
+          "target": "standalone_foundation_contracts",
+          "test": "consuming_and_finite_sum_contraction",
+          "source_sha256": "7e4d76f21cf80dd38ec6e0b6e05d5cca04d77d22378c2e9290aaf71e4cae930c"
+        },
+        {
+          "package": "rmagna",
+          "target": "standalone_foundation_contracts",
+          "test": "dimension_changing_clifford_transport",
+          "source_sha256": "7e4d76f21cf80dd38ec6e0b6e05d5cca04d77d22378c2e9290aaf71e4cae930c"
+        },
+        {
+          "package": "rmagna",
+          "target": "standalone_foundation_contracts",
+          "test": "entry_dependent_geometry_matches_finite_sums",
+          "source_sha256": "7e4d76f21cf80dd38ec6e0b6e05d5cca04d77d22378c2e9290aaf71e4cae930c"
+        },
+        {
+          "package": "rmagna",
+          "target": "standalone_foundation_contracts",
+          "test": "exact_categorical_zero_channel_uses_one_caller_word",
+          "source_sha256": "7e4d76f21cf80dd38ec6e0b6e05d5cca04d77d22378c2e9290aaf71e4cae930c"
+        },
+        {
+          "package": "rmagna",
+          "target": "standalone_foundation_contracts",
+          "test": "exact_file_parser",
+          "source_sha256": "7e4d76f21cf80dd38ec6e0b6e05d5cca04d77d22378c2e9290aaf71e4cae930c"
+        },
+        {
+          "package": "rmagna",
+          "target": "standalone_foundation_contracts",
+          "test": "explicit_trace_compilation_omits_the_open_query_projection",
+          "source_sha256": "7e4d76f21cf80dd38ec6e0b6e05d5cca04d77d22378c2e9290aaf71e4cae930c"
+        },
+        {
+          "package": "rmagna",
+          "target": "standalone_foundation_contracts",
+          "test": "file_causal_runtime_and_enumeration",
+          "source_sha256": "7e4d76f21cf80dd38ec6e0b6e05d5cca04d77d22378c2e9290aaf71e4cae930c"
+        },
+        {
+          "package": "rmagna",
+          "target": "standalone_foundation_contracts",
+          "test": "fixed_virtual_template_and_selection_offset",
+          "source_sha256": "7e4d76f21cf80dd38ec6e0b6e05d5cca04d77d22378c2e9290aaf71e4cae930c"
+        },
+        {
+          "package": "rmagna",
+          "target": "standalone_foundation_contracts",
+          "test": "history_efficiency_and_paired_statistics",
+          "source_sha256": "7e4d76f21cf80dd38ec6e0b6e05d5cca04d77d22378c2e9290aaf71e4cae930c"
+        },
+        {
+          "package": "rmagna",
+          "target": "standalone_foundation_contracts",
+          "test": "independent_proposal_and_exact_range_order",
+          "source_sha256": "7e4d76f21cf80dd38ec6e0b6e05d5cca04d77d22378c2e9290aaf71e4cae930c"
+        },
+        {
+          "package": "rmagna",
+          "target": "standalone_foundation_contracts",
+          "test": "literal_branch_order_and_declared_controls",
+          "source_sha256": "7e4d76f21cf80dd38ec6e0b6e05d5cca04d77d22378c2e9290aaf71e4cae930c"
+        },
+        {
+          "package": "rmagna",
+          "target": "standalone_foundation_contracts",
+          "test": "literal_callback_certificate_owns_signed_wire_result",
+          "source_sha256": "7e4d76f21cf80dd38ec6e0b6e05d5cca04d77d22378c2e9290aaf71e4cae930c"
+        },
+        {
+          "package": "rmagna",
+          "target": "standalone_foundation_contracts",
+          "test": "literal_layout_avoids_inline_record_collisions",
+          "source_sha256": "7e4d76f21cf80dd38ec6e0b6e05d5cca04d77d22378c2e9290aaf71e4cae930c"
+        },
+        {
+          "package": "rmagna",
+          "target": "standalone_foundation_contracts",
+          "test": "malformed_history_task_is_rejected_before_execution",
+          "source_sha256": "7e4d76f21cf80dd38ec6e0b6e05d5cca04d77d22378c2e9290aaf71e4cae930c"
+        },
+        {
+          "package": "rmagna",
+          "target": "standalone_foundation_contracts",
+          "test": "operation_sampling_reported_input_and_terminal_mass",
+          "source_sha256": "7e4d76f21cf80dd38ec6e0b6e05d5cca04d77d22378c2e9290aaf71e4cae930c"
+        },
+        {
+          "package": "rmagna",
+          "target": "standalone_foundation_contracts",
+          "test": "prepared_clifford",
+          "source_sha256": "7e4d76f21cf80dd38ec6e0b6e05d5cca04d77d22378c2e9290aaf71e4cae930c"
+        },
+        {
+          "package": "rmagna",
+          "target": "standalone_foundation_contracts",
+          "test": "quadratic_radical_support",
+          "source_sha256": "7e4d76f21cf80dd38ec6e0b6e05d5cca04d77d22378c2e9290aaf71e4cae930c"
+        },
+        {
+          "package": "rmagna",
+          "target": "standalone_foundation_contracts",
+          "test": "scaled_noise_model_and_categorical_law_interning",
+          "source_sha256": "7e4d76f21cf80dd38ec6e0b6e05d5cca04d77d22378c2e9290aaf71e4cae930c"
+        },
+        {
+          "package": "rmagna",
+          "target": "standalone_foundation_contracts",
+          "test": "sealed_file_trace_keeps_selection_parity_constants_and_fault_validation",
+          "source_sha256": "7e4d76f21cf80dd38ec6e0b6e05d5cca04d77d22378c2e9290aaf71e4cae930c"
+        },
+        {
+          "package": "rmagna",
+          "target": "standalone_foundation_contracts",
+          "test": "sealed_trace_both_compilers_preserve_complex_moments_dependent_events_and_frames",
+          "source_sha256": "7e4d76f21cf80dd38ec6e0b6e05d5cca04d77d22378c2e9290aaf71e4cae930c"
+        },
+        {
+          "package": "rmagna",
+          "target": "standalone_foundation_contracts",
+          "test": "signed_affine_grouping",
+          "source_sha256": "7e4d76f21cf80dd38ec6e0b6e05d5cca04d77d22378c2e9290aaf71e4cae930c"
+        },
+        {
+          "package": "rmagna",
+          "target": "standalone_foundation_contracts",
+          "test": "sparse_noise_stream_and_weight_sectors",
+          "source_sha256": "7e4d76f21cf80dd38ec6e0b6e05d5cca04d77d22378c2e9290aaf71e4cae930c"
+        },
+        {
+          "package": "rmagna",
+          "target": "standalone_foundation_contracts",
+          "test": "strict_parity_representation",
+          "source_sha256": "7e4d76f21cf80dd38ec6e0b6e05d5cca04d77d22378c2e9290aaf71e4cae930c"
+        },
+        {
+          "package": "rmagna",
+          "target": "standalone_foundation_contracts",
+          "test": "target_and_recovery_mapping",
+          "source_sha256": "7e4d76f21cf80dd38ec6e0b6e05d5cca04d77d22378c2e9290aaf71e4cae930c"
+        },
+        {
+          "package": "rmagna",
+          "target": "standalone_foundation_contracts",
+          "test": "target_projection_keeps_seven_protocol_records_and_independent_owner",
+          "source_sha256": "7e4d76f21cf80dd38ec6e0b6e05d5cca04d77d22378c2e9290aaf71e4cae930c"
+        },
+        {
+          "package": "rmagna",
+          "target": "standalone_foundation_contracts",
+          "test": "trace_cross_word_frames_and_prefix_sampling_keep_exact_conditional_mass",
+          "source_sha256": "7e4d76f21cf80dd38ec6e0b6e05d5cca04d77d22378c2e9290aaf71e4cae930c"
+        },
+        {
+          "package": "rmagna",
+          "target": "standalone_foundation_contracts",
+          "test": "trace_purpose_preserves_dilation_axes_and_every_fault_location",
+          "source_sha256": "7e4d76f21cf80dd38ec6e0b6e05d5cca04d77d22378c2e9290aaf71e4cae930c"
+        },
+        {
+          "package": "rmagna",
+          "target": "standalone_foundation_contracts",
+          "test": "trace_release_is_observed_even_with_external_ordinary_plans_and_invalid_requests",
+          "source_sha256": "7e4d76f21cf80dd38ec6e0b6e05d5cca04d77d22378c2e9290aaf71e4cae930c"
+        },
+        {
+          "package": "rmagna",
+          "target": "standalone_foundation_contracts",
+          "test": "true_reported_records_and_coincident_fault_order",
+          "source_sha256": "7e4d76f21cf80dd38ec6e0b6e05d5cca04d77d22378c2e9290aaf71e4cae930c"
+        },
+        {
+          "package": "rmagna",
+          "target": "standalone_foundation_contracts",
+          "test": "virtual_noise_actions",
+          "source_sha256": "7e4d76f21cf80dd38ec6e0b6e05d5cca04d77d22378c2e9290aaf71e4cae930c"
+        },
+        {
+          "package": "rmagna",
+          "target": "standalone_foundation_contracts",
+          "test": "wide_clifford_elimination",
+          "source_sha256": "7e4d76f21cf80dd38ec6e0b6e05d5cca04d77d22378c2e9290aaf71e4cae930c"
+        },
+        {
+          "package": "rmagna",
+          "target": "standalone_foundation_contracts",
+          "test": "wide_exact_scalars_and_caller_rng",
+          "source_sha256": "7e4d76f21cf80dd38ec6e0b6e05d5cca04d77d22378c2e9290aaf71e4cae930c"
+        },
+        {
+          "package": "rmagna",
+          "target": "standalone_foundation_contracts",
+          "test": "word_shifts",
+          "source_sha256": "7e4d76f21cf80dd38ec6e0b6e05d5cca04d77d22378c2e9290aaf71e4cae930c"
+        }
+      ]
     },
     {
       "id": "test_native_standalone.NativeStandaloneTest.test_reference_runtime_headers_are_self_contained",

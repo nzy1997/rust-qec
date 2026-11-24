@@ -28,11 +28,16 @@ mod prepared;
 mod shared;
 pub use shared::{AxisSectorOptions, CommutingAxisSector};
 mod support;
+mod trace;
 mod work;
 pub use prepared::{
     DensityLayout, PreparedDensityOverlap, PreparedPauliMoment, PreparedProbability,
 };
 pub use support::{PreparedProbabilitySupport, ProbabilitySupportExpansion};
+pub use trace::{
+    AmplitudeOwnershipProbe, TraceAssignment, TraceOptions, TraceQuery, TraceRecordDraw,
+    TraceRuntime, TraceSamplingError, TraceStorageStatistics,
+};
 pub use work::{QueryWorkStatistics, ReferenceStorageStatistics};
 
 use crate::clifford::{CliffordCircuit, CliffordError, CliffordGate};
@@ -73,6 +78,11 @@ pub enum UnitaryError {
     RepeatedQubit,
     RepeatedOutput,
     IncompatibleProgram,
+    AssignedTraceReference,
+    InvalidTraceQuery {
+        index: usize,
+        count: usize,
+    },
     InvalidInsertion {
         position: usize,
         gate_count: usize,
@@ -150,6 +160,13 @@ impl fmt::Display for UnitaryError {
             ),
             Self::RepeatedQubit => write!(f, "multi-qubit diagonal gate repeats a qubit"),
             Self::RepeatedOutput => write!(f, "target output list contains duplicate qubits"),
+            Self::AssignedTraceReference => {
+                write!(f, "trace sealing requires an unassigned compiled reference")
+            }
+            Self::InvalidTraceQuery { index, count } => write!(
+                f,
+                "trace query index {index} is outside sealed family count {count}"
+            ),
             Self::IncompatibleProgram => write!(
                 f,
                 "prepared plan requires a view of its original compiled program"
@@ -474,6 +491,51 @@ fn diagonal_terms(gate: UnitaryGate) -> Vec<(Vec<usize>, u8)> {
     }
 }
 
+fn transport_insertions<'a>(
+    physical: usize,
+    total: usize,
+    gates: &[CliffordGate],
+    positions: &[usize],
+    insertions: &'a [PauliInsertion],
+) -> Result<(PauliWord, BTreeMap<usize, Vec<&'a PauliWord>>), UnitaryError> {
+    let count = positions.len() - 1;
+    let mut grouped = BTreeMap::<usize, Vec<&PauliWord>>::new();
+    for insertion in insertions {
+        if insertion.before_gate > count {
+            return Err(UnitaryError::InvalidInsertion {
+                position: insertion.before_gate,
+                gate_count: count,
+            });
+        }
+        if insertion.word.width() != physical {
+            return Err(UnitaryError::DimensionMismatch);
+        }
+        grouped
+            .entry(insertion.before_gate)
+            .or_default()
+            .push(&insertion.word);
+    }
+    let mut frame = PauliWord::identity(total)?;
+    for position in 0..=count {
+        if let Some(words) = grouped.get(&position) {
+            for word in words {
+                let extended = PauliWord::new(
+                    BitVector::from_indices(total, word.x().ones())?,
+                    BitVector::from_indices(total, word.z().ones())?,
+                    word.phase(),
+                )?;
+                frame = extended.multiply(&frame)?;
+            }
+        }
+        if position < count {
+            for &gate in &gates[positions[position]..positions[position + 1]] {
+                frame = frame.conjugated(gate)?;
+            }
+        }
+    }
+    Ok((frame, grouped))
+}
+
 /// An exact query result with the resource size used for this closed network.
 #[derive(Clone, Debug)]
 pub struct NetworkValue {
@@ -500,6 +562,12 @@ struct InsertionAssignment {
     frame: crate::compact::CompactPauliWord,
     phase: Arc<ParityPhase>,
 }
+#[derive(Clone, Copy)]
+enum CompilationPurpose {
+    Open,
+    Trace,
+}
+
 struct InsertionProgram {
     scalar_geometry: prepared::SharedScalarGeometry,
     work: Arc<work::QueryWorkCounters>,
@@ -751,44 +819,13 @@ impl CompiledUnitary {
                 program: Arc::clone(&self.program),
             });
         }
-        let count = self.program.positions.len() - 1;
-        let mut grouped = BTreeMap::<usize, Vec<&PauliWord>>::new();
-        for insertion in insertions {
-            if insertion.before_gate > count {
-                return Err(UnitaryError::InvalidInsertion {
-                    position: insertion.before_gate,
-                    gate_count: count,
-                });
-            }
-            if insertion.word.width() != self.width() {
-                return Err(UnitaryError::DimensionMismatch);
-            }
-            grouped
-                .entry(insertion.before_gate)
-                .or_default()
-                .push(&insertion.word);
-        }
-        let total = self.program.reference.width();
-        let mut frame = PauliWord::identity(total)?;
-        for position in 0..=count {
-            if let Some(words) = grouped.get(&position) {
-                for word in words {
-                    let extended = PauliWord::new(
-                        BitVector::from_indices(total, word.x().ones())?,
-                        BitVector::from_indices(total, word.z().ones())?,
-                        word.phase(),
-                    )?;
-                    frame = extended.multiply(&frame)?;
-                }
-            }
-            if position < count {
-                for &gate in &self.program.circuit.gates()
-                    [self.program.positions[position]..self.program.positions[position + 1]]
-                {
-                    frame = frame.conjugated(gate)?;
-                }
-            }
-        }
+        let (frame, grouped) = transport_insertions(
+            self.width(),
+            self.program.reference.width(),
+            self.program.circuit.gates(),
+            &self.program.positions,
+            insertions,
+        )?;
         self.with_insertion_frame(&frame, &grouped, None, arithmetic)
     }
     fn with_insertion_frame(

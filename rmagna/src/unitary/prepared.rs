@@ -110,13 +110,29 @@ struct FixedResource {
     transport: Option<PreparedCatalogueBoundary>,
 }
 
-struct ScalarClosure {
+pub(super) struct ScalarClosure {
     work: Arc<super::work::QueryWorkCounters>,
     geometry: Arc<ScalarGeometry>,
     widths: Vec<usize>,
     resource: Option<FixedResource>,
 }
 impl ScalarClosure {
+    pub(super) fn detached(
+        reference: &AffineKet,
+        rows: &[BitVector],
+        legs: Vec<Vec<usize>>,
+        work: &Arc<super::work::QueryWorkCounters>,
+    ) -> Result<Self, UnitaryError> {
+        let keep = legs.iter().flatten().copied().collect::<Vec<_>>();
+        let geometry = SharedScalarGeometry::default().prepare(reference, rows, keep, work)?;
+        work.record(&work.affine_closures);
+        Ok(Self {
+            work: Arc::clone(work),
+            geometry,
+            widths: legs.iter().map(Vec::len).collect(),
+            resource: None,
+        })
+    }
     fn new(
         reference: &AffineKet,
         rows: &[BitVector],
@@ -136,7 +152,7 @@ impl ScalarClosure {
             resource: None,
         })
     }
-    fn freeze(
+    pub(super) fn freeze(
         &mut self,
         phases: &[(&ParityPhase, bool)],
         max_terms: usize,
@@ -166,7 +182,7 @@ impl ScalarClosure {
         });
         Ok(())
     }
-    fn evaluate(
+    pub(super) fn evaluate(
         &self,
         joint: &AffineKet,
         outcomes: &BitVector,
@@ -360,7 +376,7 @@ pub struct PreparedPauliMoment {
     event_count: usize,
     closure: Option<ScalarClosure>,
 }
-fn moment_joint(
+pub(super) fn moment_joint(
     boundary: &AffineKet,
     word: &PauliWord,
     arithmetic: &ScalarArithmetic,

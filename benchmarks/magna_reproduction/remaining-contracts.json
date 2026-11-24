@@ -4,16 +4,16 @@
   "upstream_commit": "56847478c840395735146ef1e1ccdc3d8aedc10f",
   "parity_claim": "static_requirements_only",
   "ledger_snapshot": {
-    "verified": 342,
+    "verified": 343,
     "partial": 7,
-    "unmapped": 3
+    "unmapped": 2
   },
   "category_counts": {
     "G": 0,
     "P": 0,
     "V": 0,
     "E": 9,
-    "U": 1
+    "U": 0
   },
   "category_meanings": {
     "G": "Confirmed interface/behavior gap in the corresponding Rust service",
@@ -1300,52 +1300,6 @@
         {
           "path": "rmagna/tests/original_reentrant_callbacks.rs",
           "anchor": "fn original_reentrant"
-        }
-      ]
-    },
-    {
-      "id": "test_native_standalone.NativeStandaloneTest.test_foundation_without_cpython",
-      "ledger_status": "unmapped",
-      "category": "U",
-      "issue": "R12",
-      "source": {
-        "path": "tests/core/test_native_standalone.py",
-        "source_sha256": "5bc19e67cdc16a54676a8305390d3009a6228cb1de9c82351a90eb851cd18c06",
-        "line": 22,
-        "end_line": 37
-      },
-      "method": {
-        "method_sha256": "efb02263d2c9be999d5e79cf634180a966075be8c78bbccff15f1263c2ec9608",
-        "required_checks": [
-          "self.assertIsNotNone(compiler, 'C++17 compiler required for native-only acceptance')",
-          "self.assertEqual(build.returncode, 0, build.stderr)",
-          "self.assertEqual(result.returncode, 0, result.stdout + result.stderr)",
-          "self.assertIn('checks passed', result.stdout)"
-        ],
-        "loops": [],
-        "module_helpers": [],
-        "module_imports": [
-          "from pathlib import Path",
-          "import shutil",
-          "import subprocess",
-          "import tempfile",
-          "import unittest"
-        ]
-      },
-      "remaining_requirement": "Qualify every source-bound helper/assertion/loop group in standalone-contracts.json with executable Rust receipts; retain the aggregate as unmapped while any obligation is unresolved.",
-      "assessment": "Source-specific fixtures now bind179/192 foundation assertions in56/58 groups, including the two previously completed service groups. The two trace storage groups conservatively retain13 assertions and six loop headers as unresolved under #1335. Their numerical witnesses pass, but amplitude-only-state omission/release is a real implementation gap; the aggregate stays unmapped and --require-complete refuses.",
-      "rust_owners": [
-        {
-          "path": "rmagna/src/runtime/mod.rs",
-          "anchor": "pub struct CausalProgram"
-        },
-        {
-          "path": "rmagna/tests/initialized_histories.rs",
-          "anchor": "fn "
-        },
-        {
-          "path": "rmagna/tests/native_core.rs",
-          "anchor": "fn "
         }
       ]
     },

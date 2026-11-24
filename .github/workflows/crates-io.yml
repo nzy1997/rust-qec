@@ -72,12 +72,12 @@ jobs:
         run: rustup toolchain install stable --profile minimal && rustup default stable
       - name: Install prerequisites for the opt-in packaged solver check
         run: |
-          # Match the main CI mirror policy; hosted Azure HTTP mirrors can stall
-          # before any packaged-crate checks run. Keep signed Ubuntu metadata.
+          # Hosted Azure and EC2 regional mirrors can stall before crate checks.
+          # Prefer the official HTTPS mirror and keep signed Ubuntu metadata.
           sudo find /etc/apt/sources.list.d -maxdepth 1 -type f \( -iname '*azure-cli*' -o -iname '*microsoft*' \) -delete
           for source_file in /etc/apt/apt-mirrors.txt /etc/apt/sources.list /etc/apt/sources.list.d/ubuntu.sources; do
             if [ -f "$source_file" ]; then
-              sudo sed -i 's|http://azure.archive.ubuntu.com|https://archive.ubuntu.com|g' "$source_file"
+              sudo sed -E -i 's#https?://(azure|[a-z0-9-]+\.ec2)\.archive\.ubuntu\.com#https://archive.ubuntu.com#g' "$source_file"
             fi
           done
           sudo timeout 5m apt-get \

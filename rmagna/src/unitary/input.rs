@@ -39,9 +39,13 @@ impl UnitaryCircuit {
         validate_stabilizer_input(input, self.width, arithmetic)?;
         match strategy {
             CompilerStrategy::ParityCopies => self.compile_parity(input, arithmetic, max_path_bits),
-            CompilerStrategy::SharedCommutingLayer => {
-                shared::compile(self, input, arithmetic, max_path_bits)
-            }
+            CompilerStrategy::SharedCommutingLayer => shared::compile(
+                self,
+                input,
+                arithmetic,
+                max_path_bits,
+                CompilationPurpose::Open,
+            ),
         }
     }
 }

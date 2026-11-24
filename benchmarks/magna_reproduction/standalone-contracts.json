@@ -3368,262 +3368,292 @@
             "package": "rmagna",
             "target": "standalone_foundation_contracts",
             "test": "affine_proposal_hull_and_projection",
-            "source_sha256": "54c86baeb3c0d0b975e15ce5f1fca3bf1dbe50aac15ef1a37929ca3530dc28bb"
+            "source_sha256": "7e4d76f21cf80dd38ec6e0b6e05d5cca04d77d22378c2e9290aaf71e4cae930c"
           },
           {
             "package": "rmagna",
             "target": "standalone_foundation_contracts",
             "test": "boundary_coordinate_rhs",
-            "source_sha256": "54c86baeb3c0d0b975e15ce5f1fca3bf1dbe50aac15ef1a37929ca3530dc28bb"
+            "source_sha256": "7e4d76f21cf80dd38ec6e0b6e05d5cca04d77d22378c2e9290aaf71e4cae930c"
           },
           {
             "package": "rmagna",
             "target": "standalone_foundation_contracts",
             "test": "cached_noise_law_and_weight",
-            "source_sha256": "54c86baeb3c0d0b975e15ce5f1fca3bf1dbe50aac15ef1a37929ca3530dc28bb"
+            "source_sha256": "7e4d76f21cf80dd38ec6e0b6e05d5cca04d77d22378c2e9290aaf71e4cae930c"
           },
           {
             "package": "rmagna",
             "target": "standalone_foundation_contracts",
             "test": "character_geometry_and_resource_transport",
-            "source_sha256": "54c86baeb3c0d0b975e15ce5f1fca3bf1dbe50aac15ef1a37929ca3530dc28bb"
+            "source_sha256": "7e4d76f21cf80dd38ec6e0b6e05d5cca04d77d22378c2e9290aaf71e4cae930c"
           },
           {
             "package": "rmagna",
             "target": "standalone_foundation_contracts",
             "test": "check_axis_prefix",
-            "source_sha256": "54c86baeb3c0d0b975e15ce5f1fca3bf1dbe50aac15ef1a37929ca3530dc28bb"
+            "source_sha256": "7e4d76f21cf80dd38ec6e0b6e05d5cca04d77d22378c2e9290aaf71e4cae930c"
           },
           {
             "package": "rmagna",
             "target": "standalone_foundation_contracts",
             "test": "check_composed_feedback_frames",
-            "source_sha256": "54c86baeb3c0d0b975e15ce5f1fca3bf1dbe50aac15ef1a37929ca3530dc28bb"
+            "source_sha256": "7e4d76f21cf80dd38ec6e0b6e05d5cca04d77d22378c2e9290aaf71e4cae930c"
           },
           {
             "package": "rmagna",
             "target": "standalone_foundation_contracts",
             "test": "check_incremental_history_session",
-            "source_sha256": "54c86baeb3c0d0b975e15ce5f1fca3bf1dbe50aac15ef1a37929ca3530dc28bb"
+            "source_sha256": "7e4d76f21cf80dd38ec6e0b6e05d5cca04d77d22378c2e9290aaf71e4cae930c"
           },
           {
             "package": "rmagna",
             "target": "standalone_foundation_contracts",
             "test": "check_packed_clifford_updates",
-            "source_sha256": "54c86baeb3c0d0b975e15ce5f1fca3bf1dbe50aac15ef1a37929ca3530dc28bb"
+            "source_sha256": "7e4d76f21cf80dd38ec6e0b6e05d5cca04d77d22378c2e9290aaf71e4cae930c"
           },
           {
             "package": "rmagna",
             "target": "standalone_foundation_contracts",
             "test": "check_quadratic_batches",
-            "source_sha256": "54c86baeb3c0d0b975e15ce5f1fca3bf1dbe50aac15ef1a37929ca3530dc28bb"
+            "source_sha256": "7e4d76f21cf80dd38ec6e0b6e05d5cca04d77d22378c2e9290aaf71e4cae930c"
           },
           {
             "package": "rmagna",
             "target": "standalone_foundation_contracts",
             "test": "check_reference_boundary",
-            "source_sha256": "54c86baeb3c0d0b975e15ce5f1fca3bf1dbe50aac15ef1a37929ca3530dc28bb"
+            "source_sha256": "7e4d76f21cf80dd38ec6e0b6e05d5cca04d77d22378c2e9290aaf71e4cae930c"
           },
           {
             "package": "rmagna",
             "target": "standalone_foundation_contracts",
             "test": "check_reference_coordinates",
-            "source_sha256": "54c86baeb3c0d0b975e15ce5f1fca3bf1dbe50aac15ef1a37929ca3530dc28bb"
+            "source_sha256": "7e4d76f21cf80dd38ec6e0b6e05d5cca04d77d22378c2e9290aaf71e4cae930c"
           },
           {
             "package": "rmagna",
             "target": "standalone_foundation_contracts",
             "test": "checked_primitives_preserve_padding_shapes_and_refusal",
-            "source_sha256": "54c86baeb3c0d0b975e15ce5f1fca3bf1dbe50aac15ef1a37929ca3530dc28bb"
+            "source_sha256": "7e4d76f21cf80dd38ec6e0b6e05d5cca04d77d22378c2e9290aaf71e4cae930c"
           },
           {
             "package": "rmagna",
             "target": "standalone_foundation_contracts",
             "test": "coherent_expansion_and_target_amplitude",
-            "source_sha256": "54c86baeb3c0d0b975e15ce5f1fca3bf1dbe50aac15ef1a37929ca3530dc28bb"
+            "source_sha256": "7e4d76f21cf80dd38ec6e0b6e05d5cca04d77d22378c2e9290aaf71e4cae930c"
           },
           {
             "package": "rmagna",
             "target": "standalone_foundation_contracts",
             "test": "coherent_file_pipeline_and_prepared_trace_runtime",
-            "source_sha256": "54c86baeb3c0d0b975e15ce5f1fca3bf1dbe50aac15ef1a37929ca3530dc28bb"
+            "source_sha256": "7e4d76f21cf80dd38ec6e0b6e05d5cca04d77d22378c2e9290aaf71e4cae930c"
           },
           {
             "package": "rmagna",
             "target": "standalone_foundation_contracts",
             "test": "completed_pair_sampling_and_branch_limit",
-            "source_sha256": "54c86baeb3c0d0b975e15ce5f1fca3bf1dbe50aac15ef1a37929ca3530dc28bb"
+            "source_sha256": "7e4d76f21cf80dd38ec6e0b6e05d5cca04d77d22378c2e9290aaf71e4cae930c"
           },
           {
             "package": "rmagna",
             "target": "standalone_foundation_contracts",
             "test": "consuming_and_finite_sum_contraction",
-            "source_sha256": "54c86baeb3c0d0b975e15ce5f1fca3bf1dbe50aac15ef1a37929ca3530dc28bb"
+            "source_sha256": "7e4d76f21cf80dd38ec6e0b6e05d5cca04d77d22378c2e9290aaf71e4cae930c"
           },
           {
             "package": "rmagna",
             "target": "standalone_foundation_contracts",
             "test": "dimension_changing_clifford_transport",
-            "source_sha256": "54c86baeb3c0d0b975e15ce5f1fca3bf1dbe50aac15ef1a37929ca3530dc28bb"
+            "source_sha256": "7e4d76f21cf80dd38ec6e0b6e05d5cca04d77d22378c2e9290aaf71e4cae930c"
           },
           {
             "package": "rmagna",
             "target": "standalone_foundation_contracts",
             "test": "entry_dependent_geometry_matches_finite_sums",
-            "source_sha256": "54c86baeb3c0d0b975e15ce5f1fca3bf1dbe50aac15ef1a37929ca3530dc28bb"
+            "source_sha256": "7e4d76f21cf80dd38ec6e0b6e05d5cca04d77d22378c2e9290aaf71e4cae930c"
           },
           {
             "package": "rmagna",
             "target": "standalone_foundation_contracts",
             "test": "exact_categorical_zero_channel_uses_one_caller_word",
-            "source_sha256": "54c86baeb3c0d0b975e15ce5f1fca3bf1dbe50aac15ef1a37929ca3530dc28bb"
+            "source_sha256": "7e4d76f21cf80dd38ec6e0b6e05d5cca04d77d22378c2e9290aaf71e4cae930c"
           },
           {
             "package": "rmagna",
             "target": "standalone_foundation_contracts",
             "test": "exact_file_parser",
-            "source_sha256": "54c86baeb3c0d0b975e15ce5f1fca3bf1dbe50aac15ef1a37929ca3530dc28bb"
+            "source_sha256": "7e4d76f21cf80dd38ec6e0b6e05d5cca04d77d22378c2e9290aaf71e4cae930c"
+          },
+          {
+            "package": "rmagna",
+            "target": "standalone_foundation_contracts",
+            "test": "explicit_trace_compilation_omits_the_open_query_projection",
+            "source_sha256": "7e4d76f21cf80dd38ec6e0b6e05d5cca04d77d22378c2e9290aaf71e4cae930c"
           },
           {
             "package": "rmagna",
             "target": "standalone_foundation_contracts",
             "test": "file_causal_runtime_and_enumeration",
-            "source_sha256": "54c86baeb3c0d0b975e15ce5f1fca3bf1dbe50aac15ef1a37929ca3530dc28bb"
+            "source_sha256": "7e4d76f21cf80dd38ec6e0b6e05d5cca04d77d22378c2e9290aaf71e4cae930c"
           },
           {
             "package": "rmagna",
             "target": "standalone_foundation_contracts",
             "test": "fixed_virtual_template_and_selection_offset",
-            "source_sha256": "54c86baeb3c0d0b975e15ce5f1fca3bf1dbe50aac15ef1a37929ca3530dc28bb"
+            "source_sha256": "7e4d76f21cf80dd38ec6e0b6e05d5cca04d77d22378c2e9290aaf71e4cae930c"
           },
           {
             "package": "rmagna",
             "target": "standalone_foundation_contracts",
             "test": "history_efficiency_and_paired_statistics",
-            "source_sha256": "54c86baeb3c0d0b975e15ce5f1fca3bf1dbe50aac15ef1a37929ca3530dc28bb"
+            "source_sha256": "7e4d76f21cf80dd38ec6e0b6e05d5cca04d77d22378c2e9290aaf71e4cae930c"
           },
           {
             "package": "rmagna",
             "target": "standalone_foundation_contracts",
             "test": "independent_proposal_and_exact_range_order",
-            "source_sha256": "54c86baeb3c0d0b975e15ce5f1fca3bf1dbe50aac15ef1a37929ca3530dc28bb"
+            "source_sha256": "7e4d76f21cf80dd38ec6e0b6e05d5cca04d77d22378c2e9290aaf71e4cae930c"
           },
           {
             "package": "rmagna",
             "target": "standalone_foundation_contracts",
             "test": "literal_branch_order_and_declared_controls",
-            "source_sha256": "54c86baeb3c0d0b975e15ce5f1fca3bf1dbe50aac15ef1a37929ca3530dc28bb"
+            "source_sha256": "7e4d76f21cf80dd38ec6e0b6e05d5cca04d77d22378c2e9290aaf71e4cae930c"
           },
           {
             "package": "rmagna",
             "target": "standalone_foundation_contracts",
             "test": "literal_callback_certificate_owns_signed_wire_result",
-            "source_sha256": "54c86baeb3c0d0b975e15ce5f1fca3bf1dbe50aac15ef1a37929ca3530dc28bb"
+            "source_sha256": "7e4d76f21cf80dd38ec6e0b6e05d5cca04d77d22378c2e9290aaf71e4cae930c"
           },
           {
             "package": "rmagna",
             "target": "standalone_foundation_contracts",
             "test": "literal_layout_avoids_inline_record_collisions",
-            "source_sha256": "54c86baeb3c0d0b975e15ce5f1fca3bf1dbe50aac15ef1a37929ca3530dc28bb"
+            "source_sha256": "7e4d76f21cf80dd38ec6e0b6e05d5cca04d77d22378c2e9290aaf71e4cae930c"
           },
           {
             "package": "rmagna",
             "target": "standalone_foundation_contracts",
             "test": "malformed_history_task_is_rejected_before_execution",
-            "source_sha256": "54c86baeb3c0d0b975e15ce5f1fca3bf1dbe50aac15ef1a37929ca3530dc28bb"
+            "source_sha256": "7e4d76f21cf80dd38ec6e0b6e05d5cca04d77d22378c2e9290aaf71e4cae930c"
           },
           {
             "package": "rmagna",
             "target": "standalone_foundation_contracts",
             "test": "operation_sampling_reported_input_and_terminal_mass",
-            "source_sha256": "54c86baeb3c0d0b975e15ce5f1fca3bf1dbe50aac15ef1a37929ca3530dc28bb"
+            "source_sha256": "7e4d76f21cf80dd38ec6e0b6e05d5cca04d77d22378c2e9290aaf71e4cae930c"
           },
           {
             "package": "rmagna",
             "target": "standalone_foundation_contracts",
             "test": "prepared_clifford",
-            "source_sha256": "54c86baeb3c0d0b975e15ce5f1fca3bf1dbe50aac15ef1a37929ca3530dc28bb"
+            "source_sha256": "7e4d76f21cf80dd38ec6e0b6e05d5cca04d77d22378c2e9290aaf71e4cae930c"
           },
           {
             "package": "rmagna",
             "target": "standalone_foundation_contracts",
             "test": "quadratic_radical_support",
-            "source_sha256": "54c86baeb3c0d0b975e15ce5f1fca3bf1dbe50aac15ef1a37929ca3530dc28bb"
+            "source_sha256": "7e4d76f21cf80dd38ec6e0b6e05d5cca04d77d22378c2e9290aaf71e4cae930c"
           },
           {
             "package": "rmagna",
             "target": "standalone_foundation_contracts",
             "test": "scaled_noise_model_and_categorical_law_interning",
-            "source_sha256": "54c86baeb3c0d0b975e15ce5f1fca3bf1dbe50aac15ef1a37929ca3530dc28bb"
+            "source_sha256": "7e4d76f21cf80dd38ec6e0b6e05d5cca04d77d22378c2e9290aaf71e4cae930c"
+          },
+          {
+            "package": "rmagna",
+            "target": "standalone_foundation_contracts",
+            "test": "sealed_file_trace_keeps_selection_parity_constants_and_fault_validation",
+            "source_sha256": "7e4d76f21cf80dd38ec6e0b6e05d5cca04d77d22378c2e9290aaf71e4cae930c"
+          },
+          {
+            "package": "rmagna",
+            "target": "standalone_foundation_contracts",
+            "test": "sealed_trace_both_compilers_preserve_complex_moments_dependent_events_and_frames",
+            "source_sha256": "7e4d76f21cf80dd38ec6e0b6e05d5cca04d77d22378c2e9290aaf71e4cae930c"
           },
           {
             "package": "rmagna",
             "target": "standalone_foundation_contracts",
             "test": "signed_affine_grouping",
-            "source_sha256": "54c86baeb3c0d0b975e15ce5f1fca3bf1dbe50aac15ef1a37929ca3530dc28bb"
+            "source_sha256": "7e4d76f21cf80dd38ec6e0b6e05d5cca04d77d22378c2e9290aaf71e4cae930c"
           },
           {
             "package": "rmagna",
             "target": "standalone_foundation_contracts",
             "test": "sparse_noise_stream_and_weight_sectors",
-            "source_sha256": "54c86baeb3c0d0b975e15ce5f1fca3bf1dbe50aac15ef1a37929ca3530dc28bb"
+            "source_sha256": "7e4d76f21cf80dd38ec6e0b6e05d5cca04d77d22378c2e9290aaf71e4cae930c"
           },
           {
             "package": "rmagna",
             "target": "standalone_foundation_contracts",
             "test": "strict_parity_representation",
-            "source_sha256": "54c86baeb3c0d0b975e15ce5f1fca3bf1dbe50aac15ef1a37929ca3530dc28bb"
+            "source_sha256": "7e4d76f21cf80dd38ec6e0b6e05d5cca04d77d22378c2e9290aaf71e4cae930c"
           },
           {
             "package": "rmagna",
             "target": "standalone_foundation_contracts",
             "test": "target_and_recovery_mapping",
-            "source_sha256": "54c86baeb3c0d0b975e15ce5f1fca3bf1dbe50aac15ef1a37929ca3530dc28bb"
+            "source_sha256": "7e4d76f21cf80dd38ec6e0b6e05d5cca04d77d22378c2e9290aaf71e4cae930c"
           },
           {
             "package": "rmagna",
             "target": "standalone_foundation_contracts",
             "test": "target_projection_keeps_seven_protocol_records_and_independent_owner",
-            "source_sha256": "54c86baeb3c0d0b975e15ce5f1fca3bf1dbe50aac15ef1a37929ca3530dc28bb"
+            "source_sha256": "7e4d76f21cf80dd38ec6e0b6e05d5cca04d77d22378c2e9290aaf71e4cae930c"
+          },
+          {
+            "package": "rmagna",
+            "target": "standalone_foundation_contracts",
+            "test": "trace_cross_word_frames_and_prefix_sampling_keep_exact_conditional_mass",
+            "source_sha256": "7e4d76f21cf80dd38ec6e0b6e05d5cca04d77d22378c2e9290aaf71e4cae930c"
           },
           {
             "package": "rmagna",
             "target": "standalone_foundation_contracts",
             "test": "trace_purpose_preserves_dilation_axes_and_every_fault_location",
-            "source_sha256": "54c86baeb3c0d0b975e15ce5f1fca3bf1dbe50aac15ef1a37929ca3530dc28bb"
+            "source_sha256": "7e4d76f21cf80dd38ec6e0b6e05d5cca04d77d22378c2e9290aaf71e4cae930c"
+          },
+          {
+            "package": "rmagna",
+            "target": "standalone_foundation_contracts",
+            "test": "trace_release_is_observed_even_with_external_ordinary_plans_and_invalid_requests",
+            "source_sha256": "7e4d76f21cf80dd38ec6e0b6e05d5cca04d77d22378c2e9290aaf71e4cae930c"
           },
           {
             "package": "rmagna",
             "target": "standalone_foundation_contracts",
             "test": "true_reported_records_and_coincident_fault_order",
-            "source_sha256": "54c86baeb3c0d0b975e15ce5f1fca3bf1dbe50aac15ef1a37929ca3530dc28bb"
+            "source_sha256": "7e4d76f21cf80dd38ec6e0b6e05d5cca04d77d22378c2e9290aaf71e4cae930c"
           },
           {
             "package": "rmagna",
             "target": "standalone_foundation_contracts",
             "test": "virtual_noise_actions",
-            "source_sha256": "54c86baeb3c0d0b975e15ce5f1fca3bf1dbe50aac15ef1a37929ca3530dc28bb"
+            "source_sha256": "7e4d76f21cf80dd38ec6e0b6e05d5cca04d77d22378c2e9290aaf71e4cae930c"
           },
           {
             "package": "rmagna",
             "target": "standalone_foundation_contracts",
             "test": "wide_clifford_elimination",
-            "source_sha256": "54c86baeb3c0d0b975e15ce5f1fca3bf1dbe50aac15ef1a37929ca3530dc28bb"
+            "source_sha256": "7e4d76f21cf80dd38ec6e0b6e05d5cca04d77d22378c2e9290aaf71e4cae930c"
           },
           {
             "package": "rmagna",
             "target": "standalone_foundation_contracts",
             "test": "wide_exact_scalars_and_caller_rng",
-            "source_sha256": "54c86baeb3c0d0b975e15ce5f1fca3bf1dbe50aac15ef1a37929ca3530dc28bb"
+            "source_sha256": "7e4d76f21cf80dd38ec6e0b6e05d5cca04d77d22378c2e9290aaf71e4cae930c"
           },
           {
             "package": "rmagna",
             "target": "standalone_foundation_contracts",
             "test": "word_shifts",
-            "source_sha256": "54c86baeb3c0d0b975e15ce5f1fca3bf1dbe50aac15ef1a37929ca3530dc28bb"
+            "source_sha256": "7e4d76f21cf80dd38ec6e0b6e05d5cca04d77d22378c2e9290aaf71e4cae930c"
           }
         ],
-        "adaptation": "Pinned foundation.cpp schedules use exact Rust scalar-ring arithmetic, raw-input finite sums, literal dense gates, finite sets or original known answers. Root and transitive fixture sources are bound; Native private layouts, RNG bitstreams and performance are separate claims. Complete helper closure is exercised through every bound calling fixture; independent raw finite scalar sums retain absolute/global phase rather than Native floating tolerances. Resource helpers compare canonicalized exact per-entry states and observed immutable-resource work across ordinary/transported paths. Trace-storage omissions remain separate unresolved groups.",
+        "adaptation": "Pinned foundation.cpp schedules use exact Rust scalar-ring arithmetic, raw-input finite sums, literal dense gates, finite sets or original known answers. Root and transitive fixture sources are bound; Native private layouts, RNG bitstreams and performance are separate claims. Complete helper closure is exercised through every bound calling fixture; independent raw finite scalar sums retain absolute/global phase rather than Native floating tolerances. Resource helpers compare canonicalized exact per-entry states and observed immutable-resource work across ordinary/transported paths. Trace-storage omissions remain separate unresolved groups. The complete fixture closure also executes sealed trace ownership, actual release, complex dense-moment, selection, cross-word and invalid-request regressions.",
         "support_sources": {
           "rmagna/tests/support/original_gf2.rs": "64814d7a310cee97f39e74a7f6027eb7d488e165b0e51a71d131ed076099077c",
           "rmagna/tests/common/mod.rs": "ecacfdbf65863a1690414edeb9ab09364c2ae01eaf0726f50b61e6e20a4f03d9"
@@ -3657,25 +3687,25 @@
             "package": "rmagna",
             "target": "standalone_foundation_contracts",
             "test": "character_geometry_and_resource_transport",
-            "source_sha256": "54c86baeb3c0d0b975e15ce5f1fca3bf1dbe50aac15ef1a37929ca3530dc28bb"
+            "source_sha256": "7e4d76f21cf80dd38ec6e0b6e05d5cca04d77d22378c2e9290aaf71e4cae930c"
           },
           {
             "package": "rmagna",
             "target": "standalone_foundation_contracts",
             "test": "check_reference_boundary",
-            "source_sha256": "54c86baeb3c0d0b975e15ce5f1fca3bf1dbe50aac15ef1a37929ca3530dc28bb"
+            "source_sha256": "7e4d76f21cf80dd38ec6e0b6e05d5cca04d77d22378c2e9290aaf71e4cae930c"
           },
           {
             "package": "rmagna",
             "target": "standalone_foundation_contracts",
             "test": "check_incremental_history_session",
-            "source_sha256": "54c86baeb3c0d0b975e15ce5f1fca3bf1dbe50aac15ef1a37929ca3530dc28bb"
+            "source_sha256": "7e4d76f21cf80dd38ec6e0b6e05d5cca04d77d22378c2e9290aaf71e4cae930c"
           },
           {
             "package": "rmagna",
             "target": "standalone_foundation_contracts",
             "test": "wide_exact_scalars_and_caller_rng",
-            "source_sha256": "54c86baeb3c0d0b975e15ce5f1fca3bf1dbe50aac15ef1a37929ca3530dc28bb"
+            "source_sha256": "7e4d76f21cf80dd38ec6e0b6e05d5cca04d77d22378c2e9290aaf71e4cae930c"
           }
         ],
         "adaptation": "Pinned foundation.cpp schedules use exact Rust scalar-ring arithmetic, raw-input finite sums, literal dense gates, finite sets or original known answers. Root and transitive fixture sources are bound; Native private layouts, RNG bitstreams and performance are separate claims. Complete helper closure is exercised through every bound calling fixture; independent raw finite scalar sums retain absolute/global phase rather than Native floating tolerances. Resource helpers compare canonicalized exact per-entry states and observed immutable-resource work across ordinary/transported paths. Trace-storage omissions remain separate unresolved groups.",
@@ -3713,61 +3743,61 @@
             "package": "rmagna",
             "target": "standalone_foundation_contracts",
             "test": "consuming_and_finite_sum_contraction",
-            "source_sha256": "54c86baeb3c0d0b975e15ce5f1fca3bf1dbe50aac15ef1a37929ca3530dc28bb"
+            "source_sha256": "7e4d76f21cf80dd38ec6e0b6e05d5cca04d77d22378c2e9290aaf71e4cae930c"
           },
           {
             "package": "rmagna",
             "target": "standalone_foundation_contracts",
             "test": "wide_clifford_elimination",
-            "source_sha256": "54c86baeb3c0d0b975e15ce5f1fca3bf1dbe50aac15ef1a37929ca3530dc28bb"
+            "source_sha256": "7e4d76f21cf80dd38ec6e0b6e05d5cca04d77d22378c2e9290aaf71e4cae930c"
           },
           {
             "package": "rmagna",
             "target": "standalone_foundation_contracts",
             "test": "prepared_clifford",
-            "source_sha256": "54c86baeb3c0d0b975e15ce5f1fca3bf1dbe50aac15ef1a37929ca3530dc28bb"
+            "source_sha256": "7e4d76f21cf80dd38ec6e0b6e05d5cca04d77d22378c2e9290aaf71e4cae930c"
           },
           {
             "package": "rmagna",
             "target": "standalone_foundation_contracts",
             "test": "character_geometry_and_resource_transport",
-            "source_sha256": "54c86baeb3c0d0b975e15ce5f1fca3bf1dbe50aac15ef1a37929ca3530dc28bb"
+            "source_sha256": "7e4d76f21cf80dd38ec6e0b6e05d5cca04d77d22378c2e9290aaf71e4cae930c"
           },
           {
             "package": "rmagna",
             "target": "standalone_foundation_contracts",
             "test": "strict_parity_representation",
-            "source_sha256": "54c86baeb3c0d0b975e15ce5f1fca3bf1dbe50aac15ef1a37929ca3530dc28bb"
+            "source_sha256": "7e4d76f21cf80dd38ec6e0b6e05d5cca04d77d22378c2e9290aaf71e4cae930c"
           },
           {
             "package": "rmagna",
             "target": "standalone_foundation_contracts",
             "test": "dimension_changing_clifford_transport",
-            "source_sha256": "54c86baeb3c0d0b975e15ce5f1fca3bf1dbe50aac15ef1a37929ca3530dc28bb"
+            "source_sha256": "7e4d76f21cf80dd38ec6e0b6e05d5cca04d77d22378c2e9290aaf71e4cae930c"
           },
           {
             "package": "rmagna",
             "target": "standalone_foundation_contracts",
             "test": "entry_dependent_geometry_matches_finite_sums",
-            "source_sha256": "54c86baeb3c0d0b975e15ce5f1fca3bf1dbe50aac15ef1a37929ca3530dc28bb"
+            "source_sha256": "7e4d76f21cf80dd38ec6e0b6e05d5cca04d77d22378c2e9290aaf71e4cae930c"
           },
           {
             "package": "rmagna",
             "target": "standalone_foundation_contracts",
             "test": "check_reference_boundary",
-            "source_sha256": "54c86baeb3c0d0b975e15ce5f1fca3bf1dbe50aac15ef1a37929ca3530dc28bb"
+            "source_sha256": "7e4d76f21cf80dd38ec6e0b6e05d5cca04d77d22378c2e9290aaf71e4cae930c"
           },
           {
             "package": "rmagna",
             "target": "standalone_foundation_contracts",
             "test": "check_incremental_history_session",
-            "source_sha256": "54c86baeb3c0d0b975e15ce5f1fca3bf1dbe50aac15ef1a37929ca3530dc28bb"
+            "source_sha256": "7e4d76f21cf80dd38ec6e0b6e05d5cca04d77d22378c2e9290aaf71e4cae930c"
           },
           {
             "package": "rmagna",
             "target": "standalone_foundation_contracts",
             "test": "coherent_expansion_and_target_amplitude",
-            "source_sha256": "54c86baeb3c0d0b975e15ce5f1fca3bf1dbe50aac15ef1a37929ca3530dc28bb"
+            "source_sha256": "7e4d76f21cf80dd38ec6e0b6e05d5cca04d77d22378c2e9290aaf71e4cae930c"
           }
         ],
         "adaptation": "Pinned foundation.cpp schedules use exact Rust scalar-ring arithmetic, raw-input finite sums, literal dense gates, finite sets or original known answers. Root and transitive fixture sources are bound; Native private layouts, RNG bitstreams and performance are separate claims. Complete helper closure is exercised through every bound calling fixture; independent raw finite scalar sums retain absolute/global phase rather than Native floating tolerances. Resource helpers compare canonicalized exact per-entry states and observed immutable-resource work across ordinary/transported paths. Trace-storage omissions remain separate unresolved groups.",
@@ -3806,31 +3836,31 @@
             "package": "rmagna",
             "target": "standalone_foundation_contracts",
             "test": "prepared_clifford",
-            "source_sha256": "54c86baeb3c0d0b975e15ce5f1fca3bf1dbe50aac15ef1a37929ca3530dc28bb"
+            "source_sha256": "7e4d76f21cf80dd38ec6e0b6e05d5cca04d77d22378c2e9290aaf71e4cae930c"
           },
           {
             "package": "rmagna",
             "target": "standalone_foundation_contracts",
             "test": "character_geometry_and_resource_transport",
-            "source_sha256": "54c86baeb3c0d0b975e15ce5f1fca3bf1dbe50aac15ef1a37929ca3530dc28bb"
+            "source_sha256": "7e4d76f21cf80dd38ec6e0b6e05d5cca04d77d22378c2e9290aaf71e4cae930c"
           },
           {
             "package": "rmagna",
             "target": "standalone_foundation_contracts",
             "test": "strict_parity_representation",
-            "source_sha256": "54c86baeb3c0d0b975e15ce5f1fca3bf1dbe50aac15ef1a37929ca3530dc28bb"
+            "source_sha256": "7e4d76f21cf80dd38ec6e0b6e05d5cca04d77d22378c2e9290aaf71e4cae930c"
           },
           {
             "package": "rmagna",
             "target": "standalone_foundation_contracts",
             "test": "dimension_changing_clifford_transport",
-            "source_sha256": "54c86baeb3c0d0b975e15ce5f1fca3bf1dbe50aac15ef1a37929ca3530dc28bb"
+            "source_sha256": "7e4d76f21cf80dd38ec6e0b6e05d5cca04d77d22378c2e9290aaf71e4cae930c"
           },
           {
             "package": "rmagna",
             "target": "standalone_foundation_contracts",
             "test": "entry_dependent_geometry_matches_finite_sums",
-            "source_sha256": "54c86baeb3c0d0b975e15ce5f1fca3bf1dbe50aac15ef1a37929ca3530dc28bb"
+            "source_sha256": "7e4d76f21cf80dd38ec6e0b6e05d5cca04d77d22378c2e9290aaf71e4cae930c"
           }
         ],
         "adaptation": "Pinned foundation.cpp schedules use exact Rust scalar-ring arithmetic, raw-input finite sums, literal dense gates, finite sets or original known answers. Root and transitive fixture sources are bound; Native private layouts, RNG bitstreams and performance are separate claims. Complete helper closure is exercised through every bound calling fixture; independent raw finite scalar sums retain absolute/global phase rather than Native floating tolerances. Resource helpers compare canonicalized exact per-entry states and observed immutable-resource work across ordinary/transported paths. Trace-storage omissions remain separate unresolved groups.",
@@ -3875,31 +3905,31 @@
             "package": "rmagna",
             "target": "standalone_foundation_contracts",
             "test": "prepared_clifford",
-            "source_sha256": "54c86baeb3c0d0b975e15ce5f1fca3bf1dbe50aac15ef1a37929ca3530dc28bb"
+            "source_sha256": "7e4d76f21cf80dd38ec6e0b6e05d5cca04d77d22378c2e9290aaf71e4cae930c"
           },
           {
             "package": "rmagna",
             "target": "standalone_foundation_contracts",
             "test": "character_geometry_and_resource_transport",
-            "source_sha256": "54c86baeb3c0d0b975e15ce5f1fca3bf1dbe50aac15ef1a37929ca3530dc28bb"
+            "source_sha256": "7e4d76f21cf80dd38ec6e0b6e05d5cca04d77d22378c2e9290aaf71e4cae930c"
           },
           {
             "package": "rmagna",
             "target": "standalone_foundation_contracts",
             "test": "strict_parity_representation",
-            "source_sha256": "54c86baeb3c0d0b975e15ce5f1fca3bf1dbe50aac15ef1a37929ca3530dc28bb"
+            "source_sha256": "7e4d76f21cf80dd38ec6e0b6e05d5cca04d77d22378c2e9290aaf71e4cae930c"
           },
           {
             "package": "rmagna",
             "target": "standalone_foundation_contracts",
             "test": "dimension_changing_clifford_transport",
-            "source_sha256": "54c86baeb3c0d0b975e15ce5f1fca3bf1dbe50aac15ef1a37929ca3530dc28bb"
+            "source_sha256": "7e4d76f21cf80dd38ec6e0b6e05d5cca04d77d22378c2e9290aaf71e4cae930c"
           },
           {
             "package": "rmagna",
             "target": "standalone_foundation_contracts",
             "test": "entry_dependent_geometry_matches_finite_sums",
-            "source_sha256": "54c86baeb3c0d0b975e15ce5f1fca3bf1dbe50aac15ef1a37929ca3530dc28bb"
+            "source_sha256": "7e4d76f21cf80dd38ec6e0b6e05d5cca04d77d22378c2e9290aaf71e4cae930c"
           }
         ],
         "adaptation": "Pinned foundation.cpp schedules use exact Rust scalar-ring arithmetic, raw-input finite sums, literal dense gates, finite sets or original known answers. Root and transitive fixture sources are bound; Native private layouts, RNG bitstreams and performance are separate claims. Complete helper closure is exercised through every bound calling fixture; independent raw finite scalar sums retain absolute/global phase rather than Native floating tolerances. Resource helpers compare canonicalized exact per-entry states and observed immutable-resource work across ordinary/transported paths. Trace-storage omissions remain separate unresolved groups.",
@@ -3943,7 +3973,7 @@
             "package": "rmagna",
             "target": "standalone_foundation_contracts",
             "test": "check_axis_prefix",
-            "source_sha256": "54c86baeb3c0d0b975e15ce5f1fca3bf1dbe50aac15ef1a37929ca3530dc28bb"
+            "source_sha256": "7e4d76f21cf80dd38ec6e0b6e05d5cca04d77d22378c2e9290aaf71e4cae930c"
           }
         ],
         "adaptation": "Pinned foundation.cpp schedules use exact Rust scalar-ring arithmetic, raw-input finite sums, literal dense gates, finite sets or original known answers. Root and transitive fixture sources are bound; Native private layouts, RNG bitstreams and performance are separate claims. The compiler shares rotation-slot extraction with the all-axis public sector analysis; an independent uncompressed seven-parity/all-pairs oracle checks every source variation. Native prefix matching is represented by owner-bound PreparedContinuation: original prefix, fresh plus wire, reset dilation, reordered physical outputs, noncommuting suffix and changed-prefix refusal are tested against fresh full compilation and all 32 literal amplitudes. Actual factory statistics verify reuse, without inventing Native private prefix counters.",
@@ -3995,7 +4025,7 @@
             "package": "rmagna",
             "target": "standalone_foundation_contracts",
             "test": "check_axis_prefix",
-            "source_sha256": "54c86baeb3c0d0b975e15ce5f1fca3bf1dbe50aac15ef1a37929ca3530dc28bb"
+            "source_sha256": "7e4d76f21cf80dd38ec6e0b6e05d5cca04d77d22378c2e9290aaf71e4cae930c"
           }
         ],
         "adaptation": "Pinned foundation.cpp schedules use exact Rust scalar-ring arithmetic, raw-input finite sums, literal dense gates, finite sets or original known answers. Root and transitive fixture sources are bound; Native private layouts, RNG bitstreams and performance are separate claims. The compiler shares rotation-slot extraction with the all-axis public sector analysis; an independent uncompressed seven-parity/all-pairs oracle checks every source variation. Native prefix matching is represented by owner-bound PreparedContinuation: original prefix, fresh plus wire, reset dilation, reordered physical outputs, noncommuting suffix and changed-prefix refusal are tested against fresh full compilation and all 32 literal amplitudes. Actual factory statistics verify reuse, without inventing Native private prefix counters.",
@@ -4053,7 +4083,7 @@
             "package": "rmagna",
             "target": "standalone_foundation_contracts",
             "test": "check_reference_coordinates",
-            "source_sha256": "54c86baeb3c0d0b975e15ce5f1fca3bf1dbe50aac15ef1a37929ca3530dc28bb"
+            "source_sha256": "7e4d76f21cf80dd38ec6e0b6e05d5cca04d77d22378c2e9290aaf71e4cae930c"
           }
         ],
         "adaptation": "Pinned foundation.cpp schedules use exact Rust scalar-ring arithmetic, raw-input finite sums, literal dense gates, finite sets or original known answers. Root and transitive fixture sources are bound; Native private layouts, RNG bitstreams and performance are separate claims. The LCG seed928271 retains widths/counts0..7, exhaustive small consistency/free-zero coordinates and the 137-bit/67-pair dependent system with all128 wide trials; failed coordinates and outside-span words are checked independently.",
@@ -4115,7 +4145,7 @@
             "package": "rmagna",
             "target": "standalone_foundation_contracts",
             "test": "check_packed_clifford_updates",
-            "source_sha256": "54c86baeb3c0d0b975e15ce5f1fca3bf1dbe50aac15ef1a37929ca3530dc28bb"
+            "source_sha256": "7e4d76f21cf80dd38ec6e0b6e05d5cca04d77d22378c2e9290aaf71e4cae930c"
           }
         ],
         "adaptation": "Pinned foundation.cpp schedules use exact Rust scalar-ring arithmetic, raw-input finite sums, literal dense gates, finite sets or original known answers. Root and transitive fixture sources are bound; Native private layouts, RNG bitstreams and performance are separate claims. Packed XOR uses all70 source rows and32 masks, invalid row70, cross-word cuts and all nine signed even coefficients. Independent per-bit polynomial coefficients check the production Clifford parity conversion and strict-above XOR.",
@@ -4187,7 +4217,7 @@
             "package": "rmagna",
             "target": "standalone_foundation_contracts",
             "test": "check_quadratic_batches",
-            "source_sha256": "54c86baeb3c0d0b975e15ce5f1fca3bf1dbe50aac15ef1a37929ca3530dc28bb"
+            "source_sha256": "7e4d76f21cf80dd38ec6e0b6e05d5cca04d77d22378c2e9290aaf71e4cae930c"
           }
         ],
         "adaptation": "Pinned foundation.cpp schedules use exact Rust scalar-ring arithmetic, raw-input finite sums, literal dense gates, finite sets or original known answers. Root and transitive fixture sources are bound; Native private layouts, RNG bitstreams and performance are separate claims. MT19937-64 seed20261004 retains all48 transpose cases,3608 coefficient/phase cases and192 affine restrictions through1025 variables. The fixture pins6228326 draws and fingerprint9638c34e8c5849b7, and evaluates explicit bits/coefficients rather than copying elimination.",
@@ -4227,7 +4257,7 @@
             "package": "rmagna",
             "target": "standalone_foundation_contracts",
             "test": "check_composed_feedback_frames",
-            "source_sha256": "54c86baeb3c0d0b975e15ce5f1fca3bf1dbe50aac15ef1a37929ca3530dc28bb"
+            "source_sha256": "7e4d76f21cf80dd38ec6e0b6e05d5cca04d77d22378c2e9290aaf71e4cae930c"
           }
         ],
         "adaptation": "Pinned foundation.cpp schedules use exact Rust scalar-ring arithmetic, raw-input finite sums, literal dense gates, finite sets or original known answers. Root and transitive fixture sources are bound; Native private layouts, RNG bitstreams and performance are separate claims. The literal protocol/recovery scripts retain all729 ternary decision patterns and six prefixes (4374 frame comparisons), plus64 real-file six-bit patterns with three callback invocations. Rust maps recovery outputs/ancilla, versioned control registers and selection offset explicitly; typed insertion tables and raw Clifford frames include global Pauli phase. The public file task requires an independent ideal target for recovery validation; its fidelity is not used as the frame oracle.",
@@ -4302,7 +4332,7 @@
             "package": "rmagna",
             "target": "standalone_foundation_contracts",
             "test": "check_reference_boundary",
-            "source_sha256": "54c86baeb3c0d0b975e15ce5f1fca3bf1dbe50aac15ef1a37929ca3530dc28bb"
+            "source_sha256": "7e4d76f21cf80dd38ec6e0b6e05d5cca04d77d22378c2e9290aaf71e4cae930c"
           }
         ],
         "adaptation": "Pinned foundation.cpp schedules use exact Rust scalar-ring arithmetic, raw-input finite sums, literal dense gates, finite sets or original known answers. Root and transitive fixture sources are bound; Native private layouts, RNG bitstreams and performance are separate claims. The original coordinate maps,70 repeated rows, both closed sectors/all flips, disposable constraints and absolute masses are checked against fresh conditioned supports and finite worlds. Rust represents disposable/committed boundaries by immutable condition views rather than Native mutable fields; actual fixed owners remain unchanged and Arc/drop evidence proves an owned probability survives all source owners.",
@@ -4363,7 +4393,7 @@
             "package": "rmagna",
             "target": "standalone_foundation_contracts",
             "test": "check_incremental_history_session",
-            "source_sha256": "54c86baeb3c0d0b975e15ce5f1fca3bf1dbe50aac15ef1a37929ca3530dc28bb"
+            "source_sha256": "7e4d76f21cf80dd38ec6e0b6e05d5cca04d77d22378c2e9290aaf71e4cae930c"
           }
         ],
         "adaptation": "Pinned foundation.cpp schedules use exact Rust scalar-ring arithmetic, raw-input finite sums, literal dense gates, finite sets or original known answers. Root and transitive fixture sources are bound; Native private layouts, RNG bitstreams and performance are separate claims. Both source Clifford/magic fixtures, both sectors, append/dependent observations, before/restore/report/reset frame sequence and every keep branch compare absolute exact probabilities with fresh parent views and an independent eight-amplitude gate oracle. Supports are individually conditioned before the new affine hull. Rust immutable committed views preserve the appended observations; actual support work proves geometry updates while resource factory counts remain flat, without claiming Native session field identity.",
@@ -4412,7 +4442,7 @@
             "package": "rmagna",
             "target": "standalone_foundation_contracts",
             "test": "wide_clifford_elimination",
-            "source_sha256": "54c86baeb3c0d0b975e15ce5f1fca3bf1dbe50aac15ef1a37929ca3530dc28bb"
+            "source_sha256": "7e4d76f21cf80dd38ec6e0b6e05d5cca04d77d22378c2e9290aaf71e4cae930c"
           }
         ],
         "adaptation": "Pinned foundation.cpp schedules use exact Rust scalar-ring arithmetic, raw-input finite sums, literal dense gates, finite sets or original known answers. Root and transitive fixture sources are bound; Native private layouts, RNG bitstreams and performance are separate claims. MT seed2026100307 retains all five63/64/65/129/257 dimensions and24 trials, eight embedded active variables, odd linear cases and exact256-word sums. Rust preserves global phase in both cold and prepared contraction, stronger than the optional Native phase-dropping path but not an implementation of that flag.",
@@ -4454,13 +4484,13 @@
             "package": "rmagna",
             "target": "standalone_foundation_contracts",
             "test": "word_shifts",
-            "source_sha256": "54c86baeb3c0d0b975e15ce5f1fca3bf1dbe50aac15ef1a37929ca3530dc28bb"
+            "source_sha256": "7e4d76f21cf80dd38ec6e0b6e05d5cca04d77d22378c2e9290aaf71e4cae930c"
           },
           {
             "package": "rmagna",
             "target": "standalone_foundation_contracts",
             "test": "checked_primitives_preserve_padding_shapes_and_refusal",
-            "source_sha256": "54c86baeb3c0d0b975e15ce5f1fca3bf1dbe50aac15ef1a37929ca3530dc28bb"
+            "source_sha256": "7e4d76f21cf80dd38ec6e0b6e05d5cca04d77d22378c2e9290aaf71e4cae930c"
           }
         ],
         "adaptation": "Pinned foundation.cpp schedules use exact Rust scalar-ring arithmetic, raw-input finite sums, literal dense gates, finite sets or original known answers. Root and transitive fixture sources are bound; Native private layouts, RNG bitstreams and performance are separate claims. MT seed20261003 retains all seven widths and eight offsets, including zero/padding/word boundaries. Rust left shift grows the declared width and right shift saturates it; Native trims zero high words. Exact set-bit images and round trips agree, while widths and overflow refusal are explicitly tested.",
@@ -4505,7 +4535,7 @@
             "package": "rmagna",
             "target": "standalone_foundation_contracts",
             "test": "history_efficiency_and_paired_statistics",
-            "source_sha256": "54c86baeb3c0d0b975e15ce5f1fca3bf1dbe50aac15ef1a37929ca3530dc28bb"
+            "source_sha256": "7e4d76f21cf80dd38ec6e0b6e05d5cca04d77d22378c2e9290aaf71e4cae930c"
           }
         ],
         "adaptation": "Pinned foundation.cpp schedules use exact Rust scalar-ring arithmetic, raw-input finite sums, literal dense gates, finite sets or original known answers. Root and transitive fixture sources are bound; Native private layouts, RNG bitstreams and performance are separate claims. The two original unit-weight rows give kappa1/variance1/4 and pilot gamma2. Scientific mantissas use Rust [1,2) normalization, equivalent to Native [1/2,1), without materializing huge floating values.",
@@ -4554,7 +4584,7 @@
             "package": "rmagna",
             "target": "standalone_foundation_contracts",
             "test": "prepared_clifford",
-            "source_sha256": "54c86baeb3c0d0b975e15ce5f1fca3bf1dbe50aac15ef1a37929ca3530dc28bb"
+            "source_sha256": "7e4d76f21cf80dd38ec6e0b6e05d5cca04d77d22378c2e9290aaf71e4cae930c"
           }
         ],
         "adaptation": "Pinned foundation.cpp schedules use exact Rust scalar-ring arithmetic, raw-input finite sums, literal dense gates, finite sets or original known answers. Root and transitive fixture sources are bound; Native private layouts, RNG bitstreams and performance are separate claims. The seed71819 schedule retains n0..7, four boundary widths,16 trials and all even assignments (16320 contractions), plus512 actual rank-zero PhaseInput resource contexts. Exact cold/prepared payloads and finite sums agree; rank-zero resource reuse uses the explicit expand_clifford entry point.",
@@ -4626,7 +4656,7 @@
             "package": "rmagna",
             "target": "standalone_foundation_contracts",
             "test": "scaled_noise_model_and_categorical_law_interning",
-            "source_sha256": "54c86baeb3c0d0b975e15ce5f1fca3bf1dbe50aac15ef1a37929ca3530dc28bb"
+            "source_sha256": "7e4d76f21cf80dd38ec6e0b6e05d5cca04d77d22378c2e9290aaf71e4cae930c"
           }
         ],
         "adaptation": "Pinned foundation.cpp schedules use exact Rust scalar-ring arithmetic, raw-input finite sums, literal dense gates, finite sets or original known answers. Root and transitive fixture sources are bound; Native private layouts, RNG bitstreams and performance are separate claims. Repeated sites retain their separate chronological actions. Rust interns equal conditional numeric laws and reports one shared model for the three depolarizing sites; Native full-category pointer identity is not exposed. Exact probabilities and tilted models are tested independently.",
@@ -4669,13 +4699,13 @@
             "package": "rmagna",
             "target": "standalone_foundation_contracts",
             "test": "virtual_noise_actions",
-            "source_sha256": "54c86baeb3c0d0b975e15ce5f1fca3bf1dbe50aac15ef1a37929ca3530dc28bb"
+            "source_sha256": "7e4d76f21cf80dd38ec6e0b6e05d5cca04d77d22378c2e9290aaf71e4cae930c"
           },
           {
             "package": "rmagna",
             "target": "standalone_foundation_contracts",
             "test": "checked_primitives_preserve_padding_shapes_and_refusal",
-            "source_sha256": "54c86baeb3c0d0b975e15ce5f1fca3bf1dbe50aac15ef1a37929ca3530dc28bb"
+            "source_sha256": "7e4d76f21cf80dd38ec6e0b6e05d5cca04d77d22378c2e9290aaf71e4cae930c"
           }
         ],
         "adaptation": "Pinned foundation.cpp schedules use exact Rust scalar-ring arithmetic, raw-input finite sums, literal dense gates, finite sets or original known answers. Root and transitive fixture sources are bound; Native private layouts, RNG bitstreams and performance are separate claims. CompactNoiseActions stores one block per one-/two-wire fixed Pauli template and materializes owned actions. The full IXYZxIXYZ-minus-II order, repeated Z2 X2 Z2 factors, empty product, XYZ site, copy/drop, out-of-range lookup and actual two-template retention are checked. This service does not claim a migration of every existing sampler action table.",
@@ -4711,7 +4741,7 @@
             "package": "rmagna",
             "target": "standalone_foundation_contracts",
             "test": "independent_proposal_and_exact_range_order",
-            "source_sha256": "54c86baeb3c0d0b975e15ce5f1fca3bf1dbe50aac15ef1a37929ca3530dc28bb"
+            "source_sha256": "7e4d76f21cf80dd38ec6e0b6e05d5cca04d77d22378c2e9290aaf71e4cae930c"
           }
         ],
         "adaptation": "Pinned foundation.cpp schedules use exact Rust scalar-ring arithmetic, raw-input finite sums, literal dense gates, finite sets or original known answers. Root and transitive fixture sources are bound; Native private layouts, RNG bitstreams and performance are separate claims. The two MZ records preserve overridea2/7 and defaultb1/2, exact caller range requests[7,2], selected word11 and joint probability1/7.",
@@ -4754,7 +4784,7 @@
             "package": "rmagna",
             "target": "standalone_foundation_contracts",
             "test": "history_efficiency_and_paired_statistics",
-            "source_sha256": "54c86baeb3c0d0b975e15ce5f1fca3bf1dbe50aac15ef1a37929ca3530dc28bb"
+            "source_sha256": "7e4d76f21cf80dd38ec6e0b6e05d5cca04d77d22378c2e9290aaf71e4cae930c"
           }
         ],
         "adaptation": "Pinned foundation.cpp schedules use exact Rust scalar-ring arithmetic, raw-input finite sums, literal dense gates, finite sets or original known answers. Root and transitive fixture sources are bound; Native private layouts, RNG bitstreams and performance are separate claims. Original paired numerator/denominator rows yield ratio1/2 and variance1/4 in the exact field.",
@@ -4790,7 +4820,7 @@
             "package": "rmagna",
             "target": "standalone_foundation_contracts",
             "test": "boundary_coordinate_rhs",
-            "source_sha256": "54c86baeb3c0d0b975e15ce5f1fca3bf1dbe50aac15ef1a37929ca3530dc28bb"
+            "source_sha256": "7e4d76f21cf80dd38ec6e0b6e05d5cca04d77d22378c2e9290aaf71e4cae930c"
           }
         ],
         "adaptation": "Pinned foundation.cpp schedules use exact Rust scalar-ring arithmetic, raw-input finite sums, literal dense gates, finite sets or original known answers. Root and transitive fixture sources are bound; Native private layouts, RNG bitstreams and performance are separate claims. Independent projection rows and closed RHS values retain selected-row coordinates, inconsistency and feedback-rank extension. Rust static record layout intentionally reports rank0 feedback; the explicit GF2 basis extension tests the original rank increment without renaming that metadata.",
@@ -4838,19 +4868,19 @@
             "package": "rmagna",
             "target": "standalone_foundation_contracts",
             "test": "literal_branch_order_and_declared_controls",
-            "source_sha256": "54c86baeb3c0d0b975e15ce5f1fca3bf1dbe50aac15ef1a37929ca3530dc28bb"
+            "source_sha256": "7e4d76f21cf80dd38ec6e0b6e05d5cca04d77d22378c2e9290aaf71e4cae930c"
           },
           {
             "package": "rmagna",
             "target": "standalone_foundation_contracts",
             "test": "literal_layout_avoids_inline_record_collisions",
-            "source_sha256": "54c86baeb3c0d0b975e15ce5f1fca3bf1dbe50aac15ef1a37929ca3530dc28bb"
+            "source_sha256": "7e4d76f21cf80dd38ec6e0b6e05d5cca04d77d22378c2e9290aaf71e4cae930c"
           },
           {
             "package": "rmagna",
             "target": "standalone_foundation_contracts",
             "test": "checked_primitives_preserve_padding_shapes_and_refusal",
-            "source_sha256": "54c86baeb3c0d0b975e15ce5f1fca3bf1dbe50aac15ef1a37929ca3530dc28bb"
+            "source_sha256": "7e4d76f21cf80dd38ec6e0b6e05d5cca04d77d22378c2e9290aaf71e4cae930c"
           }
         ],
         "adaptation": "Pinned foundation.cpp schedules use exact Rust scalar-ring arithmetic, raw-input finite sums, literal dense gates, finite sets or original known answers. Root and transitive fixture sources are bound; Native private layouts, RNG bitstreams and performance are separate claims. Literal normalization explicitly replaces repeated IDs and allocates anonymous records avoiding supplied names; strict ordinary instrument validation is unchanged. Source assignment order, identity/coincident faults, report flips, branch enumeration and a declared control compare literal/coherent exact traces. Rust enum origins/global fault ordinals replace Native string/local indices.",
@@ -4887,7 +4917,7 @@
             "package": "rmagna",
             "target": "standalone_foundation_contracts",
             "test": "operation_sampling_reported_input_and_terminal_mass",
-            "source_sha256": "54c86baeb3c0d0b975e15ce5f1fca3bf1dbe50aac15ef1a37929ca3530dc28bb"
+            "source_sha256": "7e4d76f21cf80dd38ec6e0b6e05d5cca04d77d22378c2e9290aaf71e4cae930c"
           }
         ],
         "adaptation": "Pinned foundation.cpp schedules use exact Rust scalar-ring arithmetic, raw-input finite sums, literal dense gates, finite sets or original known answers. Root and transitive fixture sources are bound; Native private layouts, RNG bitstreams and performance are separate claims. A real-file operation controller sees only the flipped reported measurement, executes exactly once and yields mass1, acceptance1, zero error and Z=-1 without entropy. File POSTSELECT means zero, so explicit NOT represents the original selected-one terminal condition.",
@@ -4924,7 +4954,7 @@
             "package": "rmagna",
             "target": "standalone_foundation_contracts",
             "test": "true_reported_records_and_coincident_fault_order",
-            "source_sha256": "54c86baeb3c0d0b975e15ce5f1fca3bf1dbe50aac15ef1a37929ca3530dc28bb"
+            "source_sha256": "7e4d76f21cf80dd38ec6e0b6e05d5cca04d77d22378c2e9290aaf71e4cae930c"
           }
         ],
         "adaptation": "Pinned foundation.cpp schedules use exact Rust scalar-ring arithmetic, raw-input finite sums, literal dense gates, finite sets or original known answers. Root and transitive fixture sources are bound; Native private layouts, RNG bitstreams and performance are separate claims. Original true word1, duplicate report flips and coincident faults preserve both true/reported values and stable operation-time grouping, including explicit identity faults. Rust stores global rather than per-group local ordinals.",
@@ -4961,13 +4991,13 @@
             "package": "rmagna",
             "target": "standalone_foundation_contracts",
             "test": "target_and_recovery_mapping",
-            "source_sha256": "54c86baeb3c0d0b975e15ce5f1fca3bf1dbe50aac15ef1a37929ca3530dc28bb"
+            "source_sha256": "7e4d76f21cf80dd38ec6e0b6e05d5cca04d77d22378c2e9290aaf71e4cae930c"
           },
           {
             "package": "rmagna",
             "target": "standalone_foundation_contracts",
             "test": "target_projection_keeps_seven_protocol_records_and_independent_owner",
-            "source_sha256": "54c86baeb3c0d0b975e15ce5f1fca3bf1dbe50aac15ef1a37929ca3530dc28bb"
+            "source_sha256": "7e4d76f21cf80dd38ec6e0b6e05d5cca04d77d22378c2e9290aaf71e4cae930c"
           }
         ],
         "adaptation": "Pinned foundation.cpp schedules use exact Rust scalar-ring arithmetic, raw-input finite sums, literal dense gates, finite sets or original known answers. Root and transitive fixture sources are bound; Native private layouts, RNG bitstreams and performance are separate claims. The independently compiled H,T ideal target is overlapped on sparse output label5; the protocol retains seven original record IDs and samples allseven without allocating inverse-target measurement records. Exact unit fidelity, local-to-physical mapping and a separate target owner test the inverse projection observable, not Native gate-list or m7 ABI.",
@@ -5011,7 +5041,7 @@
             "package": "rmagna",
             "target": "standalone_foundation_contracts",
             "test": "target_and_recovery_mapping",
-            "source_sha256": "54c86baeb3c0d0b975e15ce5f1fca3bf1dbe50aac15ef1a37929ca3530dc28bb"
+            "source_sha256": "7e4d76f21cf80dd38ec6e0b6e05d5cca04d77d22378c2e9290aaf71e4cae930c"
           }
         ],
         "adaptation": "Pinned foundation.cpp schedules use exact Rust scalar-ring arithmetic, raw-input finite sums, literal dense gates, finite sets or original known answers. Root and transitive fixture sources are bound; Native private layouts, RNG bitstreams and performance are separate claims. Recovery local output0 maps to physical5 and local ancilla1 is fresh. The original measurement and conditional CX yield exact error1/2 for both an idle source and an entangled physical-ancilla adversary. Recovery records remain separate from protocol diagnostics; the ideal target is independently owned.",
@@ -5047,7 +5077,7 @@
             "package": "rmagna",
             "target": "standalone_foundation_contracts",
             "test": "target_and_recovery_mapping",
-            "source_sha256": "54c86baeb3c0d0b975e15ce5f1fca3bf1dbe50aac15ef1a37929ca3530dc28bb"
+            "source_sha256": "7e4d76f21cf80dd38ec6e0b6e05d5cca04d77d22378c2e9290aaf71e4cae930c"
           }
         ],
         "adaptation": "Pinned foundation.cpp schedules use exact Rust scalar-ring arithmetic, raw-input finite sums, literal dense gates, finite sets or original known answers. Root and transitive fixture sources are bound; Native private layouts, RNG bitstreams and performance are separate claims. The exact H,T source and independent target overlap have fidelity1 and zero error through the real file runtime.",
@@ -5083,7 +5113,7 @@
             "package": "rmagna",
             "target": "standalone_foundation_contracts",
             "test": "malformed_history_task_is_rejected_before_execution",
-            "source_sha256": "54c86baeb3c0d0b975e15ce5f1fca3bf1dbe50aac15ef1a37929ca3530dc28bb"
+            "source_sha256": "7e4d76f21cf80dd38ec6e0b6e05d5cca04d77d22378c2e9290aaf71e4cae930c"
           }
         ],
         "adaptation": "Pinned foundation.cpp schedules use exact Rust scalar-ring arithmetic, raw-input finite sums, literal dense gates, finite sets or original known answers. Root and transitive fixture sources are bound; Native private layouts, RNG bitstreams and performance are separate claims. Malformed event/outcome dimensions and padding reject at completed-query construction; removed selection/outcomes file-task fields reject during public task parsing before execution or entropy.",
@@ -5132,7 +5162,7 @@
             "package": "rmagna",
             "target": "standalone_foundation_contracts",
             "test": "file_causal_runtime_and_enumeration",
-            "source_sha256": "54c86baeb3c0d0b975e15ce5f1fca3bf1dbe50aac15ef1a37929ca3530dc28bb"
+            "source_sha256": "7e4d76f21cf80dd38ec6e0b6e05d5cca04d77d22378c2e9290aaf71e4cae930c"
           }
         ],
         "adaptation": "Pinned foundation.cpp schedules use exact Rust scalar-ring arithmetic, raw-input finite sums, literal dense gates, finite sets or original known answers. Root and transitive fixture sources are bound; Native private layouts, RNG bitstreams and performance are separate claims. The original H0,M(1/3),echo,CX fixture prepares query families before callbacks, then checks12 seeds with both report values, exact mass1/2, raw target error and signed Z moment, and exactly one echo per draw. Rust performs a total plus conditional history query (two, not Native one sampled-parity diagnostic); explicit four-history/two-noise-pattern enumeration consumes no RNG and has error1/2.",
@@ -5208,13 +5238,13 @@
             "package": "rmagna",
             "target": "standalone_foundation_contracts",
             "test": "exact_file_parser",
-            "source_sha256": "54c86baeb3c0d0b975e15ce5f1fca3bf1dbe50aac15ef1a37929ca3530dc28bb"
+            "source_sha256": "7e4d76f21cf80dd38ec6e0b6e05d5cca04d77d22378c2e9290aaf71e4cae930c"
           },
           {
             "package": "rmagna",
             "target": "standalone_foundation_contracts",
             "test": "checked_primitives_preserve_padding_shapes_and_refusal",
-            "source_sha256": "54c86baeb3c0d0b975e15ce5f1fca3bf1dbe50aac15ef1a37929ca3530dc28bb"
+            "source_sha256": "7e4d76f21cf80dd38ec6e0b6e05d5cca04d77d22378c2e9290aaf71e4cae930c"
           }
         ],
         "adaptation": "Pinned foundation.cpp schedules use exact Rust scalar-ring arithmetic, raw-input finite sums, literal dense gates, finite sets or original known answers. Root and transitive fixture sources are bound; Native private layouts, RNG bitstreams and performance are separate claims. The exact M1/30,XOR duplicate, external decoder and POSTSELECT fixture preserves metadata/version. Huge empty REPEAT is accepted only with explicit allow_wide_repeat_counts; the default u64 syntax contract remains unchanged. Exact BigUint preflight rejects huge nonempty expansion, while zero outer repeats skip safely.",
@@ -5254,7 +5284,7 @@
             "package": "rmagna",
             "target": "standalone_foundation_contracts",
             "test": "scaled_noise_model_and_categorical_law_interning",
-            "source_sha256": "54c86baeb3c0d0b975e15ce5f1fca3bf1dbe50aac15ef1a37929ca3530dc28bb"
+            "source_sha256": "7e4d76f21cf80dd38ec6e0b6e05d5cca04d77d22378c2e9290aaf71e4cae930c"
           }
         ],
         "adaptation": "Pinned foundation.cpp schedules use exact Rust scalar-ring arithmetic, raw-input finite sums, literal dense gates, finite sets or original known answers. Root and transitive fixture sources are bound; Native private layouts, RNG bitstreams and performance are separate claims. Original depolarize2/correlated/readout fixture has three categories and18 actions, scaled correlated probability1/6 and three eligible tilts. Empty-model nonpositive scales and two-site rates crossing one refuse.",
@@ -5318,7 +5348,7 @@
             "package": "rmagna",
             "target": "standalone_foundation_contracts",
             "test": "cached_noise_law_and_weight",
-            "source_sha256": "54c86baeb3c0d0b975e15ce5f1fca3bf1dbe50aac15ef1a37929ca3530dc28bb"
+            "source_sha256": "7e4d76f21cf80dd38ec6e0b6e05d5cca04d77d22378c2e9290aaf71e4cae930c"
           }
         ],
         "adaptation": "Pinned foundation.cpp retains all41 original channels, the constant-true guard, two excluded endpoint totals, scales[None,1/2,1,2] and32 MT seeds. Every original action/anchor and all38 eligible interior channel probabilities/likelihood factors are independently checked. The actual PreparedNoiseSchedule shared occurrence/conditional-law service executes the full128 scheduled draws plus eight forced equality-tail draws. A literal per-lane rational comparison and fixed integer1:2:3 conditional oracle independently predict all choices, actions, random-word counts/fingerprints, exact tails, probabilities and weights; no production packed-threshold or conditional sampler is used by that oracle. Statistics require41 sites, one interned conditional model and the independently counted occurrence groups. The fixed true guard needs no adaptive runtime; its scale exclusion is retained. Packed and ordinary scalar streams intentionally differ, so the original ordinary full/sparse cached-versus-fresh Rust comparisons are kept separately rather than asserting equal packed/scalar outcomes. In this adapter the prepared owner stores the proposal law: its physical_probability field equals q, and supplied raw p/q factors recover the independent physical mass exactly. Native private cache caps, category pointer layout and seed ABI are not claimed.",
@@ -5355,7 +5385,7 @@
             "package": "rmagna",
             "target": "standalone_foundation_contracts",
             "test": "exact_categorical_zero_channel_uses_one_caller_word",
-            "source_sha256": "54c86baeb3c0d0b975e15ce5f1fca3bf1dbe50aac15ef1a37929ca3530dc28bb"
+            "source_sha256": "7e4d76f21cf80dd38ec6e0b6e05d5cca04d77d22378c2e9290aaf71e4cae930c"
           }
         ],
         "adaptation": "Pinned foundation.cpp schedules use exact Rust scalar-ring arithmetic, raw-input finite sums, literal dense gates, finite sets or original known answers. Root and transitive fixture sources are bound; Native private layouts, RNG bitstreams and performance are separate claims. The original weights[0,1/3,2/3] use one exact bound3 categorical selection. Rust caller-owned words0,1,2 exercise every bucket: zero weight is never selected and no per-zero-channel entropy is consumed. The public word-based sampler does not expose Native randrange callback identity.",
@@ -5392,7 +5422,7 @@
             "package": "rmagna",
             "target": "standalone_foundation_contracts",
             "test": "fixed_virtual_template_and_selection_offset",
-            "source_sha256": "54c86baeb3c0d0b975e15ce5f1fca3bf1dbe50aac15ef1a37929ca3530dc28bb"
+            "source_sha256": "7e4d76f21cf80dd38ec6e0b6e05d5cca04d77d22378c2e9290aaf71e4cae930c"
           }
         ],
         "adaptation": "Pinned foundation.cpp schedules use exact Rust scalar-ring arithmetic, raw-input finite sums, literal dense gates, finite sets or original known answers. Root and transitive fixture sources are bound; Native private layouts, RNG bitstreams and performance are separate claims. The real-file M,decoder,CH,NOT,POSTSELECT fixture prepares all retained families without callbacks, retains two odd phase variables and unchanged storage across both deterministic decisions. Rust uses two physical slots, one record and two versioned controls (five slots); Native wire_count4 is a different private allocation. Callback outcomes and raw acceptance verify the complete assignment, not equal private wire counts.",
@@ -5428,7 +5458,7 @@
             "package": "rmagna",
             "target": "standalone_foundation_contracts",
             "test": "fixed_virtual_template_and_selection_offset",
-            "source_sha256": "54c86baeb3c0d0b975e15ce5f1fca3bf1dbe50aac15ef1a37929ca3530dc28bb"
+            "source_sha256": "7e4d76f21cf80dd38ec6e0b6e05d5cca04d77d22378c2e9290aaf71e4cae930c"
           }
         ],
         "adaptation": "Pinned foundation.cpp schedules use exact Rust scalar-ring arithmetic, raw-input finite sums, literal dense gates, finite sets or original known answers. Root and transitive fixture sources are bound; Native private layouts, RNG bitstreams and performance are separate claims. Both real controller outputs test the original NOT constant: deterministic acceptance equals decision0/1 with no entropy, one callback per draw and unchanged prepared storage.",
@@ -5465,7 +5495,7 @@
             "package": "rmagna",
             "target": "standalone_foundation_contracts",
             "test": "coherent_file_pipeline_and_prepared_trace_runtime",
-            "source_sha256": "54c86baeb3c0d0b975e15ce5f1fca3bf1dbe50aac15ef1a37929ca3530dc28bb"
+            "source_sha256": "7e4d76f21cf80dd38ec6e0b6e05d5cca04d77d22378c2e9290aaf71e4cae930c"
           }
         ],
         "adaptation": "Pinned foundation.cpp schedules use exact Rust scalar-ring arithmetic, raw-input finite sums, literal dense gates, finite sets or original known answers. Root and transitive fixture sources are bound; Native private layouts, RNG bitstreams and performance are separate claims. The real-file H0,M0,CHrec1 fixture compiles a coherent control with one record/report anchor and two odd ancillas, creates/reuses a prepared Z0Z1 geometry and preserves the report-flip physical correlation. This group covers lowering only; amplitude-network release remains explicitly unresolved in the separate trace groups.",
@@ -5496,13 +5526,17 @@
         42,
         43
       ],
-      "status": "unresolved",
-      "reason": "Numerical dilation, all66 original-location fault frames, exact moments and prepared reuse pass the source fixture, but Rust still retains shared raw/query AffineKet boundaries. Native amplitude-only-object omission and runtime amplitude-network release are not implemented. Keep this entire group unresolved until #1335 supplies observable ownership/drop evidence; do not promote on factory counts or numeric equality.",
-      "assessment": "implementation_gap",
+      "status": "bound",
+      "reason": "Complete source-specific numerical and storage obligations use the opt-in sealed trace runtime, actual Weak ownership/drop observations and prepared-map reuse. Original public amplitude paths remain available separately.",
+      "assessment": "source_bound_witness",
       "candidate_owners": [
         {
-          "path": "rmagna/src/instrument/original_trace.rs",
-          "anchor": "pub struct OriginalStaticTrace"
+          "path": "rmagna/src/unitary/trace.rs",
+          "anchor": "pub struct TraceRuntime"
+        },
+        {
+          "path": "rmagna/src/instrument/trace.rs",
+          "anchor": "pub struct InstrumentTraceRuntime"
         }
       ],
       "candidate_witnesses": [
@@ -5510,10 +5544,43 @@
           "package": "rmagna",
           "target": "standalone_foundation_contracts",
           "test": "trace_purpose_preserves_dilation_axes_and_every_fault_location",
-          "source_sha256": "54c86baeb3c0d0b975e15ce5f1fca3bf1dbe50aac15ef1a37929ca3530dc28bb"
+          "source_sha256": "7e4d76f21cf80dd38ec6e0b6e05d5cca04d77d22378c2e9290aaf71e4cae930c"
         }
       ],
-      "follow_up_issue": 1335
+      "follow_up_issue": 1335,
+      "qualification": {
+        "witnesses": [
+          {
+            "package": "rmagna",
+            "target": "standalone_foundation_contracts",
+            "test": "trace_purpose_preserves_dilation_axes_and_every_fault_location",
+            "source_sha256": "7e4d76f21cf80dd38ec6e0b6e05d5cca04d77d22378c2e9290aaf71e4cae930c"
+          },
+          {
+            "package": "rmagna",
+            "target": "standalone_foundation_contracts",
+            "test": "explicit_trace_compilation_omits_the_open_query_projection",
+            "source_sha256": "7e4d76f21cf80dd38ec6e0b6e05d5cca04d77d22378c2e9290aaf71e4cae930c"
+          },
+          {
+            "package": "rmagna",
+            "target": "standalone_foundation_contracts",
+            "test": "sealed_trace_both_compilers_preserve_complex_moments_dependent_events_and_frames",
+            "source_sha256": "7e4d76f21cf80dd38ec6e0b6e05d5cca04d77d22378c2e9290aaf71e4cae930c"
+          },
+          {
+            "package": "rmagna",
+            "target": "standalone_foundation_contracts",
+            "test": "trace_release_is_observed_even_with_external_ordinary_plans_and_invalid_requests",
+            "source_sha256": "7e4d76f21cf80dd38ec6e0b6e05d5cca04d77d22378c2e9290aaf71e4cae930c"
+          }
+        ],
+        "adaptation": "Opt-in sealed fixed scalar queries replace Native private amplitude-plan arrays. Explicit SharedCommutingLayer trace compilation omits the separate open query projection; the common exact full Clifford dilation is transient. Preparation sums every physical bra/ket output and retains only event/magic-coordinate kernels and frozen Gaussian/phase resources. Weak raw/query/program probes observe actual owner release, including external-plan lifetimes. Full original-location phased fault frames, rotation phases and exact complex conditional moments remain intact under both compilers. Ordinary amplitude-capable APIs are unchanged; no Native array ABI, arbitrary late layouts, target-density service, RSS or performance equivalence is claimed.",
+        "support_sources": {
+          "rmagna/tests/support/original_gf2.rs": "64814d7a310cee97f39e74a7f6027eb7d488e165b0e51a71d131ed076099077c",
+          "rmagna/tests/common/mod.rs": "ecacfdbf65863a1690414edeb9ab09364c2ae01eaf0726f50b61e6e20a4f03d9"
+        }
+      }
     },
     {
       "id": "foundation/main.prepared-trace-runtime",
@@ -5530,13 +5597,17 @@
         "main/require-093"
       ],
       "loops": [],
-      "status": "unresolved",
-      "reason": "Numerical dilation, all66 original-location fault frames, exact moments and prepared reuse pass the source fixture, but Rust still retains shared raw/query AffineKet boundaries. Native amplitude-only-object omission and runtime amplitude-network release are not implemented. Keep this entire group unresolved until #1335 supplies observable ownership/drop evidence; do not promote on factory counts or numeric equality.",
-      "assessment": "implementation_gap",
+      "status": "bound",
+      "reason": "Complete source-specific numerical and storage obligations use the opt-in sealed trace runtime, actual Weak ownership/drop observations and prepared-map reuse. Original public amplitude paths remain available separately.",
+      "assessment": "source_bound_witness",
       "candidate_owners": [
         {
-          "path": "rmagna/src/instrument/original_prepared.rs",
-          "anchor": "pub struct OriginalPreparedTrace"
+          "path": "rmagna/src/unitary/trace.rs",
+          "anchor": "pub struct TraceRuntime"
+        },
+        {
+          "path": "rmagna/src/instrument/trace.rs",
+          "anchor": "pub struct InstrumentTraceRuntime"
         }
       ],
       "candidate_witnesses": [
@@ -5544,10 +5615,43 @@
           "package": "rmagna",
           "target": "standalone_foundation_contracts",
           "test": "coherent_file_pipeline_and_prepared_trace_runtime",
-          "source_sha256": "54c86baeb3c0d0b975e15ce5f1fca3bf1dbe50aac15ef1a37929ca3530dc28bb"
+          "source_sha256": "7e4d76f21cf80dd38ec6e0b6e05d5cca04d77d22378c2e9290aaf71e4cae930c"
         }
       ],
-      "follow_up_issue": 1335
+      "follow_up_issue": 1335,
+      "qualification": {
+        "witnesses": [
+          {
+            "package": "rmagna",
+            "target": "standalone_foundation_contracts",
+            "test": "coherent_file_pipeline_and_prepared_trace_runtime",
+            "source_sha256": "7e4d76f21cf80dd38ec6e0b6e05d5cca04d77d22378c2e9290aaf71e4cae930c"
+          },
+          {
+            "package": "rmagna",
+            "target": "standalone_foundation_contracts",
+            "test": "sealed_file_trace_keeps_selection_parity_constants_and_fault_validation",
+            "source_sha256": "7e4d76f21cf80dd38ec6e0b6e05d5cca04d77d22378c2e9290aaf71e4cae930c"
+          },
+          {
+            "package": "rmagna",
+            "target": "standalone_foundation_contracts",
+            "test": "trace_cross_word_frames_and_prefix_sampling_keep_exact_conditional_mass",
+            "source_sha256": "7e4d76f21cf80dd38ec6e0b6e05d5cca04d77d22378c2e9290aaf71e4cae930c"
+          },
+          {
+            "package": "rmagna",
+            "target": "standalone_foundation_contracts",
+            "test": "trace_release_is_observed_even_with_external_ordinary_plans_and_invalid_requests",
+            "source_sha256": "7e4d76f21cf80dd38ec6e0b6e05d5cca04d77d22378c2e9290aaf71e4cae930c"
+          }
+        ],
+        "adaptation": "The actual parsed/lowered coherent instrument is consumed into a sealed declared scalar-family runtime. Its warmed amplitude caches and catalog/program owners are dropped; only physically closed event/magic kernels, prepared phase maps/resources and independent original-location fault metadata remain. Report-flip moments, record marginals and prefix sampling reuse those owners without new factories. Selection/parity constants, owner and fault validation, exact absolute conditional masses and cross-word frames are preserved. Ordinary file evaluators remain amplitude-capable; callback/target-density migration, Native private counters, RNG-word ABI, RSS and performance equivalence are outside this opt-in contract.",
+        "support_sources": {
+          "rmagna/tests/support/original_gf2.rs": "64814d7a310cee97f39e74a7f6027eb7d488e165b0e51a71d131ed076099077c",
+          "rmagna/tests/common/mod.rs": "ecacfdbf65863a1690414edeb9ab09364c2ae01eaf0726f50b61e6e20a4f03d9"
+        }
+      }
     },
     {
       "id": "foundation/main.character-geometry",
@@ -5594,13 +5698,13 @@
             "package": "rmagna",
             "target": "standalone_foundation_contracts",
             "test": "character_geometry_and_resource_transport",
-            "source_sha256": "54c86baeb3c0d0b975e15ce5f1fca3bf1dbe50aac15ef1a37929ca3530dc28bb"
+            "source_sha256": "7e4d76f21cf80dd38ec6e0b6e05d5cca04d77d22378c2e9290aaf71e4cae930c"
           },
           {
             "package": "rmagna",
             "target": "standalone_foundation_contracts",
             "test": "entry_dependent_geometry_matches_finite_sums",
-            "source_sha256": "54c86baeb3c0d0b975e15ce5f1fca3bf1dbe50aac15ef1a37929ca3530dc28bb"
+            "source_sha256": "7e4d76f21cf80dd38ec6e0b6e05d5cca04d77d22378c2e9290aaf71e4cae930c"
           }
         ],
         "adaptation": "Pinned foundation.cpp schedules use exact Rust scalar-ring arithmetic, raw-input finite sums, literal dense gates, finite sets or original known answers. Root and transitive fixture sources are bound; Native private layouts, RNG bitstreams and performance are separate claims. The original two-T reference,240 full Clifford changes,15 changed physical boundaries, new odd phase rejection and separate geometry quota refusal compare cold/prepared entries and independent raw finite sums. Rust freezes geometry separately from immutable resource entries. Unlike the optional Native shared probe, Rust supports entry-dependent constraints/phases with per-term maps, checked using four certified indicator entries and corrected phases; no Native private rejection flag is asserted.",
@@ -5643,7 +5747,7 @@
             "package": "rmagna",
             "target": "standalone_foundation_contracts",
             "test": "character_geometry_and_resource_transport",
-            "source_sha256": "54c86baeb3c0d0b975e15ce5f1fca3bf1dbe50aac15ef1a37929ca3530dc28bb"
+            "source_sha256": "7e4d76f21cf80dd38ec6e0b6e05d5cca04d77d22378c2e9290aaf71e4cae930c"
           }
         ],
         "adaptation": "Pinned foundation.cpp schedules use exact Rust scalar-ring arithmetic, raw-input finite sums, literal dense gates, finite sets or original known answers. Root and transitive fixture sources are bound; Native private layouts, RNG bitstreams and performance are separate claims. The exact source two-T constants, four Clifford increments/two affine offsets, frozen physical-boundary refusal and new odd phase refusal preserve immutable entries and actual reused/recomputed Gaussian counts. Cold/warm global q constants are canonicalized into coefficients before structural comparison; variable phases/columns and all finite sums must agree.",
@@ -5684,7 +5788,7 @@
             "package": "rmagna",
             "target": "standalone_foundation_contracts",
             "test": "strict_parity_representation",
-            "source_sha256": "54c86baeb3c0d0b975e15ce5f1fca3bf1dbe50aac15ef1a37929ca3530dc28bb"
+            "source_sha256": "7e4d76f21cf80dd38ec6e0b6e05d5cca04d77d22378c2e9290aaf71e4cae930c"
           }
         ],
         "adaptation": "Pinned foundation.cpp schedules use exact Rust scalar-ring arithmetic, raw-input finite sums, literal dense gates, finite sets or original known answers. Root and transitive fixture sources are bound; Native private layouts, RNG bitstreams and performance are separate claims. The exact four-variable source, four increments/two offsets and all15-parity zero-function rewrite share the existing immutable resource after Clifford-difference validation. Rust accepts mathematically equivalent spellings; Native strict=true rejects changed literal parity representation. The observable exact state and unchanged resource work are qualified, not that private strict flag or its false-mode spelling policy.",
@@ -5732,13 +5836,13 @@
             "package": "rmagna",
             "target": "standalone_foundation_contracts",
             "test": "dimension_changing_clifford_transport",
-            "source_sha256": "54c86baeb3c0d0b975e15ce5f1fca3bf1dbe50aac15ef1a37929ca3530dc28bb"
+            "source_sha256": "7e4d76f21cf80dd38ec6e0b6e05d5cca04d77d22378c2e9290aaf71e4cae930c"
           },
           {
             "package": "rmagna",
             "target": "standalone_foundation_contracts",
             "test": "checked_primitives_preserve_padding_shapes_and_refusal",
-            "source_sha256": "54c86baeb3c0d0b975e15ce5f1fca3bf1dbe50aac15ef1a37929ca3530dc28bb"
+            "source_sha256": "7e4d76f21cf80dd38ec6e0b6e05d5cca04d77d22378c2e9290aaf71e4cae930c"
           }
         ],
         "adaptation": "Pinned foundation.cpp schedules use exact Rust scalar-ring arithmetic, raw-input finite sums, literal dense gates, finite sets or original known answers. Root and transitive fixture sources are bound; Native private layouts, RNG bitstreams and performance are separate claims. The original zero-variable phase3 resource reuses its rank-zero core for two-/three-variable Clifford tensors with phase7 and noninjective maps. expand_clifford validates dimensions and rejects odd updates/non-Clifford reference cores; exact cold/warm states and global offset agree with literal finite sums.",
@@ -5780,7 +5884,7 @@
             "package": "rmagna",
             "target": "standalone_foundation_contracts",
             "test": "consuming_and_finite_sum_contraction",
-            "source_sha256": "54c86baeb3c0d0b975e15ce5f1fca3bf1dbe50aac15ef1a37929ca3530dc28bb"
+            "source_sha256": "7e4d76f21cf80dd38ec6e0b6e05d5cca04d77d22378c2e9290aaf71e4cae930c"
           }
         ],
         "adaptation": "Pinned foundation.cpp schedules use exact Rust scalar-ring arithmetic, raw-input finite sums, literal dense gates, finite sets or original known answers. Root and transitive fixture sources are bound; Native private layouts, RNG bitstreams and performance are separate claims. MT seed2026100503 retains n0..7,40 trials and all original random inputs. Rust contraction borrows its input and returns an owned payload: clone and direct routes agree, source is then dropped, and every output equals the raw finite sum. This is ownership equivalence, not a C++ rvalue allocation/consuming API claim.",
@@ -5821,7 +5925,7 @@
             "package": "rmagna",
             "target": "standalone_foundation_contracts",
             "test": "consuming_and_finite_sum_contraction",
-            "source_sha256": "54c86baeb3c0d0b975e15ce5f1fca3bf1dbe50aac15ef1a37929ca3530dc28bb"
+            "source_sha256": "7e4d76f21cf80dd38ec6e0b6e05d5cca04d77d22378c2e9290aaf71e4cae930c"
           }
         ],
         "adaptation": "Pinned foundation.cpp schedules use exact Rust scalar-ring arithmetic, raw-input finite sums, literal dense gates, finite sets or original known answers. Root and transitive fixture sources are bound; Native private layouts, RNG bitstreams and performance are separate claims. All eight global phases, four one-variable linear coefficients and visible/hidden columns reproduce the original64 known-answer contractions by raw scalar summation.",
@@ -5862,7 +5966,7 @@
             "package": "rmagna",
             "target": "standalone_foundation_contracts",
             "test": "completed_pair_sampling_and_branch_limit",
-            "source_sha256": "54c86baeb3c0d0b975e15ce5f1fca3bf1dbe50aac15ef1a37929ca3530dc28bb"
+            "source_sha256": "7e4d76f21cf80dd38ec6e0b6e05d5cca04d77d22378c2e9290aaf71e4cae930c"
           }
         ],
         "adaptation": "Pinned foundation.cpp schedules use exact Rust scalar-ring arithmetic, raw-input finite sums, literal dense gates, finite sets or original known answers. Root and transitive fixture sources are bound; Native private layouts, RNG bitstreams and performance are separate claims. Exact plus-state completed density has both masses1/2; actual reported sampling covers1000 source MT seeds and both observed values, while enumeration retains bothbranches and rejects a branchlimit1. Rust Born random words are not Python/Native seeded-word ABI.",
@@ -5900,7 +6004,7 @@
             "package": "rmagna",
             "target": "standalone_foundation_contracts",
             "test": "sparse_noise_stream_and_weight_sectors",
-            "source_sha256": "54c86baeb3c0d0b975e15ce5f1fca3bf1dbe50aac15ef1a37929ca3530dc28bb"
+            "source_sha256": "7e4d76f21cf80dd38ec6e0b6e05d5cca04d77d22378c2e9290aaf71e4cae930c"
           }
         ],
         "adaptation": "Pinned foundation.cpp schedules use exact Rust scalar-ring arithmetic, raw-input finite sums, literal dense gates, finite sets or original known answers. Root and transitive fixture sources are bound; Native private layouts, RNG bitstreams and performance are separate claims. One original three-way site retains all100 MT seeds, exact faults and unchanged caller RNG fingerprint for full versus sparse named-action sampling.",
@@ -5940,7 +6044,7 @@
             "package": "rmagna",
             "target": "standalone_foundation_contracts",
             "test": "sparse_noise_stream_and_weight_sectors",
-            "source_sha256": "54c86baeb3c0d0b975e15ce5f1fca3bf1dbe50aac15ef1a37929ca3530dc28bb"
+            "source_sha256": "7e4d76f21cf80dd38ec6e0b6e05d5cca04d77d22378c2e9290aaf71e4cae930c"
           }
         ],
         "adaptation": "Pinned foundation.cpp schedules use exact Rust scalar-ring arithmetic, raw-input finite sums, literal dense gates, finite sets or original known answers. Root and transitive fixture sources are bound; Native private layouts, RNG bitstreams and performance are separate claims. The original two3/4-identity,1/4-fault sites enumerate exactly three weight<=1 patterns, first mass9/16, covered mass15/16 and error numerator6/16.",
@@ -5984,7 +6088,7 @@
             "package": "rmagna",
             "target": "standalone_foundation_contracts",
             "test": "history_efficiency_and_paired_statistics",
-            "source_sha256": "54c86baeb3c0d0b975e15ce5f1fca3bf1dbe50aac15ef1a37929ca3530dc28bb"
+            "source_sha256": "7e4d76f21cf80dd38ec6e0b6e05d5cca04d77d22378c2e9290aaf71e4cae930c"
           }
         ],
         "adaptation": "Pinned foundation.cpp schedules use exact Rust scalar-ring arithmetic, raw-input finite sums, literal dense gates, finite sets or original known answers. Root and transitive fixture sources are bound; Native private layouts, RNG bitstreams and performance are separate claims. Two equal2^19999 weights give ESS2 and exact mean2^19999 without float conversion; Rust scientific mantissa1 times2^19999 is the Native mantissa1/2 times2^20000.",
@@ -6022,7 +6126,7 @@
             "package": "rmagna",
             "target": "standalone_foundation_contracts",
             "test": "wide_exact_scalars_and_caller_rng",
-            "source_sha256": "54c86baeb3c0d0b975e15ce5f1fca3bf1dbe50aac15ef1a37929ca3530dc28bb"
+            "source_sha256": "7e4d76f21cf80dd38ec6e0b6e05d5cca04d77d22378c2e9290aaf71e4cae930c"
           }
         ],
         "adaptation": "Pinned foundation.cpp schedules use exact Rust scalar-ring arithmetic, raw-input finite sums, literal dense gates, finite sets or original known answers. Root and transitive fixture sources are bound; Native private layouts, RNG bitstreams and performance are separate claims. The original2^10000 scalar ratio is exactlyone, and194-variable equations include bit193, outcome[1,0], solutionbit0 and192 freevariables. Wide solve and scientific forms preserve values without truncation.",
@@ -6058,7 +6162,7 @@
             "package": "rmagna",
             "target": "standalone_foundation_contracts",
             "test": "wide_exact_scalars_and_caller_rng",
-            "source_sha256": "54c86baeb3c0d0b975e15ce5f1fca3bf1dbe50aac15ef1a37929ca3530dc28bb"
+            "source_sha256": "7e4d76f21cf80dd38ec6e0b6e05d5cca04d77d22378c2e9290aaf71e4cae930c"
           }
         ],
         "adaptation": "Pinned foundation.cpp schedules use exact Rust scalar-ring arithmetic, raw-input finite sums, literal dense gates, finite sets or original known answers. Root and transitive fixture sources are bound; Native private layouts, RNG bitstreams and performance are separate claims. The original tiny2^-2048 Bernoulli threshold requests exactly2048 false bits from the caller and returns true; the counter is observed on the actual source.",
@@ -6094,13 +6198,13 @@
             "package": "rmagna",
             "target": "standalone_foundation_contracts",
             "test": "signed_affine_grouping",
-            "source_sha256": "54c86baeb3c0d0b975e15ce5f1fca3bf1dbe50aac15ef1a37929ca3530dc28bb"
+            "source_sha256": "7e4d76f21cf80dd38ec6e0b6e05d5cca04d77d22378c2e9290aaf71e4cae930c"
           },
           {
             "package": "rmagna",
             "target": "standalone_foundation_contracts",
             "test": "checked_primitives_preserve_padding_shapes_and_refusal",
-            "source_sha256": "54c86baeb3c0d0b975e15ce5f1fca3bf1dbe50aac15ef1a37929ca3530dc28bb"
+            "source_sha256": "7e4d76f21cf80dd38ec6e0b6e05d5cca04d77d22378c2e9290aaf71e4cae930c"
           }
         ],
         "adaptation": "Pinned foundation.cpp schedules use exact Rust scalar-ring arithmetic, raw-input finite sums, literal dense gates, finite sets or original known answers. Root and transitive fixture sources are bound; Native private layouts, RNG bitstreams and performance are separate claims. Negative and positive equal-support terms combine before positivity: -plus+2plus certifies one positive component, as do alternate bases/offsets of the same three-bit affine set. Zero cancellation, complex cancellation, negative-only and variable-phase conservative refusal are tested. Certificate preparation is owned and does not alter the existing sampler.",
@@ -6139,7 +6243,7 @@
             "package": "rmagna",
             "target": "standalone_foundation_contracts",
             "test": "coherent_expansion_and_target_amplitude",
-            "source_sha256": "54c86baeb3c0d0b975e15ce5f1fca3bf1dbe50aac15ef1a37929ca3530dc28bb"
+            "source_sha256": "7e4d76f21cf80dd38ec6e0b6e05d5cca04d77d22378c2e9290aaf71e4cae930c"
           }
         ],
         "adaptation": "Pinned foundation.cpp schedules use exact Rust scalar-ring arithmetic, raw-input finite sums, literal dense gates, finite sets or original known answers. Root and transitive fixture sources are bound; Native private layouts, RNG bitstreams and performance are separate claims. The original plus + i|0> expansion has norm2 from its cross terms, and independent plus/zero target overlap1/sqrt2. Exact overlaps, not support union alone, determine the result.",
@@ -6185,7 +6289,7 @@
             "package": "rmagna",
             "target": "standalone_foundation_contracts",
             "test": "literal_callback_certificate_owns_signed_wire_result",
-            "source_sha256": "54c86baeb3c0d0b975e15ce5f1fca3bf1dbe50aac15ef1a37929ca3530dc28bb"
+            "source_sha256": "7e4d76f21cf80dd38ec6e0b6e05d5cca04d77d22378c2e9290aaf71e4cae930c"
           }
         ],
         "adaptation": "Pinned foundation.cpp schedules use exact Rust scalar-ring arithmetic, raw-input finite sums, literal dense gates, finite sets or original known answers. Root and transitive fixture sources are bound; Native private layouts, RNG bitstreams and performance are separate claims. The original signed wire-2 fixture calls once with reported r1, executes returned H-2 and produces zero probability after MXs0. The owned branch certificate survives dropping the plan/source without callback replay; no Native capsule field naming is claimed.",
@@ -6237,13 +6341,13 @@
             "package": "rmagna",
             "target": "standalone_foundation_contracts",
             "test": "affine_proposal_hull_and_projection",
-            "source_sha256": "54c86baeb3c0d0b975e15ce5f1fca3bf1dbe50aac15ef1a37929ca3530dc28bb"
+            "source_sha256": "7e4d76f21cf80dd38ec6e0b6e05d5cca04d77d22378c2e9290aaf71e4cae930c"
           },
           {
             "package": "rmagna",
             "target": "standalone_foundation_contracts",
             "test": "checked_primitives_preserve_padding_shapes_and_refusal",
-            "source_sha256": "54c86baeb3c0d0b975e15ce5f1fca3bf1dbe50aac15ef1a37929ca3530dc28bb"
+            "source_sha256": "7e4d76f21cf80dd38ec6e0b6e05d5cca04d77d22378c2e9290aaf71e4cae930c"
           }
         ],
         "adaptation": "Pinned foundation.cpp schedules use exact Rust scalar-ring arithmetic, raw-input finite sums, literal dense gates, finite sets or original known answers. Root and transitive fixture sources are bound; Native private layouts, RNG bitstreams and performance are separate claims. The original82-wire/two80-column pieces produce an81-dimensional hull, correlated base difference and impossible prefix. All320 MT seed202609301 finite conditioning/projection cases retain dependent columns and inconsistent observations; hull construction uses columns, never2^81 words.",
@@ -6290,7 +6394,7 @@
             "package": "rmagna",
             "target": "standalone_foundation_contracts",
             "test": "quadratic_radical_support",
-            "source_sha256": "54c86baeb3c0d0b975e15ce5f1fca3bf1dbe50aac15ef1a37929ca3530dc28bb"
+            "source_sha256": "7e4d76f21cf80dd38ec6e0b6e05d5cca04d77d22378c2e9290aaf71e4cae930c"
           }
         ],
         "adaptation": "Pinned foundation.cpp schedules use exact Rust scalar-ring arithmetic, raw-input finite sums, literal dense gates, finite sets or original known answers. Root and transitive fixture sources are bound; Native private layouts, RNG bitstreams and performance are separate claims. All640 MT seed20260930 scalar-phase sums retain n0..7,80 trials, odd Z4 coefficients, noninjective maps and offsets. Independently enumerated finite complex sums check every support/nonzero output word.",
