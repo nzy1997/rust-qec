@@ -8,6 +8,23 @@ import coverage_ledger as ledger_tools
 
 HERE = Path(__file__).resolve().parent
 ROOT = HERE.parent.parent
+
+# F2 whole-method qualification cannot be replaced by the pre-existing explicit
+# literal witnesses, even when both editable ledgers are changed together.
+_FALLBACK_COMMON = {
+    "original_opt_in_global_success_matches_literal_without_literal_compilation",
+    "original_opt_in_fallback_propagates_non_whitelisted_and_boundary_errors_once",
+    "original_opt_in_fallback_validates_before_preparation_and_never_retries_literal_failure",
+    "original_opt_in_collection_preserves_chronological_errors_and_callback_failures",
+}
+FALLBACK_WITNESSES = {
+    "test_native_global_ownership.NativeGlobalOwnershipTests.test_compile_counts_preparation_fallback_once":
+        _FALLBACK_COMMON | {"original_opt_in_preparation_refusal_compiles_the_empty_positive_branch_once",
+                            "original_explicit_literal_policy_compiles_once_without_structural_preparation"},
+    "test_native_global_ownership.NativeGlobalOwnershipTests.test_native_fallback_retains_values_packed_before_kernel":
+        _FALLBACK_COMMON | {"original_opt_in_odd_phase_refusal_keeps_packed_inputs_and_collected_rule",
+                            "original_literal_policy_retains_packed_values_and_never_replays_the_phase_rule"},
+}
 require = ledger_tools.require
 rust = ledger_tools.rust
 reference = ledger_tools.reference
@@ -50,6 +67,10 @@ def check_decisions(decisions, ledger, manifest, *, root=ROOT, upstream=None):
                 require(witness["package"] == "rmagna" and witness["source_sha256"] == witness_hash,
                         "snapshot Rust witness source changed")
                 require(witness["test"] in witness_names, "snapshot Rust witness test missing")
+        if name in FALLBACK_WITNESSES and status == "verified":
+            observed = {witness["test"] for witness in row["rust_tests"]}
+            require(FALLBACK_WITNESSES[name] <= observed,
+                    f"missing F2 transition/ownership/error-order witnesses: {name}")
         if status == "partial":
             require(row["remaining_gap"] == expected[name]["remaining_gap"], f"snapshot gap differs from ledger: {name}")
         if declarations is not None:

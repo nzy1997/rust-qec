@@ -18,8 +18,8 @@ class RemainingContractsTests(unittest.TestCase):
 
     def test_complete_static_inventory_does_not_certify_parity(self):
         result = self.check()
-        self.assertEqual(result["outstanding"], 8)
-        self.assertEqual(result["categories"], {"G": 0, "P": 0, "V": 0, "E": 8, "U": 0})
+        self.assertEqual(result["outstanding"], 6)
+        self.assertEqual(result["categories"], {"G": 0, "P": 0, "V": 0, "E": 6, "U": 0})
         self.assertEqual((result["tasks"], result["paper_files"], result["roadmap_issues"]), (31, 435, 18))
         self.assertEqual(result["scope"], "static_requirements_only")
         self.assertFalse(result["upstream_verified"])
@@ -27,7 +27,7 @@ class RemainingContractsTests(unittest.TestCase):
         changed["methods"][0]["category"] = "unknown"
         with self.assertRaisesRegex(ValueError, "unknown category"):
             self.check(changed)
-        self.assertEqual(result["ledger_snapshot"], {"verified": 344, "partial": 6, "unmapped": 2})
+        self.assertEqual(result["ledger_snapshot"], {"verified": 346, "partial": 4, "unmapped": 2})
 
     def test_source_missing_method_and_unwitnessed_promotions_are_rejected(self):
         changed = copy.deepcopy(self.catalog)

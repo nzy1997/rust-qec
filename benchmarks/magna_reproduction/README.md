@@ -3474,7 +3474,7 @@ yield. Report flips compose by XOR. Its JSON adapter refuses bool/negative/float
 codes; fault-group snapshot counts describe retained groups, not avoided Native
 compiler work.
 
-The execution policy is explicitly `LiteralPerAssignment`. Unexpected kernel
+The default execution policy is `LiteralPerAssignment`. Unexpected kernel
 errors and quota refusals propagate once. `compile_with_kernel` is the same
 captured/collected pipeline with a caller-supplied exact kernel, enabling backend
 comparisons without replay. `compile` returns an owned certificate with independent
@@ -3482,8 +3482,9 @@ JSON exports and an input-only diagnostic SHA256; source identity is separate.
 Probability queries perform no input hashing and have no probability-value cache. Downstream type probes locate existing artifacts in both Cargo deps and
 per-target build output layouts, including a real relocated library/test binary.
 They reuse dependency artifacts without nested Cargo builds.
-There is no implicit Native preparation, automatic backend fallback, or mutable
-Python option dictionary.
+This default path has no implicit Native preparation, automatic backend fallback,
+or mutable Python option dictionary. The explicit F2 executor below adds a
+separate, bounded preparation-fallback policy.
 
 `OriginalTraceCache` is an optional bounded LRU keyed by source session and path
 budget. It stores immutable traces without retaining source callbacks. Evicted
@@ -3502,7 +3503,7 @@ rejected at JSON import. `SparseNoiseSampler` owns action buffers over the exist
 exact categorical sampler. Guarded categories require the causal runtime rather
 than silent guard removal.
 
-The target runs 30 tests, including all 162 original partial-incidence queries,
+The original R04 target ran 30 tests, including all 162 original partial-incidence queries,
 all 64 borrowed/owned fault/event queries under both coherent compilers, and all 100
 captured Native sparse/dense categorical choices/actions/weights. Sparse seeded
 comparisons additionally check Rust RNG final state; default Python RNG identity
@@ -3510,10 +3511,12 @@ is a separate R06 concern. The three fixture generators use the identified
 prebuilt helper and retained environment, and execute complete unchanged original
 methods without a Native rebuild.
 
-The ledger promotes 20 complete typed equivalents, keeps 6 methods partial, and
-leaves 1 reference-tool method unmapped. The remaining gaps are explicit: arbitrary
-cyclic/aliased Python metadata, metadata-keyed certificate caching, and automatic
-Native preparation/fallback reports are not implemented by the typed API.
+The original R04 snapshot promoted20 complete typed equivalents, kept6 methods
+partial and left1 reference-tool method unmapped. F2 below qualifies two more
+methods through an explicit Rust fallback policy. The remaining gaps cover
+arbitrary cyclic/aliased Python metadata, metadata-keyed certificate caching
+and source-tool compatibility; Native private dictionaries remain a typed-API
+representation boundary.
 Exact manifest-relative reference paths avoid basename-search ambiguity; this is
 not a new Rust C++ header resolver. None of these gaps is an architecture exclusion
 or removed from the original 352-method denominator. These decisions do not claim
@@ -4124,8 +4127,8 @@ follow-up [#1335](https://github.com/nzy1997/rust-qec/issues/1335) have complete
 source-specific foundation bindings, subject to the execution gate above.
 Missing entire groups/helpers/loops, adjacent fixture substitutions, stale
 source/binary identities, incomplete compiler/run observations and unsupported
-promotions fail validation. The current ledger records344 verified /6 partial /
-2 unmapped, with8 outstanding methods. This does not establish full352-method
+promotions fail validation. The current ledger records346 verified /4 partial /
+2 unmapped, with6 outstanding methods. This does not establish full352-method
 parity, Python/private-container identity or paper performance.
 
 ### B03 Bravyi-Haah paper campaign
@@ -4462,4 +4465,71 @@ under the explicit Rust representation above; the denominator remains352.
 Follow-ups [F2 #1340](https://github.com/nzy1997/rust-qec/issues/1340) (opt-in
 fallback with captured-input ownership) and
 [F3 #1341](https://github.com/nzy1997/rust-qec/issues/1341) (metadata/tooling
-compatibility decisions) have no hard dependency on F1 and remain separate work.
+compatibility decisions) have no hard dependency on F1. F2 is implemented below;
+F3 remains separate work.
+
+
+### F2 captured-input preparation fallback
+
+[#1340](https://github.com/nzy1997/rust-qec/issues/1340) adds the explicit
+`OriginalAssignmentPlan::executor(PrepareOrLiteral, options)` policy. The ordinary
+plan APIs and default `LiteralPerAssignment` path keep their existing contract.
+One call captures admitted input values and chronologically collects and lowers rule decisions
+before attempting the existing global affine trace. A successful global query
+returns an exact probability without a literal branch. A supported refusal
+consumes the frozen lowering in one literal compilation and returns its complete
+owned certificate. Preparation is per call; no structure/result cache or Native
+performance equivalence is claimed.
+
+The whitelist is deliberately closed: coherent-source geometry exceeding the
+separate preparation cap while still fitting the immutable source hard cap;
+and the exact authoritative `controlled odd phase requires complex feedback`
+non-applicability. Other declaration, input, owner, lifetime, source hard-budget,
+query-policy, arithmetic, observer and literal errors propagate once. The source
+preparation cap applies only to source compiler geometry; scalar query limits
+remain independently explicit. No source quota is increased on fallback.
+
+`compile_with_boundary` exposes an optional post-attempt comparison observer
+with a detached mutable scratch assignment and the actual refusal reason. The
+retained true bits, faults, report flips and collected decisions are inaccessible
+to that mutation. Even an observer error with the same shape as a whitelisted
+preparation refusal propagates without retry. The core callback and literal
+compiler sites count actual work, including alternate dispatches. Per-call
+observations include failures, mark saturated counts as uncertifiable, and require quiescent
+source clones for attribution; results retain their own snapshot.
+
+Both pinned methods are qualified under this explicit Rust representation. The
+empty-operation positive-state fixture with zero preparation geometry reports
+one attempted preparation, one literal compilation and probability1, with both
+output amplitudes exactly1/sqrt(2). The MZ/CONTROL/MX rule `1 + record_bit` fixture
+reports one rule collection before the boundary and one literal compilation
+with zero replay, retaining exact probability and phase-sensitive amplitudes
+when the caller Arc and scratch records/faults/report flips are mutated. Both
+compiler strategies and additional metadata cases are covered. Rust rejects this
+controlled-odd-phase declaration structurally; it does not reproduce Native's
+private prepared-plan, normal/resource dictionaries or rule-evaluation ABI.
+
+The six additional tests also cover actual prepared success, all four record
+words and Pauli faults/report flips for affine `1 + 6*record_bit`, non-dyadic
+masses with signed readouts and Pauli faults,128 correlated two-wire feedback/
+report-flip/readout-sign cases against an independent analytic oracle, fresh
+per-call observations, foreign ownership, invalid inputs, source
+hard caps, chronological callback failures, and refusal to retry query/boundary
+or literal failures. Actual compiled mutations replay a rule, repack modified
+scratch, compile a second literal branch or retry an unexpected boundary error;
+each is rejected, including cases with unchanged exact mass. Production bytes
+are restored before the final positive checks. The binding validator rejects
+joint ledger rewrites that substitute the old literal-only witnesses for the
+complete F2 transition/ownership/error-order closure.
+
+```sh
+cargo test --locked -p rmagna --test rust_snapshot_contracts -- --show-output
+python3 -B benchmarks/magna_reproduction/remaining_contracts.py check
+python3 -I -m unittest discover -s benchmarks/magna_reproduction -p 'test_*.py'
+```
+
+The ledger now records346 verified /4 partial /2 unmapped original methods,
+with the original352-method denominator unchanged. The six remaining methods
+belong to [F3 #1341](https://github.com/nzy1997/rust-qec/issues/1341); no unrelated
+method is promoted and no full Python/private-object or paper-performance parity
+is asserted by F2.

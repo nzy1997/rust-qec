@@ -2234,3 +2234,801 @@ fn compact_noise_empty_report_schedule_never_consumes_input_rows() {
     assert!(stream.next().is_none());
     assert_eq!(pulls.load(Ordering::SeqCst), 0);
 }
+
+// Complete F2 ownership/refusal methods use the authoritative declared rule;
+// the legacy opaque-callback/literal witnesses above remain independent.
+fn fallback_positive_ket() -> rmagna::stabilizer::AffineKet {
+    rmagna::stabilizer::AffineKet::new(
+        bits(1, 0),
+        vec![bits(1, 1)],
+        rmagna::quadratic::QuadraticForm::new(0, vec![0], vec![bits(1, 0)]).unwrap(),
+        ScalarArithmetic::default().omega(0, -1).unwrap(),
+    )
+    .unwrap()
+}
+fn fallback_positive(strategy: CompilerStrategy, limits: OriginalLimits) -> OriginalAssignmentPlan {
+    let a = ScalarArithmetic::default();
+    let initial = fallback_positive_ket();
+    OriginalAssignmentPlan::from_owned(
+        OriginalInstrument::new(vec![0], vec![0], initial, vec![], vec![], limits, &a).unwrap(),
+        strategy,
+        a,
+    )
+}
+fn fallback_declared(
+    slope: i32,
+    strategy: CompilerStrategy,
+    nonlinear: bool,
+    limits: OriginalLimits,
+) -> OriginalAssignmentPlan {
+    let a = ScalarArithmetic::default();
+    let l = ControlRuleLimits::default();
+    let bit = ControlExpression::record("m".into(), l).unwrap();
+    let exponent = ControlExpression::compose(
+        ControlOperator::Add,
+        vec![
+            ControlExpression::constant(1),
+            ControlExpression::compose(
+                ControlOperator::Multiply,
+                vec![ControlExpression::constant(slope), bit.clone()],
+                l,
+            )
+            .unwrap(),
+        ],
+        l,
+    )
+    .unwrap();
+    let when = if nonlinear {
+        ControlExpression::compose(ControlOperator::And, vec![bit.clone(), bit], l).unwrap()
+    } else {
+        ControlExpression::constant(1)
+    };
+    let declaration = OriginalDeclaredControl::new(
+        "c".into(),
+        vec!["m".into()],
+        "owned-rule-v1".into(),
+        ControlRule::new(
+            vec![ControlGate::new(ControlGateKind::T, vec![0], Some(exponent), when, l).unwrap()],
+            l,
+        )
+        .unwrap(),
+    )
+    .unwrap();
+    // The independently declared source has the same positive ket, MZ/CONTROL/MX
+    // operations and rule 1 + record_bit as the pinned original refusal method.
+    let ir = OriginalInstrument::new_with_declared_controls(
+        vec![0],
+        vec![0],
+        fallback_positive_ket(),
+        vec![
+            OriginalOperation {
+                id: "m".into(),
+                gate: OriginalGate::Measure {
+                    factors: vec![(0, OriginalPauli::Z)],
+                    inverted: false,
+                    record: "m".into(),
+                },
+            },
+            OriginalOperation {
+                id: "c".into(),
+                gate: OriginalGate::Control,
+            },
+            OriginalOperation {
+                id: "n".into(),
+                gate: OriginalGate::Measure {
+                    factors: vec![(0, OriginalPauli::X)],
+                    inverted: false,
+                    record: "n".into(),
+                },
+            },
+        ],
+        vec![declaration],
+        limits,
+        &a,
+    )
+    .unwrap();
+    OriginalAssignmentPlan::from_owned(ir, strategy, a)
+}
+fn fallback_options() -> OriginalAssignmentExecutionOptions<'static> {
+    OriginalAssignmentExecutionOptions {
+        max_structure_geometry_words: 0,
+        ..Default::default()
+    }
+}
+#[test]
+fn original_opt_in_preparation_refusal_compiles_the_empty_positive_branch_once() {
+    let a = ScalarArithmetic::default();
+    for strategy in [
+        CompilerStrategy::ParityCopies,
+        CompilerStrategy::SharedCommutingLayer,
+    ] {
+        let source = fallback_positive(strategy, Default::default());
+        let expected = source.compile(OriginalAssignment::default()).unwrap();
+        let mut executor = source.executor(
+            OriginalAssignmentExecutionPolicy::PrepareOrLiteral,
+            fallback_options(),
+        );
+        assert_eq!(
+            executor.execution_policy(),
+            OriginalAssignmentExecutionPolicy::PrepareOrLiteral
+        );
+        assert_eq!(
+            source.execution_policy(),
+            OriginalAssignmentExecutionPolicy::LiteralPerAssignment
+        );
+        let found = executor.compile(OriginalAssignment::default()).unwrap();
+        assert_eq!(
+            found.route(),
+            OriginalAssignmentExecutionRoute::PreparationFallback
+        );
+        assert!(
+            matches!(found.fallback_reason(), Some(OriginalAssignmentFallbackReason::PreparationGeometry {
+            limit:0,required }) if *required > 0)
+        );
+        assert_eq!(
+            found.literal_certificate().unwrap().to_json(),
+            expected.to_json()
+        );
+        assert_eq!(found.probability(), &ExactScalar::one());
+        for y in 0..2 {
+            assert_eq!(
+                found
+                    .literal_certificate()
+                    .unwrap()
+                    .branch()
+                    .amplitude(&bits(1, y), 256, &a)
+                    .unwrap(),
+                a.omega(0, -1).unwrap()
+            );
+        }
+        println!("F2 empty positive exact mass/amplitudes matched before work assertions");
+        assert_eq!(
+            found.statistics(),
+            OriginalAssignmentExecutionStatistics {
+                preparation_attempts: 1,
+                literal_compilation_attempts: 1,
+                literal_compilations: 1,
+                ..Default::default()
+            }
+        );
+        assert_eq!(executor.statistics(), found.statistics());
+        println!(
+            "F2 preparation budget {strategy:?}: reason={:?}; work={:?}; probability=1; both branch amplitudes=1/sqrt(2)",
+            found.fallback_reason(),
+            found.statistics()
+        );
+        // The same source/options with an explicit literal policy never prepare.
+        let mut literal = source.executor(
+            OriginalAssignmentExecutionPolicy::LiteralPerAssignment,
+            fallback_options(),
+        );
+        let found = literal.compile(OriginalAssignment::default()).unwrap();
+        assert_eq!(found.route(), OriginalAssignmentExecutionRoute::Literal);
+        assert!(found.fallback_reason().is_none());
+        assert_eq!(found.statistics().preparation_attempts, 0);
+        assert_eq!(found.statistics().literal_compilations, 1);
+        assert_eq!(
+            found.literal_certificate().unwrap().to_json(),
+            expected.to_json()
+        );
+    }
+}
+#[test]
+fn original_opt_in_odd_phase_refusal_keeps_packed_inputs_and_collected_rule() {
+    let a = ScalarArithmetic::default();
+    for strategy in [
+        CompilerStrategy::ParityCopies,
+        CompilerStrategy::SharedCommutingLayer,
+    ] {
+        for with_metadata in [false, true] {
+            let source = fallback_declared(1, strategy, false, Default::default());
+            let mut original = Arc::new(OriginalAssignment {
+                true_values: vec![("m".into(), true), ("n".into(), false)],
+                faults: if with_metadata {
+                    vec![OriginalFault {
+                        after: "m".into(),
+                        wire: 0,
+                        pauli: OriginalPauli::Y,
+                    }]
+                } else {
+                    vec![]
+                },
+                report_flips: if with_metadata {
+                    vec!["m".into(), "n".into(), "m".into()]
+                } else {
+                    vec![]
+                },
+            });
+            let expected = source.compile(Arc::clone(&original)).unwrap();
+            let boundary_calls = AtomicUsize::new(0);
+            let mut executor = source.executor(
+                OriginalAssignmentExecutionPolicy::PrepareOrLiteral,
+                Default::default(),
+            );
+            let found = executor
+                .compile_with_boundary(Arc::clone(&original), |scratch, reason| {
+                    boundary_calls.fetch_add(1, Ordering::SeqCst);
+                    assert_eq!(
+                        reason,
+                        Some(&OriginalAssignmentFallbackReason::ControlledOddPhase {
+                            operation: "c".into()
+                        })
+                    );
+                    scratch.true_values[0].1 = false;
+                    scratch.true_values[1].1 = true;
+                    scratch.faults = vec![OriginalFault {
+                        after: "c".into(),
+                        wire: 0,
+                        pauli: OriginalPauli::X,
+                    }];
+                    scratch.report_flips = vec!["m".into()];
+                    *Arc::get_mut(&mut original).expect("input Arc released before boundary") =
+                        scratch.clone();
+                    Ok(())
+                })
+                .unwrap();
+            assert_eq!(boundary_calls.load(Ordering::SeqCst), 1);
+            assert_eq!(
+                found.route(),
+                OriginalAssignmentExecutionRoute::PreparationFallback
+            );
+            assert_eq!(found.probability(), expected.probability());
+            println!("F2 exact mass matched before ownership/work assertions");
+            assert_eq!(
+                found.literal_certificate().unwrap().to_json(),
+                expected.to_json()
+            );
+            assert_eq!(found.assignment().true_values[0], ("m".into(), true));
+            assert_eq!(found.decisions()[0].inputs.entries(), &[("m".into(), true)]);
+            assert_eq!(found.decisions().len(), 1);
+            assert_eq!(
+                found.statistics(),
+                OriginalAssignmentExecutionStatistics {
+                    preparation_attempts: 1,
+                    control_evaluations: 1,
+                    control_completions: 1,
+                    literal_compilation_attempts: 1,
+                    literal_compilations: 1,
+                    boundary_observations: 1,
+                    ..Default::default()
+                }
+            );
+            for y in 0..2 {
+                let amplitude = found
+                    .literal_certificate()
+                    .unwrap()
+                    .branch()
+                    .amplitude(&bits(1, y), 1024, &a)
+                    .unwrap();
+                assert_eq!(
+                    amplitude,
+                    expected.branch().amplitude(&bits(1, y), 1024, &a).unwrap()
+                );
+                if !with_metadata {
+                    assert_eq!(amplitude, a.omega(2, -3).unwrap());
+                }
+            }
+            let mutated = source.compile(Arc::clone(&original)).unwrap();
+            assert_ne!(
+                mutated.to_json(),
+                expected.to_json(),
+                "mutated inputs must be distinguishable even when their mass agrees"
+            );
+            // Returned observations are owned and do not include later oracle work.
+            assert_eq!(found.statistics().control_evaluations, 1);
+            println!(
+                "F2 odd phase {strategy:?} metadata={with_metadata}: reason={:?}; work={:?}; frozen exact branch and probability match; zero rule replay",
+                found.fallback_reason(),
+                found.statistics()
+            );
+        }
+    }
+}
+#[test]
+fn original_opt_in_global_success_matches_literal_without_literal_compilation() {
+    for strategy in [
+        CompilerStrategy::ParityCopies,
+        CompilerStrategy::SharedCommutingLayer,
+    ] {
+        let source = fallback_positive(strategy, Default::default());
+        let mut executor = source.executor(
+            OriginalAssignmentExecutionPolicy::PrepareOrLiteral,
+            Default::default(),
+        );
+        let value = executor.compile(OriginalAssignment::default()).unwrap();
+        assert_eq!(
+            value.route(),
+            OriginalAssignmentExecutionRoute::PreparedGlobal
+        );
+        assert!(value.literal_certificate().is_none() && value.fallback_reason().is_none());
+        assert_eq!(value.probability(), &ExactScalar::one());
+        assert_eq!(
+            value.statistics(),
+            OriginalAssignmentExecutionStatistics {
+                preparation_attempts: 1,
+                prepared_sources: 1,
+                prepared_queries: 1,
+                prepared_evaluations: 1,
+                ..Default::default()
+            }
+        );
+        let source = fallback_declared(6, strategy, false, Default::default());
+        let mut executor = source.executor(
+            OriginalAssignmentExecutionPolicy::PrepareOrLiteral,
+            Default::default(),
+        );
+        for word in 0..4 {
+            for pauli in [
+                OriginalPauli::I,
+                OriginalPauli::X,
+                OriginalPauli::Y,
+                OriginalPauli::Z,
+            ] {
+                for flip in [false, true] {
+                    let input = OriginalAssignment {
+                        true_values: vec![("m".into(), word & 1 != 0), ("n".into(), word & 2 != 0)],
+                        faults: vec![OriginalFault {
+                            after: "m".into(),
+                            wire: 0,
+                            pauli,
+                        }],
+                        report_flips: if flip { vec!["m".into()] } else { vec![] },
+                    };
+                    let expected = source.compile(input.clone()).unwrap();
+                    let found = executor.compile(input).unwrap();
+                    assert_eq!(
+                        found.route(),
+                        OriginalAssignmentExecutionRoute::PreparedGlobal
+                    );
+                    assert_eq!(found.probability(), expected.probability());
+                    assert_eq!(found.decisions(), expected.branch().decisions());
+                    assert_eq!(
+                        found.statistics(),
+                        OriginalAssignmentExecutionStatistics {
+                            preparation_attempts: 1,
+                            prepared_sources: 1,
+                            prepared_queries: 1,
+                            prepared_evaluations: 1,
+                            control_evaluations: 1,
+                            control_completions: 1,
+                            ..Default::default()
+                        }
+                    );
+                }
+            }
+        }
+    }
+    // Analytic single-wire masses distinguish true/reported coordinates, signed
+    // readouts and faults. X commutes with MX; Y and Z interchange its masses.
+    for strategy in [
+        CompilerStrategy::ParityCopies,
+        CompilerStrategy::SharedCommutingLayer,
+    ] {
+        for inverted in [false, true] {
+            let raw = instrument(1, None, None);
+            let mut operations = raw.operations().to_vec();
+            if let OriginalGate::Measure { inverted: flag, .. } =
+                &mut operations.last_mut().unwrap().gate
+            {
+                *flag = inverted;
+            } else {
+                panic!("expected original MX fixture");
+            }
+            let source = OriginalAssignmentPlan::from_owned(
+                raw.with_operations(operations, &ScalarArithmetic::default())
+                    .unwrap(),
+                strategy,
+                ScalarArithmetic::default(),
+            );
+            let mut executor = source.executor(
+                OriginalAssignmentExecutionPolicy::PrepareOrLiteral,
+                Default::default(),
+            );
+            for high in [false, true] {
+                for flip in [false, true] {
+                    for pauli in [
+                        OriginalPauli::I,
+                        OriginalPauli::X,
+                        OriginalPauli::Y,
+                        OriginalPauli::Z,
+                    ] {
+                        let found = executor
+                            .compile(OriginalAssignment {
+                                true_values: vec![("m".into(), !high ^ inverted)],
+                                faults: vec![fault(pauli)],
+                                report_flips: if flip { vec!["m".into()] } else { vec![] },
+                            })
+                            .unwrap();
+                        let swapped = matches!(pauli, OriginalPauli::Y | OriginalPauli::Z);
+                        assert_eq!(found.probability(), &mass(high ^ swapped));
+                        assert_eq!(
+                            found.route(),
+                            OriginalAssignmentExecutionRoute::PreparedGlobal
+                        );
+                        assert_eq!(found.statistics().literal_compilation_attempts, 0);
+                    }
+                }
+            }
+        }
+    }
+    // A separate measured wire drives T^(1+2*reported_m) on |+>. Its MX mass
+    // changes with feedback, unlike the pinned single-wire 1/4 fixture. The
+    // independent oracle is one fair MZ times (1 +/- 1/sqrt(2))/2.
+    let a = ScalarArithmetic::default();
+    let l = ControlRuleLimits::default();
+    for strategy in [
+        CompilerStrategy::ParityCopies,
+        CompilerStrategy::SharedCommutingLayer,
+    ] {
+        for inverted_m in [false, true] {
+            for inverted_n in [false, true] {
+                let exponent = ControlExpression::compose(
+                    ControlOperator::Add,
+                    vec![
+                        ControlExpression::constant(1),
+                        ControlExpression::compose(
+                            ControlOperator::Multiply,
+                            vec![
+                                ControlExpression::constant(2),
+                                ControlExpression::record("m".into(), l).unwrap(),
+                            ],
+                            l,
+                        )
+                        .unwrap(),
+                    ],
+                    l,
+                )
+                .unwrap();
+                let declaration = OriginalDeclaredControl::new(
+                    "c".into(),
+                    vec!["m".into()],
+                    "correlated-v1".into(),
+                    ControlRule::new(
+                        vec![
+                            ControlGate::new(
+                                ControlGateKind::T,
+                                vec![1],
+                                Some(exponent),
+                                ControlExpression::constant(1),
+                                l,
+                            )
+                            .unwrap(),
+                        ],
+                        l,
+                    )
+                    .unwrap(),
+                )
+                .unwrap();
+                let initial = rmagna::stabilizer::AffineKet::new(
+                    bits(2, 0),
+                    vec![bits(2, 1), bits(2, 2)],
+                    rmagna::quadratic::QuadraticForm::new(
+                        0,
+                        vec![0, 0],
+                        vec![bits(2, 0), bits(2, 0)],
+                    )
+                    .unwrap(),
+                    a.omega(0, -2).unwrap(),
+                )
+                .unwrap();
+                let raw = OriginalInstrument::new_with_declared_controls(
+                    vec![0, 1],
+                    vec![0, 1],
+                    initial,
+                    vec![
+                        OriginalOperation {
+                            id: "m".into(),
+                            gate: OriginalGate::Measure {
+                                factors: vec![(0, OriginalPauli::Z)],
+                                inverted: inverted_m,
+                                record: "m".into(),
+                            },
+                        },
+                        OriginalOperation {
+                            id: "c".into(),
+                            gate: OriginalGate::Control,
+                        },
+                        OriginalOperation {
+                            id: "n".into(),
+                            gate: OriginalGate::Measure {
+                                factors: vec![(1, OriginalPauli::X)],
+                                inverted: inverted_n,
+                                record: "n".into(),
+                            },
+                        },
+                    ],
+                    vec![declaration],
+                    Default::default(),
+                    &a,
+                )
+                .unwrap();
+                let source = OriginalAssignmentPlan::from_owned(raw, strategy, a);
+                let mut executor = source.executor(
+                    OriginalAssignmentExecutionPolicy::PrepareOrLiteral,
+                    Default::default(),
+                );
+                for word in 0..4 {
+                    for flip_m in [false, true] {
+                        for flip_n in [false, true] {
+                            let m = word & 1 != 0;
+                            let n = word & 2 != 0;
+                            let input = OriginalAssignment {
+                                true_values: vec![("m".into(), m), ("n".into(), n)],
+                                report_flips: [("m", flip_m), ("n", flip_n)]
+                                    .into_iter()
+                                    .filter_map(|(r, on)| on.then_some(r.into()))
+                                    .collect(),
+                                ..Default::default()
+                            };
+                            let expected = a
+                                .multiply(&half(), &mass((n ^ inverted_n) == (m ^ flip_m)))
+                                .unwrap();
+                            assert_eq!(
+                                source.compile(input.clone()).unwrap().probability(),
+                                &expected
+                            );
+                            let found = executor.compile(input).unwrap();
+                            assert_eq!(found.probability(), &expected);
+                            assert_eq!(
+                                found.route(),
+                                OriginalAssignmentExecutionRoute::PreparedGlobal
+                            );
+                            assert_eq!(found.statistics().control_evaluations, 1);
+                            assert_eq!(found.statistics().literal_compilation_attempts, 0);
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+#[test]
+fn original_opt_in_fallback_propagates_non_whitelisted_and_boundary_errors_once() {
+    let source = fallback_positive(CompilerStrategy::ParityCopies, Default::default());
+    let errors = [
+        OriginalError::Scalar(rmagna::scalar::ScalarError::ExponentOverflow),
+        OriginalError::Unitary(rmagna::unitary::UnitaryError::IncompatibleProgram),
+        OriginalError::ResourceLimit {
+            option: "max_geometry_words",
+            limit: 0,
+            required: 2096,
+        },
+        OriginalError::DeclaredControl {
+            operation: "c".into(),
+            error: ControlRuleError::UnsupportedFeedback(
+                "controlled odd phase requires complex feedback",
+            ),
+        },
+    ];
+    for options in [
+        OriginalAssignmentExecutionOptions::default(),
+        fallback_options(),
+    ] {
+        for injected in &errors {
+            let mut executor =
+                source.executor(OriginalAssignmentExecutionPolicy::PrepareOrLiteral, options);
+            let calls = AtomicUsize::new(0);
+            let found = executor.compile_with_boundary(OriginalAssignment::default(), |_, _| {
+                calls.fetch_add(1, Ordering::SeqCst);
+                Err(injected.clone())
+            });
+            let error = match found {
+                Err(e) => e,
+                Ok(_) => panic!("boundary failure was swallowed"),
+            };
+            assert_eq!(error, *injected);
+            assert_eq!(calls.load(Ordering::SeqCst), 1);
+            assert_eq!(executor.statistics().literal_compilation_attempts, 0);
+            assert_eq!(executor.statistics().preparation_attempts, 1);
+            assert_eq!(executor.statistics().boundary_observations, 1);
+            assert!(!executor.statistics().saturated);
+        }
+    }
+    // Query/resource refusal is not a source-preparation geometry refusal.
+    let mut options = OriginalAssignmentExecutionOptions::default();
+    options.network.max_terms = 0;
+    let mut executor =
+        source.executor(OriginalAssignmentExecutionPolicy::PrepareOrLiteral, options);
+    let called = AtomicUsize::new(0);
+    assert!(
+        executor
+            .compile_with_boundary(OriginalAssignment::default(), |_, _| {
+                called.fetch_add(1, Ordering::SeqCst);
+                Ok(())
+            })
+            .is_err()
+    );
+    assert_eq!(called.load(Ordering::SeqCst), 0);
+    assert_eq!(executor.statistics().prepared_sources, 1);
+    assert_eq!(executor.statistics().literal_compilation_attempts, 0);
+    assert!(executor.last_fallback_reason().is_none());
+    // Initial-state admission fits 2112 words, but the measured two-record
+    // coherent dilation needs more. Neither cap selection may bypass this
+    // immutable source limit, even when preparation's separate cap is zero.
+    let mut limits = OriginalLimits::default();
+    limits.expansion.max_geometry_words = 2112;
+    let source = fallback_declared(6, CompilerStrategy::ParityCopies, false, limits);
+    for options in [
+        OriginalAssignmentExecutionOptions::default(),
+        fallback_options(),
+    ] {
+        let mut executor =
+            source.executor(OriginalAssignmentExecutionPolicy::PrepareOrLiteral, options);
+        assert!(matches!(executor.compile(OriginalAssignment {
+            true_values: vec![("m".into(), true),("n".into(), false)], ..Default::default()
+        }), Err(OriginalError::ResourceLimit {option:"max_geometry_words", required, ..}) if required>2112));
+        assert_eq!(executor.statistics().literal_compilation_attempts, 0);
+        assert!(executor.last_fallback_reason().is_none());
+    }
+    let source = fallback_declared(6, CompilerStrategy::ParityCopies, true, Default::default());
+    let mut executor = source.executor(
+        OriginalAssignmentExecutionPolicy::PrepareOrLiteral,
+        Default::default(),
+    );
+    assert!(matches!(
+        executor.compile(OriginalAssignment {
+            true_values: vec![("m".into(), true), ("n".into(), false)],
+            ..Default::default()
+        }),
+        Err(OriginalError::DeclaredControl {
+            error: ControlRuleError::UnsupportedFeedback(_),
+            ..
+        })
+    ));
+    assert_eq!(executor.statistics().control_evaluations, 1);
+    assert_eq!(executor.statistics().preparation_attempts, 1);
+    assert_eq!(executor.statistics().literal_compilation_attempts, 0);
+    assert!(executor.last_fallback_reason().is_none());
+}
+#[test]
+fn original_opt_in_fallback_validates_before_preparation_and_never_retries_literal_failure() {
+    let source = fallback_declared(1, CompilerStrategy::ParityCopies, false, Default::default());
+    let base = OriginalAssignment {
+        true_values: vec![("m".into(), true), ("n".into(), false)],
+        ..Default::default()
+    };
+    let mut inputs = vec![OriginalAssignment::default()];
+    let mut value = base.clone();
+    value.true_values.push(("m".into(), false));
+    inputs.push(value);
+    let mut value = base.clone();
+    value.report_flips.push("unknown".into());
+    inputs.push(value);
+    let mut value = base.clone();
+    value.faults.push(OriginalFault {
+        after: "unknown".into(),
+        wire: 0,
+        pauli: OriginalPauli::X,
+    });
+    inputs.push(value);
+    let mut value = base.clone();
+    value.faults.push(OriginalFault {
+        after: "m".into(),
+        wire: 99,
+        pauli: OriginalPauli::X,
+    });
+    inputs.push(value);
+    let mut executor = source.executor(
+        OriginalAssignmentExecutionPolicy::PrepareOrLiteral,
+        Default::default(),
+    );
+    for input in inputs {
+        assert!(executor.compile(input).is_err());
+        assert_eq!(
+            executor.statistics(),
+            OriginalAssignmentExecutionStatistics::default()
+        );
+    }
+    let foreign = fallback_declared(1, CompilerStrategy::ParityCopies, false, Default::default())
+        .compact(bits(2, 1), OriginalSharedFaults::empty())
+        .unwrap();
+    assert!(matches!(
+        executor.compile(foreign),
+        Err(OriginalError::Metadata {
+            kind: "compact assignment belongs to a different IR snapshot",
+            ..
+        })
+    ));
+    assert_eq!(
+        executor.statistics(),
+        OriginalAssignmentExecutionStatistics::default()
+    );
+    let local = source
+        .compact(bits(2, 1), OriginalSharedFaults::empty())
+        .unwrap();
+    assert_eq!(
+        executor.compile(local).unwrap().route(),
+        OriginalAssignmentExecutionRoute::PreparationFallback
+    );
+    assert_eq!(executor.statistics().literal_compilations, 1);
+    // A literal probability failure after the one successful branch compilation
+    // propagates, preserving the original pair cap rather than raising it.
+    let mut limits = OriginalLimits::default();
+    limits.completed.max_pairs = 0;
+    let source = fallback_positive(CompilerStrategy::ParityCopies, limits);
+    let expected = source.compile(OriginalAssignment::default()).err().unwrap();
+    let mut executor = source.executor(
+        OriginalAssignmentExecutionPolicy::PrepareOrLiteral,
+        fallback_options(),
+    );
+    let error = match executor.compile(OriginalAssignment::default()) {
+        Err(e) => e,
+        Ok(_) => panic!("literal pair cap was bypassed"),
+    };
+    assert_eq!(error, expected);
+    assert_eq!(executor.statistics().literal_compilation_attempts, 1);
+    assert_eq!(executor.statistics().literal_compilations, 1);
+    assert_eq!(executor.statistics().preparation_attempts, 1);
+    assert_eq!(source.input_key_generations(), 0);
+}
+
+#[test]
+fn original_opt_in_collection_preserves_chronological_errors_and_callback_failures() {
+    let a = ScalarArithmetic::default();
+    for dead_wire in [false, true] {
+        let calls = Arc::new(AtomicUsize::new(0));
+        let observed = Arc::clone(&calls);
+        let mut ops = vec![];
+        if dead_wire {
+            ops.extend([
+                OriginalOperation {
+                    id: "drop".into(),
+                    gate: OriginalGate::Discard(0),
+                },
+                OriginalOperation {
+                    id: "invalid".into(),
+                    gate: OriginalGate::Pauli {
+                        wire: 0,
+                        pauli: OriginalPauli::X,
+                    },
+                },
+            ]);
+        }
+        ops.push(OriginalOperation {
+            id: "c".into(),
+            gate: OriginalGate::Control,
+        });
+        let source = OriginalAssignmentPlan::from_owned(
+            OriginalInstrument::new(
+                vec![0],
+                if dead_wire { vec![] } else { vec![0] },
+                CliffordCircuit::computational(bits(1, 0)).unwrap(),
+                ops,
+                vec![OriginalControl {
+                    operation: "c".into(),
+                    parents: vec![],
+                    version: "fails-once".into(),
+                    callback: Arc::new(move |_| {
+                        observed.fetch_add(1, Ordering::SeqCst);
+                        Err(OriginalCallbackError::Failed("sentinel".into()))
+                    }),
+                }],
+                Default::default(),
+                &a,
+            )
+            .unwrap(),
+            CompilerStrategy::ParityCopies,
+            a,
+        );
+        let expected = source.compile(OriginalAssignment::default()).err().unwrap();
+        calls.store(0, Ordering::SeqCst);
+        let mut executor = source.executor(
+            OriginalAssignmentExecutionPolicy::PrepareOrLiteral,
+            fallback_options(),
+        );
+        let error = match executor.compile(OriginalAssignment::default()) {
+            Err(e) => e,
+            Ok(_) => panic!("collection failure was swallowed"),
+        };
+        assert_eq!(error, expected);
+        assert_eq!(calls.load(Ordering::SeqCst), usize::from(!dead_wire));
+        assert_eq!(
+            executor.statistics().control_evaluations,
+            u64::from(!dead_wire)
+        );
+        assert_eq!(executor.statistics().control_completions, 0);
+        assert_eq!(executor.statistics().preparation_attempts, 0);
+        assert_eq!(executor.statistics().literal_compilation_attempts, 0);
+        assert!(!executor.statistics().saturated);
+    }
+}
