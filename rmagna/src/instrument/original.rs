@@ -104,13 +104,16 @@ pub use assignment_stream::{
 mod assignment_plan;
 pub use assignment_plan::{
     OriginalAffineRecordProposal, OriginalAssignmentBatch, OriginalAssignmentBatchStatistics,
-    OriginalAssignmentCertificate, OriginalAssignmentExecutionPolicy, OriginalAssignmentInput,
-    OriginalAssignmentPlan, OriginalCachedAssignment, OriginalCompactAssignment,
-    OriginalCompactNoiseChannel, OriginalCompactNoiseLayout, OriginalIndependentRecordProposal,
-    OriginalNoiseAssignmentStream, OriginalNoiseCodeSelection, OriginalPackedAssignmentBatch,
-    OriginalPackedAssignmentPlan, OriginalPackedBatchOptions, OriginalPackedBatchStatistics,
-    OriginalProbabilityCache, OriginalProbabilityCacheStatistics, OriginalProposalDraw,
-    OriginalProposalDrawError, OriginalProposalOptions, OriginalSharedFaults, OriginalTraceCache,
+    OriginalAssignmentCertificate, OriginalAssignmentExecution, OriginalAssignmentExecutionOptions,
+    OriginalAssignmentExecutionPolicy, OriginalAssignmentExecutionRoute,
+    OriginalAssignmentExecutionStatistics, OriginalAssignmentExecutor,
+    OriginalAssignmentFallbackReason, OriginalAssignmentInput, OriginalAssignmentPlan,
+    OriginalCachedAssignment, OriginalCompactAssignment, OriginalCompactNoiseChannel,
+    OriginalCompactNoiseLayout, OriginalIndependentRecordProposal, OriginalNoiseAssignmentStream,
+    OriginalNoiseCodeSelection, OriginalPackedAssignmentBatch, OriginalPackedAssignmentPlan,
+    OriginalPackedBatchOptions, OriginalPackedBatchStatistics, OriginalProbabilityCache,
+    OriginalProbabilityCacheStatistics, OriginalProposalDraw, OriginalProposalDrawError,
+    OriginalProposalOptions, OriginalSharedFaults, OriginalTraceCache,
     OriginalTraceCacheStatistics,
 };
 
@@ -395,6 +398,7 @@ fn distinct(wires: &[OriginalWire]) -> bool {
 /// state before any callback. Assignment admission also precedes every callback.
 #[derive(Clone)]
 pub struct OriginalInstrument {
+    work: Arc<OriginalLiteralWork>,
     inputs: Vec<OriginalWire>,
     outputs: Vec<OriginalWire>,
     initial: AffineKet,
@@ -504,6 +508,7 @@ impl OriginalInstrument {
             return Err(invalid("unused control", name));
         }
         Ok(Self {
+            work: Arc::new(OriginalLiteralWork::default()),
             inputs,
             outputs,
             initial,
@@ -623,6 +628,15 @@ impl OriginalInstrument {
         strategy: CompilerStrategy,
         arithmetic: &ScalarArithmetic,
     ) -> Result<OriginalBranch, OriginalError> {
+        self.collect_assignment(assignment)?
+            .compile(self, strategy, arithmetic)
+    }
+    // Preserve chronological validation/callback/lifetime ordering, but stop
+    // before the quantum compiler. Fallback consumes this frozen lowering.
+    fn collect_assignment(
+        &self,
+        assignment: &OriginalAssignment,
+    ) -> Result<OriginalCollectedBranch, OriginalError> {
         let l = self.limits;
         self.admit_assignment_metadata(assignment)?;
         let values = self.assignment_true_values(assignment)?;
@@ -662,10 +676,12 @@ impl OriginalInstrument {
                         .map(|p| (p.clone(), reports[p.as_str()]))
                         .collect(),
                 };
+                self.work.record(&self.work.controls);
                 let gates = (c.callback)(&inputs).map_err(|error| OriginalError::Callback {
                     operation: op.id.clone(),
                     error,
                 })?;
+                self.work.record(&self.work.completed_controls);
                 emitted = emitted
                     .checked_add(gates.len())
                     .ok_or(OriginalError::DimensionMismatch)?;
@@ -733,9 +749,6 @@ impl OriginalInstrument {
             .map(|w| lower.live[w])
             .chain(lower.environment_slots.iter().copied())
             .collect();
-        let initial = with_zero_ancillas(&self.initial, lower.slots)?;
-        let unitary = UnitaryCircuit::new(lower.slots, lower.gates)?
-            .compile_stabilizer_with_path_limit(&initial, arithmetic, strategy, l.max_path_bits)?;
         let records = self
             .records
             .iter()
@@ -745,16 +758,82 @@ impl OriginalInstrument {
                 reported_value: reports[r.as_str()],
             })
             .collect();
-        Ok(OriginalBranch {
-            unitary,
+        Ok(OriginalCollectedBranch {
+            lower,
             keep,
-            fixed: lower.fixed,
-            outputs: self.outputs.clone(),
-            environment: lower.environment,
             records,
             decisions,
             origins,
-            limits: l,
+        })
+    }
+}
+// These counters live at the actual callback/compiler sites, including calls
+// made by alternate dispatch paths. They are not nominal executor labels.
+#[derive(Default)]
+struct OriginalLiteralWork {
+    controls: std::sync::atomic::AtomicU64,
+    completed_controls: std::sync::atomic::AtomicU64,
+    compilations: std::sync::atomic::AtomicU64,
+    completed_compilations: std::sync::atomic::AtomicU64,
+    saturated: std::sync::atomic::AtomicBool,
+}
+impl OriginalLiteralWork {
+    fn record(&self, counter: &std::sync::atomic::AtomicU64) {
+        use std::sync::atomic::Ordering::Relaxed;
+        if counter
+            .fetch_update(Relaxed, Relaxed, |v| v.checked_add(1))
+            .is_err()
+        {
+            self.saturated.store(true, Relaxed);
+        }
+    }
+    fn snapshot(&self) -> ([u64; 4], bool) {
+        use std::sync::atomic::Ordering::Relaxed;
+        (
+            [
+                self.controls.load(Relaxed),
+                self.completed_controls.load(Relaxed),
+                self.compilations.load(Relaxed),
+                self.completed_compilations.load(Relaxed),
+            ],
+            self.saturated.load(Relaxed),
+        )
+    }
+}
+struct OriginalCollectedBranch {
+    lower: BranchLowering,
+    keep: Vec<usize>,
+    records: Vec<OriginalRecord>,
+    decisions: Vec<OriginalDecision>,
+    origins: Vec<OriginalOrigin>,
+}
+impl OriginalCollectedBranch {
+    fn compile(
+        self,
+        source: &OriginalInstrument,
+        strategy: CompilerStrategy,
+        arithmetic: &ScalarArithmetic,
+    ) -> Result<OriginalBranch, OriginalError> {
+        let initial = with_zero_ancillas(&source.initial, self.lower.slots)?;
+        let circuit = UnitaryCircuit::new(self.lower.slots, self.lower.gates)?;
+        source.work.record(&source.work.compilations);
+        let unitary = circuit.compile_stabilizer_with_path_limit(
+            &initial,
+            arithmetic,
+            strategy,
+            source.limits.max_path_bits,
+        )?;
+        source.work.record(&source.work.completed_compilations);
+        Ok(OriginalBranch {
+            unitary,
+            keep: self.keep,
+            fixed: self.lower.fixed,
+            outputs: source.outputs.clone(),
+            environment: self.lower.environment,
+            records: self.records,
+            decisions: self.decisions,
+            origins: self.origins,
+            limits: source.limits,
         })
     }
 }

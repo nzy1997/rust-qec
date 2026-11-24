@@ -377,7 +377,7 @@
           "package": "rmagna",
           "target": "rust_snapshot_contracts",
           "test": "original_sampler_reconfiguration_is_an_explicit_fresh_preparation",
-          "source_sha256": "361e89079517d0b9295f04e320e85fc175f412f820aaec67368e60797a3c8d3c"
+          "source_sha256": "7766230f45528c4d60b7d7f1ffb218583a3568a44947fc635126feae8be44cc8"
         }
       ]
     },
@@ -876,7 +876,7 @@
           "package": "rmagna",
           "target": "rust_snapshot_contracts",
           "test": "original_partial_feedback_incidence_matches_all_162_queries",
-          "source_sha256": "361e89079517d0b9295f04e320e85fc175f412f820aaec67368e60797a3c8d3c"
+          "source_sha256": "7766230f45528c4d60b7d7f1ffb218583a3568a44947fc635126feae8be44cc8"
         }
       ]
     },
@@ -1448,7 +1448,7 @@
           "package": "rmagna",
           "target": "rust_snapshot_contracts",
           "test": "original_trace_cache_obeys_source_and_budget_identity_and_weak_eviction",
-          "source_sha256": "361e89079517d0b9295f04e320e85fc175f412f820aaec67368e60797a3c8d3c"
+          "source_sha256": "7766230f45528c4d60b7d7f1ffb218583a3568a44947fc635126feae8be44cc8"
         }
       ]
     },
@@ -2047,13 +2047,13 @@
           "package": "rmagna",
           "target": "rust_snapshot_contracts",
           "test": "original_compiled_misuses_and_legacy_private_entries_are_rejected_downstream",
-          "source_sha256": "361e89079517d0b9295f04e320e85fc175f412f820aaec67368e60797a3c8d3c"
+          "source_sha256": "7766230f45528c4d60b7d7f1ffb218583a3568a44947fc635126feae8be44cc8"
         },
         {
           "package": "rmagna",
           "target": "rust_snapshot_contracts",
           "test": "original_public_trace_boundary_is_available_as_a_typed_rust_service",
-          "source_sha256": "361e89079517d0b9295f04e320e85fc175f412f820aaec67368e60797a3c8d3c"
+          "source_sha256": "7766230f45528c4d60b7d7f1ffb218583a3568a44947fc635126feae8be44cc8"
         }
       ]
     },
@@ -2105,7 +2105,7 @@
           "package": "rmagna",
           "target": "rust_snapshot_contracts",
           "test": "original_unexpected_kernel_error_propagates_once_without_another_backend_attempt",
-          "source_sha256": "361e89079517d0b9295f04e320e85fc175f412f820aaec67368e60797a3c8d3c"
+          "source_sha256": "7766230f45528c4d60b7d7f1ffb218583a3568a44947fc635126feae8be44cc8"
         }
       ]
     },
@@ -2235,7 +2235,7 @@
           "package": "rmagna",
           "target": "rust_snapshot_contracts",
           "test": "original_noise_layout_rejects_all_four_bad_code_rows_and_cancels_duplicate_reports",
-          "source_sha256": "361e89079517d0b9295f04e320e85fc175f412f820aaec67368e60797a3c8d3c"
+          "source_sha256": "7766230f45528c4d60b7d7f1ffb218583a3568a44947fc635126feae8be44cc8"
         }
       ]
     },
@@ -2248,7 +2248,7 @@
           "package": "rmagna",
           "target": "rust_snapshot_contracts",
           "test": "original_compact_batch_retains_owner_while_callbacks_execute_on_every_assignment",
-          "source_sha256": "361e89079517d0b9295f04e320e85fc175f412f820aaec67368e60797a3c8d3c"
+          "source_sha256": "7766230f45528c4d60b7d7f1ffb218583a3568a44947fc635126feae8be44cc8"
         }
       ]
     },
@@ -2261,13 +2261,13 @@
           "package": "rmagna",
           "target": "rust_snapshot_contracts",
           "test": "original_shared_fault_group_keeps_records_report_errors_and_independent_snapshots",
-          "source_sha256": "361e89079517d0b9295f04e320e85fc175f412f820aaec67368e60797a3c8d3c"
+          "source_sha256": "7766230f45528c4d60b7d7f1ffb218583a3568a44947fc635126feae8be44cc8"
         },
         {
           "package": "rmagna",
           "target": "rust_snapshot_contracts",
           "test": "original_noise_rows_snapshot_before_yield_and_share_true_record_inversions",
-          "source_sha256": "361e89079517d0b9295f04e320e85fc175f412f820aaec67368e60797a3c8d3c"
+          "source_sha256": "7766230f45528c4d60b7d7f1ffb218583a3568a44947fc635126feae8be44cc8"
         }
       ]
     },
@@ -2280,7 +2280,7 @@
           "package": "rmagna",
           "target": "rust_snapshot_contracts",
           "test": "original_probability_queries_generate_no_input_key_but_explicit_compile_does",
-          "source_sha256": "361e89079517d0b9295f04e320e85fc175f412f820aaec67368e60797a3c8d3c"
+          "source_sha256": "7766230f45528c4d60b7d7f1ffb218583a3568a44947fc635126feae8be44cc8"
         }
       ]
     },
@@ -2470,7 +2470,7 @@
           "package": "rmagna",
           "target": "rust_snapshot_contracts",
           "test": "original_ordinary_faults_are_copied_again_after_each_mutating_yield",
-          "source_sha256": "361e89079517d0b9295f04e320e85fc175f412f820aaec67368e60797a3c8d3c"
+          "source_sha256": "7766230f45528c4d60b7d7f1ffb218583a3568a44947fc635126feae8be44cc8"
         }
       ]
     },
@@ -2483,7 +2483,7 @@
           "package": "rmagna",
           "target": "rust_snapshot_contracts",
           "test": "original_no_feedback_stream_releases_all_sixty_four_consumed_assignments",
-          "source_sha256": "361e89079517d0b9295f04e320e85fc175f412f820aaec67368e60797a3c8d3c"
+          "source_sha256": "7766230f45528c4d60b7d7f1ffb218583a3568a44947fc635126feae8be44cc8"
         }
       ]
     },
@@ -2547,7 +2547,7 @@
           "package": "rmagna",
           "target": "rust_snapshot_contracts",
           "test": "original_empty_fault_sharing_cannot_bypass_foreign_snapshot_validation",
-          "source_sha256": "361e89079517d0b9295f04e320e85fc175f412f820aaec67368e60797a3c8d3c"
+          "source_sha256": "7766230f45528c4d60b7d7f1ffb218583a3568a44947fc635126feae8be44cc8"
         }
       ]
     },
@@ -2560,37 +2560,95 @@
           "package": "rmagna",
           "target": "rust_snapshot_contracts",
           "test": "original_certificate_keeps_both_captured_inputs_before_the_evaluation_kernel_returns",
-          "source_sha256": "361e89079517d0b9295f04e320e85fc175f412f820aaec67368e60797a3c8d3c"
+          "source_sha256": "7766230f45528c4d60b7d7f1ffb218583a3568a44947fc635126feae8be44cc8"
         }
       ]
     },
     {
       "id": "test_native_global_ownership.NativeGlobalOwnershipTests.test_compile_counts_preparation_fallback_once",
-      "status": "partial",
-      "contract": "Explicit LiteralPerAssignment policy compiles the admitted source once with no structural preparation attempt; exact values and amplitudes are checked.",
+      "status": "verified",
+      "contract": "Opt-in PrepareOrLiteral attempts actual coherent-source preparation under a separate zero geometry cap, then consumes frozen lowering in exactly one actual literal compilation. Both compilers preserve the empty-operation positive-state probability1, full branch amplitudes and typed certificate. Actual factory-site observations and typed refusal/route replace Native private normal/resource dictionaries; default explicit literal and all non-whitelisted/query/boundary/literal errors retain their own policy and quotas.",
       "rust_tests": [
         {
           "package": "rmagna",
           "target": "rust_snapshot_contracts",
           "test": "original_explicit_literal_policy_compiles_once_without_structural_preparation",
-          "source_sha256": "361e89079517d0b9295f04e320e85fc175f412f820aaec67368e60797a3c8d3c"
+          "source_sha256": "7766230f45528c4d60b7d7f1ffb218583a3568a44947fc635126feae8be44cc8"
+        },
+        {
+          "package": "rmagna",
+          "target": "rust_snapshot_contracts",
+          "test": "original_opt_in_collection_preserves_chronological_errors_and_callback_failures",
+          "source_sha256": "7766230f45528c4d60b7d7f1ffb218583a3568a44947fc635126feae8be44cc8"
+        },
+        {
+          "package": "rmagna",
+          "target": "rust_snapshot_contracts",
+          "test": "original_opt_in_fallback_propagates_non_whitelisted_and_boundary_errors_once",
+          "source_sha256": "7766230f45528c4d60b7d7f1ffb218583a3568a44947fc635126feae8be44cc8"
+        },
+        {
+          "package": "rmagna",
+          "target": "rust_snapshot_contracts",
+          "test": "original_opt_in_fallback_validates_before_preparation_and_never_retries_literal_failure",
+          "source_sha256": "7766230f45528c4d60b7d7f1ffb218583a3568a44947fc635126feae8be44cc8"
+        },
+        {
+          "package": "rmagna",
+          "target": "rust_snapshot_contracts",
+          "test": "original_opt_in_global_success_matches_literal_without_literal_compilation",
+          "source_sha256": "7766230f45528c4d60b7d7f1ffb218583a3568a44947fc635126feae8be44cc8"
+        },
+        {
+          "package": "rmagna",
+          "target": "rust_snapshot_contracts",
+          "test": "original_opt_in_preparation_refusal_compiles_the_empty_positive_branch_once",
+          "source_sha256": "7766230f45528c4d60b7d7f1ffb218583a3568a44947fc635126feae8be44cc8"
         }
-      ],
-      "remaining_gap": "The upstream max_structure_bytes=0 automatic Native-preparation fallback and its Python normal/resource dictionaries are not implemented by this API. Rust chooses literal execution explicitly; this is not full original-method verification."
+      ]
     },
     {
       "id": "test_native_global_ownership.NativeGlobalOwnershipTests.test_native_fallback_retains_values_packed_before_kernel",
-      "status": "partial",
-      "contract": "The original odd-phase control scenario uses captured input even when the kernel mutates caller values; one rule collection and no replay.",
+      "status": "verified",
+      "contract": "The original MZ/CONTROL/MX rule1+record_bit scenario uses the opt-in controlled-odd-phase preparation refusal. True bits,faults,report flips and one rule decision are frozen before a boundary mutates the original caller Arc and detached scratch. Fallback consumes that lowering once: exact probability,phase-sensitive branch amplitudes,records and owned certificate match an independent explicit-literal oracle. Actual source callback/compiler counts reject replay and repeated compilation. Rust structurally rejects the authoritative controlled-odd-phase family rather than reproducing Native private signature-workspace/rule_evaluations dictionaries.",
       "rust_tests": [
         {
           "package": "rmagna",
           "target": "rust_snapshot_contracts",
           "test": "original_literal_policy_retains_packed_values_and_never_replays_the_phase_rule",
-          "source_sha256": "361e89079517d0b9295f04e320e85fc175f412f820aaec67368e60797a3c8d3c"
+          "source_sha256": "7766230f45528c4d60b7d7f1ffb218583a3568a44947fc635126feae8be44cc8"
+        },
+        {
+          "package": "rmagna",
+          "target": "rust_snapshot_contracts",
+          "test": "original_opt_in_collection_preserves_chronological_errors_and_callback_failures",
+          "source_sha256": "7766230f45528c4d60b7d7f1ffb218583a3568a44947fc635126feae8be44cc8"
+        },
+        {
+          "package": "rmagna",
+          "target": "rust_snapshot_contracts",
+          "test": "original_opt_in_fallback_propagates_non_whitelisted_and_boundary_errors_once",
+          "source_sha256": "7766230f45528c4d60b7d7f1ffb218583a3568a44947fc635126feae8be44cc8"
+        },
+        {
+          "package": "rmagna",
+          "target": "rust_snapshot_contracts",
+          "test": "original_opt_in_fallback_validates_before_preparation_and_never_retries_literal_failure",
+          "source_sha256": "7766230f45528c4d60b7d7f1ffb218583a3568a44947fc635126feae8be44cc8"
+        },
+        {
+          "package": "rmagna",
+          "target": "rust_snapshot_contracts",
+          "test": "original_opt_in_global_success_matches_literal_without_literal_compilation",
+          "source_sha256": "7766230f45528c4d60b7d7f1ffb218583a3568a44947fc635126feae8be44cc8"
+        },
+        {
+          "package": "rmagna",
+          "target": "rust_snapshot_contracts",
+          "test": "original_opt_in_odd_phase_refusal_keeps_packed_inputs_and_collected_rule",
+          "source_sha256": "7766230f45528c4d60b7d7f1ffb218583a3568a44947fc635126feae8be44cc8"
         }
-      ],
-      "remaining_gap": "Rust executes this case literally by explicit policy; the original automatic Native fastpath-to-literal fallback and its private rule_evaluations counter remain unimplemented."
+      ]
     },
     {
       "id": "test_native_global_ownership.NativeGlobalOwnershipTests.test_same_immutable_plan_has_independent_concurrent_workspaces",
@@ -2653,7 +2711,7 @@
           "package": "rmagna",
           "target": "rust_snapshot_contracts",
           "test": "original_unpaired_environment_surrogate_rejects_at_the_shared_json_import_boundary",
-          "source_sha256": "361e89079517d0b9295f04e320e85fc175f412f820aaec67368e60797a3c8d3c"
+          "source_sha256": "7766230f45528c4d60b7d7f1ffb218583a3568a44947fc635126feae8be44cc8"
         }
       ]
     },
@@ -2666,7 +2724,7 @@
           "package": "rmagna",
           "target": "rust_snapshot_contracts",
           "test": "original_environment_unicode_nul_and_non_bmp_labels_survive_both_tensor_services",
-          "source_sha256": "361e89079517d0b9295f04e320e85fc175f412f820aaec67368e60797a3c8d3c"
+          "source_sha256": "7766230f45528c4d60b7d7f1ffb218583a3568a44947fc635126feae8be44cc8"
         }
       ]
     },
@@ -3809,7 +3867,7 @@
           "package": "rmagna",
           "target": "rust_snapshot_contracts",
           "test": "original_borrowed_and_owned_traces_keep_all_sixty_four_control_fault_event_queries",
-          "source_sha256": "361e89079517d0b9295f04e320e85fc175f412f820aaec67368e60797a3c8d3c"
+          "source_sha256": "7766230f45528c4d60b7d7f1ffb218583a3568a44947fc635126feae8be44cc8"
         }
       ],
       "remaining_gap": "Arbitrary cyclic/aliased Python annotation graphs and deepcopy alias identity are not representable in the typed OriginalGate API. No graph arena or Python-object compatibility has been implemented."
@@ -3823,7 +3881,7 @@
           "package": "rmagna",
           "target": "rust_snapshot_contracts",
           "test": "original_guarded_supplied_noise_retains_owned_actions_after_inputs_are_dropped",
-          "source_sha256": "361e89079517d0b9295f04e320e85fc175f412f820aaec67368e60797a3c8d3c"
+          "source_sha256": "7766230f45528c4d60b7d7f1ffb218583a3568a44947fc635126feae8be44cc8"
         }
       ],
       "remaining_gap": "Supplied arbitrary nested Python gate extra metadata is unsupported. Rust supplies checked categorical fault identities,not arbitrary Python gate dictionaries."
@@ -3850,7 +3908,7 @@
           "package": "rmagna",
           "target": "rust_snapshot_contracts",
           "test": "original_borrowed_and_owned_traces_keep_all_sixty_four_control_fault_event_queries",
-          "source_sha256": "361e89079517d0b9295f04e320e85fc175f412f820aaec67368e60797a3c8d3c"
+          "source_sha256": "7766230f45528c4d60b7d7f1ffb218583a3568a44947fc635126feae8be44cc8"
         }
       ],
       "remaining_gap": "Cyclic public Python metadata deepcopy and mutable prepared.matches identity have no direct typed graph implementation; source replacement creates a new explicit session token."
@@ -3941,7 +3999,7 @@
           "package": "rmagna",
           "target": "rust_snapshot_contracts",
           "test": "original_borrowed_and_owned_traces_keep_all_sixty_four_control_fault_event_queries",
-          "source_sha256": "361e89079517d0b9295f04e320e85fc175f412f820aaec67368e60797a3c8d3c"
+          "source_sha256": "7766230f45528c4d60b7d7f1ffb218583a3568a44947fc635126feae8be44cc8"
         }
       ]
     },
@@ -4301,19 +4359,19 @@
           "package": "rmagna",
           "target": "rust_snapshot_contracts",
           "test": "original_sparse_actions_match_all_hundred_dense_draws_and_remain_isolated",
-          "source_sha256": "361e89079517d0b9295f04e320e85fc175f412f820aaec67368e60797a3c8d3c"
+          "source_sha256": "7766230f45528c4d60b7d7f1ffb218583a3568a44947fc635126feae8be44cc8"
         },
         {
           "package": "rmagna",
           "target": "rust_snapshot_contracts",
           "test": "original_direct_sparse_action_table_owns_nested_factors_and_rejects_shape_errors",
-          "source_sha256": "361e89079517d0b9295f04e320e85fc175f412f820aaec67368e60797a3c8d3c"
+          "source_sha256": "7766230f45528c4d60b7d7f1ffb218583a3568a44947fc635126feae8be44cc8"
         },
         {
           "package": "rmagna",
           "target": "rust_snapshot_contracts",
           "test": "original_compiled_misuses_and_legacy_private_entries_are_rejected_downstream",
-          "source_sha256": "361e89079517d0b9295f04e320e85fc175f412f820aaec67368e60797a3c8d3c"
+          "source_sha256": "7766230f45528c4d60b7d7f1ffb218583a3568a44947fc635126feae8be44cc8"
         }
       ]
     },
@@ -4544,7 +4602,7 @@
           "package": "rmagna",
           "target": "rust_snapshot_contracts",
           "test": "original_parent_list_replacement_changes_source_identity_and_uses_new_callback_inputs",
-          "source_sha256": "361e89079517d0b9295f04e320e85fc175f412f820aaec67368e60797a3c8d3c"
+          "source_sha256": "7766230f45528c4d60b7d7f1ffb218583a3568a44947fc635126feae8be44cc8"
         }
       ]
     },
@@ -4570,19 +4628,19 @@
           "package": "rmagna",
           "target": "rust_snapshot_contracts",
           "test": "original_probability_queries_generate_no_input_key_but_explicit_compile_does",
-          "source_sha256": "361e89079517d0b9295f04e320e85fc175f412f820aaec67368e60797a3c8d3c"
+          "source_sha256": "7766230f45528c4d60b7d7f1ffb218583a3568a44947fc635126feae8be44cc8"
         },
         {
           "package": "rmagna",
           "target": "rust_snapshot_contracts",
           "test": "original_lazy_batches_capture_one_source_while_next_single_query_uses_replacement",
-          "source_sha256": "361e89079517d0b9295f04e320e85fc175f412f820aaec67368e60797a3c8d3c"
+          "source_sha256": "7766230f45528c4d60b7d7f1ffb218583a3568a44947fc635126feae8be44cc8"
         },
         {
           "package": "rmagna",
           "target": "rust_snapshot_contracts",
           "test": "original_borrowed_and_owned_traces_keep_all_sixty_four_control_fault_event_queries",
-          "source_sha256": "361e89079517d0b9295f04e320e85fc175f412f820aaec67368e60797a3c8d3c"
+          "source_sha256": "7766230f45528c4d60b7d7f1ffb218583a3568a44947fc635126feae8be44cc8"
         }
       ],
       "remaining_gap": "No arbitrary Python metadata mutation,metadata-keyed certificate LRU or cache_hit dictionary exists. Typed source/JSON isolation is witnessed,but the original complete metadata/cache method remains partial."
@@ -4596,13 +4654,13 @@
           "package": "rmagna",
           "target": "rust_snapshot_contracts",
           "test": "original_lazy_batches_capture_one_source_while_next_single_query_uses_replacement",
-          "source_sha256": "361e89079517d0b9295f04e320e85fc175f412f820aaec67368e60797a3c8d3c"
+          "source_sha256": "7766230f45528c4d60b7d7f1ffb218583a3568a44947fc635126feae8be44cc8"
         },
         {
           "package": "rmagna",
           "target": "rust_snapshot_contracts",
           "test": "original_probability_queries_generate_no_input_key_but_explicit_compile_does",
-          "source_sha256": "361e89079517d0b9295f04e320e85fc175f412f820aaec67368e60797a3c8d3c"
+          "source_sha256": "7766230f45528c4d60b7d7f1ffb218583a3568a44947fc635126feae8be44cc8"
         }
       ]
     },
@@ -5242,7 +5300,7 @@
           "package": "rmagna",
           "target": "rust_snapshot_contracts",
           "test": "original_compiled_misuses_and_legacy_private_entries_are_rejected_downstream",
-          "source_sha256": "361e89079517d0b9295f04e320e85fc175f412f820aaec67368e60797a3c8d3c"
+          "source_sha256": "7766230f45528c4d60b7d7f1ffb218583a3568a44947fc635126feae8be44cc8"
         }
       ]
     },

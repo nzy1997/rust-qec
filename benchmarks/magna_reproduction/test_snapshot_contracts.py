@@ -15,11 +15,30 @@ class SnapshotContractsTests(unittest.TestCase):
     def check(self, decisions=None):
         return contracts.check_decisions(decisions or self.decisions, self.ledger, self.manifest)
 
-    def test_all27_decisions_keep_six_partial_and_one_unmapped_gap_visible(self):
+    def test_all27_decisions_keep_four_partial_and_one_unmapped_gap_visible(self):
         result = self.check()
         self.assertEqual(result["methods"], 27)
-        self.assertEqual(result["decisions"], {"verified": 20, "partial": 6, "unmapped": 1})
+        self.assertEqual(result["decisions"], {"verified": 22, "partial": 4, "unmapped": 1})
         self.assertFalse(result["upstream_verified"])
+
+    def test_joint_ledger_rebinding_cannot_replace_fallback_with_legacy_literal_only(self):
+        legacy = {
+            "test_native_global_ownership.NativeGlobalOwnershipTests.test_compile_counts_preparation_fallback_once":
+                "original_explicit_literal_policy_compiles_once_without_structural_preparation",
+            "test_native_global_ownership.NativeGlobalOwnershipTests.test_native_fallback_retains_values_packed_before_kernel":
+                "original_literal_policy_retains_packed_values_and_never_replays_the_phase_rule",
+        }
+        for case, test in legacy.items():
+            with self.subTest(case=case):
+                decisions = copy.deepcopy(self.decisions)
+                ledger = copy.deepcopy(self.ledger)
+                row = next(r for r in decisions["methods"] if r["id"] == case)
+                witnesses = [w for w in row["rust_tests"] if w["test"] == test]
+                self.assertEqual(len(witnesses), 1)
+                row["rust_tests"] = witnesses
+                next(r for r in ledger["cases"] if r["id"] == case)["rust_tests"] = witnesses
+                with self.assertRaisesRegex(ValueError, "F2 transition/ownership/error-order"):
+                    contracts.check_decisions(decisions, ledger, self.manifest)
 
     def test_hidden_gap_promotions_and_architecture_exclusions_are_rejected(self):
         altered = copy.deepcopy(self.decisions)

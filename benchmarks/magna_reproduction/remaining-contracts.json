@@ -4,15 +4,15 @@
   "upstream_commit": "56847478c840395735146ef1e1ccdc3d8aedc10f",
   "parity_claim": "static_requirements_only",
   "ledger_snapshot": {
-    "verified": 344,
-    "partial": 6,
+    "verified": 346,
+    "partial": 4,
     "unmapped": 2
   },
   "category_counts": {
     "G": 0,
     "P": 0,
     "V": 0,
-    "E": 8,
+    "E": 6,
     "U": 0
   },
   "category_meanings": {
@@ -1126,92 +1126,6 @@
     }
   },
   "methods": [
-    {
-      "id": "test_native_global_ownership.NativeGlobalOwnershipTests.test_compile_counts_preparation_fallback_once",
-      "ledger_status": "partial",
-      "category": "E",
-      "issue": "R04",
-      "source": {
-        "path": "tests/core/test_native_global_ownership.py",
-        "source_sha256": "51cd28f9cf3d831bfc922feb72891f84e6a40e7f919a71ff46a4e5f7cd63fdf9",
-        "line": 27,
-        "end_line": 39
-      },
-      "method": {
-        "method_sha256": "f0038037d2545b8977412ae4983ad749d1f3b701d1171e080a823158e900e518",
-        "required_checks": [
-          "self.assertEqual(found.probability, expected.probability)",
-          "self.assertEqual(found.branch, expected.branch)",
-          "self.assertEqual(found.normal.certificates[0]['stage'], 'native_global_preparation')",
-          "self.assertTrue(found.resource.get('native_global_compile', False))",
-          "self.assertIsNone(sim._prepared.native_plan)",
-          "self.assertEqual(sim.execution_info['engine'], 'native')",
-          "self.assertEqual(sim.execution_info['literal_compilations'], 1)"
-        ],
-        "loops": [],
-        "module_helpers": [
-          "NativeGlobalOwnershipTests.instrument"
-        ],
-        "module_imports": [
-          "from concurrent.futures import ThreadPoolExecutor",
-          "from copy import deepcopy",
-          "from magna import _native",
-          "from magna.operations import Simulator, Options, InstrumentIR, StabilizerKet, SampleAssignment, ControlNode, PhaseFeedback, ControlExpression, ControlGate, ControlRule",
-          "from tests.support.operation_hooks import schedule_stats",
-          "from unittest.mock import patch",
-          "import unittest"
-        ]
-      },
-      "remaining_requirement": "The upstream max_structure_bytes=0 automatic Native-preparation fallback and its Python normal/resource dictionaries are not implemented by this API. Rust chooses literal execution explicitly; this is not full original-method verification.",
-      "assessment": "Explicit LiteralPerAssignment policy compiles the admitted source once with no structural preparation attempt; exact values and amplitudes are checked.",
-      "rust_owners": [
-        {
-          "path": "rmagna/tests/rust_snapshot_contracts.rs",
-          "anchor": "original_explicit_literal_policy_compiles_once_without_structural_preparation"
-        }
-      ]
-    },
-    {
-      "id": "test_native_global_ownership.NativeGlobalOwnershipTests.test_native_fallback_retains_values_packed_before_kernel",
-      "ledger_status": "partial",
-      "category": "E",
-      "issue": "R04",
-      "source": {
-        "path": "tests/core/test_native_global_ownership.py",
-        "source_sha256": "51cd28f9cf3d831bfc922feb72891f84e6a40e7f919a71ff46a4e5f7cd63fdf9",
-        "line": 41,
-        "end_line": 53
-      },
-      "method": {
-        "method_sha256": "3599b029aad18307b94bc533ea358f11a445f41fb40352cc3a99873005042ea3",
-        "required_checks": [
-          "self.assertEqual(sim.execution_info['literal_compilations'], 1)",
-          "self.assertEqual(schedule_stats(sim._prepared.native_plan.feedback)['rule_evaluations'], 0)",
-          "self.assertEqual(sim.probability(a), expected)"
-        ],
-        "loops": [],
-        "module_helpers": [
-          "NativeGlobalOwnershipTests.instrument"
-        ],
-        "module_imports": [
-          "from concurrent.futures import ThreadPoolExecutor",
-          "from copy import deepcopy",
-          "from magna import _native",
-          "from magna.operations import Simulator, Options, InstrumentIR, StabilizerKet, SampleAssignment, ControlNode, PhaseFeedback, ControlExpression, ControlGate, ControlRule",
-          "from tests.support.operation_hooks import schedule_stats",
-          "from unittest.mock import patch",
-          "import unittest"
-        ]
-      },
-      "remaining_requirement": "Rust executes this case literally by explicit policy; the original automatic Native fastpath-to-literal fallback and its private rule_evaluations counter remain unimplemented.",
-      "assessment": "The original odd-phase control scenario uses captured input even when the kernel mutates caller values; one rule collection and no replay.",
-      "rust_owners": [
-        {
-          "path": "rmagna/tests/rust_snapshot_contracts.rs",
-          "anchor": "original_literal_policy_retains_packed_values_and_never_replays_the_phase_rule"
-        }
-      ]
-    },
     {
       "id": "test_native_source_tools.NativeSourceToolsTests.test_source_resolution_rejects_absent_and_ambiguous_hooks",
       "ledger_status": "unmapped",

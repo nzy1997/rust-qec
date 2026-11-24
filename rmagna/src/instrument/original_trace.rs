@@ -153,6 +153,17 @@ impl OriginalInstrument {
         trace_limits: OriginalDeclaredTraceLimits,
         arithmetic: &ScalarArithmetic,
     ) -> Result<OriginalStaticTrace, OriginalError> {
+        self.compile_trace_with_preparation_limit(strategy, trace_limits, usize::MAX, arithmetic)
+    }
+    // A preparation-only geometry cap never changes the immutable source or
+    // the returned reference's independent query limits.
+    pub(in crate::instrument::original) fn compile_trace_with_preparation_limit(
+        &self,
+        strategy: CompilerStrategy,
+        trace_limits: OriginalDeclaredTraceLimits,
+        max_geometry_words: usize,
+        arithmetic: &ScalarArithmetic,
+    ) -> Result<OriginalStaticTrace, OriginalError> {
         let failure = |operation: &str, error| OriginalError::DeclaredControl {
             operation: operation.into(),
             error,
@@ -265,7 +276,10 @@ impl OriginalInstrument {
         let output_slots = self.outputs.iter().map(|w| lower.live[w]).collect();
         admit(
             "max_geometry_words",
-            self.limits.expansion.max_geometry_words,
+            self.limits
+                .expansion
+                .max_geometry_words
+                .min(max_geometry_words),
             16 * (lower.slots as u128 * (self.initial.columns().len() as u128 + 1).div_ceil(64)
                 + lower.slots as u128
                 + self.initial.columns().len() as u128

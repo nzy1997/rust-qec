@@ -79,12 +79,22 @@ struct Snapshot {
     input_key_generations: AtomicUsize,
     identity: Arc<()>,
 }
-/// The source is captured once; every assignment is then compiled literally.
-/// Resource refusals and unexpected errors propagate without another backend.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+/// Literal remains the default; preparation fallback is explicitly opted in
+/// through [`OriginalAssignmentPlan::executor`]. Neither policy retries errors
+/// from a caller boundary or from literal compilation.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub enum OriginalAssignmentExecutionPolicy {
+    #[default]
     LiteralPerAssignment,
+    PrepareOrLiteral,
 }
+#[path = "original_assignment_execution.rs"]
+mod execution;
+pub use execution::{
+    OriginalAssignmentExecution, OriginalAssignmentExecutionOptions,
+    OriginalAssignmentExecutionRoute, OriginalAssignmentExecutionStatistics,
+    OriginalAssignmentExecutor, OriginalAssignmentFallbackReason,
+};
 /// A prepared source identity, independent of the lifetime of the caller's IR.
 /// Clones share this identity. Constructing a new plan creates a new identity,
 /// even for a byte-for-byte equivalent source; compact assignments are local to
@@ -177,10 +187,13 @@ impl OriginalAssignmentPlan {
         Self::from_owned(instrument.clone(), strategy, arithmetic)
     }
     pub fn from_owned(
-        instrument: OriginalInstrument,
+        mut instrument: OriginalInstrument,
         strategy: CompilerStrategy,
         arithmetic: ScalarArithmetic,
     ) -> Self {
+        // A newly captured source session owns fresh observations; clones of
+        // this plan share them just as they share the immutable source.
+        instrument.work = Arc::new(OriginalLiteralWork::default());
         Self(Arc::new(Snapshot {
             instrument,
             strategy,
@@ -217,18 +230,26 @@ impl OriginalAssignmentPlan {
         self.probabilities([input.into()])
             .next_with_kernel(|assignment, branch, arithmetic| {
                 let value = kernel(&branch, &arithmetic)?;
-                let encoded = certificate::input_key_json(&assignment).to_string();
-                self.0.input_key_generations.fetch_add(1, Ordering::Relaxed);
-                let input_fingerprint = format!("{:x}", Sha256::digest(encoded.as_bytes()));
-                Ok(OriginalAssignmentCertificate::new(
-                    assignment,
-                    branch,
-                    value,
-                    input_fingerprint,
-                    Arc::clone(&self.0.identity),
-                ))
+                Ok(self.assignment_certificate(assignment, branch, value))
             })
             .expect("one input")
+    }
+    fn assignment_certificate(
+        &self,
+        assignment: OriginalAssignment,
+        branch: OriginalBranch,
+        value: ExactScalar,
+    ) -> OriginalAssignmentCertificate {
+        let encoded = certificate::input_key_json(&assignment).to_string();
+        self.0.input_key_generations.fetch_add(1, Ordering::Relaxed);
+        let input_fingerprint = format!("{:x}", Sha256::digest(encoded.as_bytes()));
+        OriginalAssignmentCertificate::new(
+            assignment,
+            branch,
+            value,
+            input_fingerprint,
+            Arc::clone(&self.0.identity),
+        )
     }
     /// Prepare a coherent trace from the captured source. Borrowed construction
     /// cloned that source; owned construction moved it. The returned trace is
@@ -323,6 +344,80 @@ impl OriginalAssignmentPlan {
         }
         Ok(())
     }
+    fn capture_input(
+        &self,
+        input: OriginalAssignmentInput,
+        previous_group: &mut Option<OriginalSharedFaults>,
+        statistics: &mut OriginalAssignmentBatchStatistics,
+    ) -> Result<OriginalAssignment, OriginalError> {
+        Ok(match input {
+            OriginalAssignmentInput::Ordinary(assignment) => {
+                *previous_group = None;
+                self.0.instrument.admit_assignment_metadata(&assignment)?;
+                statistics.fault_group_snapshots += 1;
+                (*assignment).clone()
+            }
+            OriginalAssignmentInput::Records(assignment) => {
+                *previous_group = None;
+                statistics.fault_group_snapshots += 1;
+                self.0.instrument.normalize_record_assignment(&assignment)?
+            }
+            OriginalAssignmentInput::Compact(assignment) => {
+                // Identity is checked before even looking at the shared
+                // empty-group address. Equal empty faults cannot bypass it.
+                if !Arc::ptr_eq(&self.0.identity, &assignment.owner) {
+                    return Err(invalid(
+                        "compact assignment belongs to a different IR snapshot",
+                        "",
+                    ));
+                }
+                if !previous_group
+                    .as_ref()
+                    .is_some_and(|last| last.shares_storage_with(&assignment.shared))
+                {
+                    *previous_group = Some(assignment.shared.clone());
+                    statistics.fault_group_snapshots += 1;
+                }
+                let metadata = self
+                    .records()
+                    .iter()
+                    .map(|r| 32 + r.len() as u128)
+                    .sum::<u128>()
+                    + assignment
+                        .shared
+                        .faults()
+                        .iter()
+                        .map(|f| 48 + f.after.len() as u128)
+                        .sum::<u128>()
+                    + assignment
+                        .shared
+                        .report_flips()
+                        .iter()
+                        .map(|r| 32 + r.len() as u128)
+                        .sum::<u128>();
+                admit(
+                    "max_metadata_bytes",
+                    self.0.instrument.limits.max_metadata_bytes,
+                    metadata,
+                )?;
+                OriginalAssignment {
+                    true_values: self
+                        .records()
+                        .iter()
+                        .enumerate()
+                        .map(|(j, name)| {
+                            (
+                                name.clone(),
+                                assignment.word.get(j).expect("validated record width"),
+                            )
+                        })
+                        .collect(),
+                    faults: assignment.shared.faults().to_vec(),
+                    report_flips: assignment.shared.report_flips().to_vec(),
+                }
+            }
+        })
+    }
     pub fn probabilities<I>(&self, inputs: I) -> OriginalAssignmentBatch<I::IntoIter>
     where
         I: IntoIterator,
@@ -374,82 +469,11 @@ where
         };
         self.statistics.inputs += 1;
         let result = (|| {
-            let assignment = match input.into() {
-                OriginalAssignmentInput::Ordinary(assignment) => {
-                    self.previous_group = None;
-                    self.plan
-                        .0
-                        .instrument
-                        .admit_assignment_metadata(&assignment)?;
-                    self.statistics.fault_group_snapshots += 1;
-                    (*assignment).clone()
-                }
-                OriginalAssignmentInput::Records(assignment) => {
-                    self.previous_group = None;
-                    self.statistics.fault_group_snapshots += 1;
-                    self.plan
-                        .0
-                        .instrument
-                        .normalize_record_assignment(&assignment)?
-                }
-                OriginalAssignmentInput::Compact(assignment) => {
-                    // Identity is checked before even looking at the shared
-                    // empty-group address. Equal empty faults cannot bypass it.
-                    if !Arc::ptr_eq(&self.plan.0.identity, &assignment.owner) {
-                        return Err(invalid(
-                            "compact assignment belongs to a different IR snapshot",
-                            "",
-                        ));
-                    }
-                    if !self
-                        .previous_group
-                        .as_ref()
-                        .is_some_and(|last| last.shares_storage_with(&assignment.shared))
-                    {
-                        self.previous_group = Some(assignment.shared.clone());
-                        self.statistics.fault_group_snapshots += 1;
-                    }
-                    let metadata = self
-                        .plan
-                        .records()
-                        .iter()
-                        .map(|r| 32 + r.len() as u128)
-                        .sum::<u128>()
-                        + assignment
-                            .shared
-                            .faults()
-                            .iter()
-                            .map(|f| 48 + f.after.len() as u128)
-                            .sum::<u128>()
-                        + assignment
-                            .shared
-                            .report_flips()
-                            .iter()
-                            .map(|r| 32 + r.len() as u128)
-                            .sum::<u128>();
-                    admit(
-                        "max_metadata_bytes",
-                        self.plan.0.instrument.limits.max_metadata_bytes,
-                        metadata,
-                    )?;
-                    OriginalAssignment {
-                        true_values: self
-                            .plan
-                            .records()
-                            .iter()
-                            .enumerate()
-                            .map(|(j, name)| {
-                                (
-                                    name.clone(),
-                                    assignment.word.get(j).expect("validated record width"),
-                                )
-                            })
-                            .collect(),
-                        faults: assignment.shared.faults().to_vec(),
-                        report_flips: assignment.shared.report_flips().to_vec(),
-                    }
-                }
-            };
+            let assignment = self.plan.capture_input(
+                input.into(),
+                &mut self.previous_group,
+                &mut self.statistics,
+            )?;
             let snapshot = &self.plan.0;
             let branch = snapshot.instrument.compile(
                 &assignment,
