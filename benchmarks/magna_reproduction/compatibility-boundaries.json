@@ -29,7 +29,14 @@
       "current_probability_cache": "exact_probability_values_keyed_by_source_session_and_compiled_physical_state",
       "current_certificate_json": "owned_export_not_a_metadata_keyed_branch_certificate_cache",
       "metadata_certificate_lru": "not_implemented",
+      "pinned_prepared_domain": "scoped_acyclic_nested_metadata_json_fingerprint_rejects_cycles_alias_identity_not_qualified",
       "if_selected": "define_graph_identity_and_nested_mutation_invalidation_before_caching_owned_branch_certificates"
+    },
+    "supplied_noise_lowering": {
+      "pinned_hook": "kind_and_first_qubit_projection_discards_extra_annotations",
+      "pinned_native_lowering": "validates_noise_action_input_but_retains_only_assignment_anchor",
+      "current_rust": "owned_physical_action_witness_is_distinct_from_literal_python_hook_parity",
+      "python_noise_draw_hook_adapter": "not_implemented"
     },
     "source_navigation": {
       "current": "manifest_relative_exact_paths_with_existence_hash_and_symlink_checks",
@@ -62,6 +69,10 @@
         "G1",
         "G2"
       ]
+    },
+    "N1": {
+      "capability": "pinned_noise_draw_hook_projection_validation_anchor_lowering_and_mutation_isolation_if_selected",
+      "depends_on": []
     },
     "S1": {
       "capability": "zero_unique_ambiguous_recursive_source_lookup_if_exact_compatibility_is_selected",
@@ -267,16 +278,15 @@
       },
       "original_obligations": [
         {
-          "id": "noise_extra_copy",
-          "requirement": "Lowering snapshots arbitrary nested gate extra metadata as well as physical guarded-noise actions.",
+          "id": "noise_hook_projection",
+          "requirement": "The original NoiseDraw/test-hook interface projects supplied gates to kind/first-qubit pairs, validates that Native boundary and returns stable anchor-only lowered operations after caller mutation. Extra annotations are discarded, not preserved.",
           "status": "not_implemented"
         }
       ],
       "boundary": "additional_compatibility_scope_not_selected",
       "support_status": "source_bound_subset_not_original_parity",
       "implementation_dependencies": [
-        "G1",
-        "G2"
+        "N1"
       ],
       "rust_witnesses": [
         {
@@ -287,9 +297,9 @@
         }
       ],
       "installed_boundary_witnesses": [],
-      "supported_contract": "Both causal strategies retain owned supplied categorical fault actions after caller replacement and program/source drop, preserving the exact physical -Z result.",
-      "unsupported_behavior": "Arbitrary gate dictionaries and nested Python extra annotations are not accepted or copied by the typed noise API.",
-      "rationale": "Physical fault identity/action ownership and arbitrary annotation ownership are distinct contracts; a new graph/domain adapter would be needed for the latter.",
+      "supported_contract": "Both Rust causal compilers own supplied categorical fault inputs and preserve the physical -Z result after caller replacement and source/program drop. This is a physical-action ownership witness, distinct from literal original Python hook/anchor lowering.",
+      "unsupported_behavior": "The original Python NoiseDraw/test-hook interface, kind/first-qubit projection, Native input validation and anchor-only lowered output are not exposed as that interface. The hook discards extra annotations; its mutation equality does not establish metadata retention or supplied-action compilation.",
+      "rationale": "Retain typed physical-action ownership without inventing original extra-copy semantics. Exact Python hook compatibility is separate N1 scope with no graph dependency; preserve the original partial status.",
       "support_sources": [
         {
           "path": "rmagna/tests/rust_snapshot_contracts.rs",
@@ -431,7 +441,7 @@
       "original_obligations": [
         {
           "id": "nested_metadata",
-          "requirement": "Public operations/branches retain arbitrary nested metadata, with a declared alias/cycle domain.",
+          "requirement": "Prepared operations/branches retain the scoped acyclic nested metadata; public IR cycle copying does not establish prepared/cached cycle support.",
           "status": "not_implemented"
         },
         {
@@ -440,8 +450,8 @@
           "status": "not_implemented"
         },
         {
-          "id": "certificate_graph_copy",
-          "requirement": "Returned cached branch certificates preserve metadata and isolate caller mutation, including aliases/cycles.",
+          "id": "certificate_metadata_copy",
+          "requirement": "Returned cached branch certificates preserve the scoped acyclic nested metadata and isolate caller mutation; alias identity is not asserted and cyclic prepared fingerprints are rejected.",
           "status": "not_implemented"
         },
         {
@@ -479,7 +489,7 @@
       ],
       "installed_boundary_witnesses": [],
       "supported_contract": "Returned certificate JSON is an owned export; explicit operation/initial replacements affect new sessions. OriginalProbabilityCache stores exact probability values for source-session/compiled-state keys while constructing fresh branches/callbacks.",
-      "unsupported_behavior": "No arbitrary annotation payload, metadata-only nested mutation invalidation, metadata-bearing branch-certificate LRU or original cache_hit dictionary semantics is implemented.",
+      "unsupported_behavior": "Scoped acyclic nested metadata preservation, nested mutation/prepared invalidation and metadata-keyed branch-certificate LRU are not implemented. Public IR/defer cycle copying does not qualify prepared/cached cycles: the pinned JSON fingerprint rejects them, and the scoped cache method asserts no alias identity.",
       "rationale": "Probability-value reuse and returned JSON isolation do not certify a metadata-sensitive certificate cache. Define graph identity/mutation and copy semantics before adding such a cache.",
       "support_sources": [
         {

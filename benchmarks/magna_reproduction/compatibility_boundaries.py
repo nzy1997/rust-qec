@@ -1,11 +1,13 @@
 """F3 source-bound decisions, deliberately separate from original parity."""
 from collections import Counter
+import ast
 import hashlib
 import json
 from pathlib import Path
 import runpy
 import subprocess
 import tempfile
+from types import SimpleNamespace
 
 import coverage_ledger as ledger_tools
 
@@ -21,12 +23,12 @@ OBLIGATIONS = {
     "recursive_lookup": "Recursive basename lookup rejects zero/multiple matches and returns the sole match.",
     "public_graph_copy": "Public deferral copies the entire annotation graph, preserving internal aliases/cycles while isolating caller mutation.",
     "owned_graph_transfer": "Owned deferral transfers mutable annotation leaves under an explicit caller-relinquishment contract.",
-    "noise_extra_copy": "Lowering snapshots arbitrary nested gate extra metadata as well as physical guarded-noise actions.",
+    "noise_hook_projection": "The original NoiseDraw/test-hook interface projects supplied gates to kind/first-qubit pairs, validates that Native boundary and returns stable anchor-only lowered operations after caller mutation. Extra annotations are discarded, not preserved.",
     "constructor_graph_copy": "Public IR construction preserves cross-operation aliases/cycles inside an isolated graph snapshot.",
     "mutable_prepared_matches": "Prepared snapshots detect nested mutable operation/initial/control changes in the public source.",
-    "nested_metadata": "Public operations/branches retain arbitrary nested metadata, with a declared alias/cycle domain.",
+    "nested_metadata": "Prepared operations/branches retain the scoped acyclic nested metadata; public IR cycle copying does not establish prepared/cached cycle support.",
     "metadata_identity": "Metadata-only edits participate in preparation/certificate identity and invalidate old metadata-bearing hits.",
-    "certificate_graph_copy": "Returned cached branch certificates preserve metadata and isolate caller mutation, including aliases/cycles.",
+    "certificate_metadata_copy": "Returned cached branch certificates preserve the scoped acyclic nested metadata and isolate caller mutation; alias identity is not asserted and cyclic prepared fingerprints are rejected.",
     "certificate_lru": "A bounded metadata-keyed branch-certificate LRU returns cache_hit and fresh metadata; a probability-value LRU is insufficient.",
     "extension_import": "Import of the CPython package without its compiled extension fails through the package loader.",
     "extension_build_hint": "The loader gives the original missing-extension/build-script diagnostic without misleading circular-import text.",
@@ -35,6 +37,7 @@ QUERY = "test_query_reuse.OwnershipAndDependencies."
 OPTIMIZATION = "test_simulator_optimization.OptimizationTests."
 SOURCE = "test_native_source_tools.NativeSourceToolsTests.test_source_resolution_rejects_absent_and_ambiguous_hooks"
 LOADER = "test_user_interface.MissingExtensionTests.test_import_without_native_extension_explains_how_to_build"
+NOISE = QUERY + "test_lowered_operations_are_owned_even_for_guarded_noise"
 BORROWED = "original_borrowed_and_owned_traces_keep_all_sixty_four_control_fault_event_queries"
 IR = "core/magna/ir.py"
 DEFER = "core/magna/deferred_feedback.py"
@@ -46,14 +49,14 @@ SPECS = {
     SOURCE: ("unmapped", ["recursive_lookup"], ["scripts/native_sources.py"], []),
     QUERY + "test_deferred_public_graph_isolation_and_owned_transfer": (
         "partial", ["public_graph_copy", "owned_graph_transfer"], [IR, DEFER, DEFERRED], [BORROWED]),
-    QUERY + "test_lowered_operations_are_owned_even_for_guarded_noise": (
-        "partial", ["noise_extra_copy"], [IR, "tests/support/file_hooks.py", LOWER,
+    NOISE: (
+        "partial", ["noise_hook_projection"], [IR, "tests/support/file_hooks.py", LOWER,
                                      "core/magna/native/compile/file_lowering.cpp"],
         ["original_guarded_supplied_noise_retains_owned_actions_after_inputs_are_dropped"]),
     QUERY + "test_public_ir_still_copies_arbitrary_graph_and_prepared_snapshot": (
         "partial", ["constructor_graph_copy", "mutable_prepared_matches"], [IR], [BORROWED]),
     OPTIMIZATION + "test_prepared_ir_nested_mutation_and_returned_snapshot": (
-        "partial", ["nested_metadata", "metadata_identity", "certificate_graph_copy", "certificate_lru"],
+        "partial", ["nested_metadata", "metadata_identity", "certificate_metadata_copy", "certificate_lru"],
         [IR, "core/magna/simulator.py", "core/magna/native/runtime/certificate_cache.hpp",
          "core/magna/native/bindings/certificate_cache_bindings.hpp"],
         ["original_probability_queries_generate_no_input_key_but_explicit_compile_does",
@@ -85,7 +88,14 @@ POLICIES = {
         "current_probability_cache": "exact_probability_values_keyed_by_source_session_and_compiled_physical_state",
         "current_certificate_json": "owned_export_not_a_metadata_keyed_branch_certificate_cache",
         "metadata_certificate_lru": "not_implemented",
+        "pinned_prepared_domain": "scoped_acyclic_nested_metadata_json_fingerprint_rejects_cycles_alias_identity_not_qualified",
         "if_selected": "define_graph_identity_and_nested_mutation_invalidation_before_caching_owned_branch_certificates",
+    },
+    "supplied_noise_lowering": {
+        "pinned_hook": "kind_and_first_qubit_projection_discards_extra_annotations",
+        "pinned_native_lowering": "validates_noise_action_input_but_retains_only_assignment_anchor",
+        "current_rust": "owned_physical_action_witness_is_distinct_from_literal_python_hook_parity",
+        "python_noise_draw_hook_adapter": "not_implemented",
     },
     "source_navigation": {
         "current": "manifest_relative_exact_paths_with_existence_hash_and_symlink_checks",
@@ -105,6 +115,7 @@ IMPLEMENTATION_PLAN = {
     "G1": {"capability": "explicit_metadata_graph_domain_alias_cycle_identity_and_budgets", "depends_on": []},
     "G2": {"capability": "public_copy_owned_transfer_nested_mutation_and_prepared_matching", "depends_on": ["G1"]},
     "G3": {"capability": "metadata_keyed_certificate_identity_lru_and_returned_graph_isolation", "depends_on": ["G1", "G2"]},
+    "N1": {"capability": "pinned_noise_draw_hook_projection_validation_anchor_lowering_and_mutation_isolation_if_selected", "depends_on": []},
     "S1": {"capability": "zero_unique_ambiguous_recursive_source_lookup_if_exact_compatibility_is_selected", "depends_on": []},
     "I1": {"capability": "explicit_cpython_distribution_loader_and_build_diagnostics_if_selected", "depends_on": []},
 }
@@ -217,7 +228,7 @@ def check_catalogue(catalogue, ledger, manifest, remaining, *, root=ROOT, upstre
                 and row["support_status"] == "source_bound_subset_not_original_parity",
                 f"unsupported compatibility support/parity status: {name}")
         require(row["implementation_dependencies"] == (
-            ["S1"] if name == SOURCE else ["I1"] if name == LOADER else
+            ["S1"] if name == SOURCE else ["I1"] if name == LOADER else ["N1"] if name == NOISE else
             ["G1", "G2", "G3"] if name.startswith(OPTIMIZATION) else ["G1", "G2"]),
             f"compatibility method implementation order changed: {name}")
         require(row["rust_witnesses"] == witnesses(root, required_tests),
@@ -251,13 +262,81 @@ def check_catalogue(catalogue, ledger, manifest, remaining, *, root=ROOT, upstre
                 upstream_verified=upstream is not None)
 
 
+def source_function(source, name, namespace):
+    functions = [node for node in ast.parse(source).body
+                 if isinstance(node, ast.FunctionDef) and node.name == name]
+    require(len(functions) == 1, f"expected one pinned source function: {name}")
+    exec(compile(ast.Module(body=functions, type_ignores=[]), f"<pinned {name}>", "exec"), namespace)
+    return namespace[name]
+
+
+def probe_source_semantics(hook_source, ir_source):
+    """Execute pinned pure Python up to, never through, the Native boundary."""
+    class BoundaryReached(Exception):
+        pass
+
+    payloads = []
+
+    def capture(*args):
+        payloads.append(args[3])
+        raise BoundaryReached
+
+    lower = source_function(hook_source, "lower", dict(
+        native_testing=SimpleNamespace(load=lambda: SimpleNamespace(lower_circuit_file=capture)),
+        _circuit_handle=lambda circuit: None))
+    gate = dict(kind="X", qubits=[1], extra={"nested": [2]})
+    cyclic = {}
+    cyclic["self"] = cyclic
+    for current in [gate, dict(kind="X", qubits=[1], extra=cyclic)]:
+        try:
+            lower(None, (0, 1), {}, SimpleNamespace(gates={"site": (current,)}))
+        except BoundaryReached:
+            pass
+        else:
+            raise ValueError("pinned hook did not reach the recording Native boundary")
+    gate["qubits"][0] = 99
+    gate["extra"]["nested"].append(7)
+    require(payloads == [(('site', (('X', 1),)),)] * 2,
+            "pinned hook must project kind/first-qubit and discard nested/cyclic extras")
+
+    fingerprint = source_function(ir_source, "fingerprint", dict(sha256=hashlib.sha256, json=json))
+    expected = hashlib.sha256(b'{"metadata":{"marks":[1]}}').hexdigest()
+    require(fingerprint({"metadata": {"marks": [1]}}) == expected,
+            "pinned acyclic metadata fingerprint changed")
+    require(fingerprint({"metadata": {"marks": [2]}}) != expected,
+            "pinned metadata-only mutation must change the fingerprint")
+    shared = {"marks": [1]}
+    require(fingerprint([shared, shared]) == fingerprint([{"marks": [1]}, {"marks": [1]}]),
+            "pinned JSON fingerprint must not encode alias identity")
+    cyclic_list = []
+    cyclic_list.append(cyclic_list)
+    for value in [cyclic, cyclic_list]:
+        try:
+            fingerprint({"metadata": value})
+        except ValueError as error:
+            require("Circular reference" in str(error), "pinned cycle rejection reason changed")
+        else:
+            raise ValueError("pinned prepared fingerprint unexpectedly accepts cyclic metadata")
+    return dict(scope="selected_pure_source_functions_no_native_or_simulator_execution",
+                noise_projection="kind_first_qubit_only_nested_and_cyclic_extras_discarded",
+                captured_payload_isolation="unchanged_after_caller_qubit_and_extra_mutation",
+                fingerprint="acyclic_metadata_sensitive_alias_identity_insensitive_dict_list_cycles_rejected",
+                native_anchor_lowering="source_bound_only_not_executed",
+                cached_certificate_execution="not_run_no_cyclic_certificate_qualification")
+
+
 def probe_boundaries(upstream=None):
     """Observe actual tool/OS boundaries, not a new source lookup or launcher."""
     upstream_lookup = None
+    semantics = "not_run"
     if upstream is not None:
         path = reference.relative_file(upstream, "scripts/native_sources.py")
         reference.verify_files(upstream, {"scripts/native_sources.py": reference.load_manifest()["upstream"]["files"]["scripts/native_sources.py"]})
         upstream_lookup = runpy.run_path(str(path))["native_source"]
+        files = reference.load_manifest()["upstream"]["files"]
+        reference.verify_files(upstream, {name: files[name] for name in ["tests/support/file_hooks.py", IR]})
+        semantics = probe_source_semantics((upstream / "tests/support/file_hooks.py").read_text(),
+                                          (upstream / IR).read_text())
     with tempfile.TemporaryDirectory(prefix="magna-compatibility-") as directory:
         root = Path(directory).resolve()
         body = b"root exact hook\n"
@@ -297,6 +376,7 @@ def probe_boundaries(upstream=None):
         else:
             raise ValueError("missing executable did not fail at the caller boundary")
     return dict(status="PASS", exact_paths="missing_rejected_unique_admitted_duplicate_basenames_distinct",
+                source_semantics=semantics,
                 upstream_recursive_lookup="zero_unique_ambiguous_pass" if upstream_lookup else "not_run",
                 missing_executable="caller_observed_FileNotFoundError_no_program_executed",
                 cpython_extension_import="not_implemented_not_qualified")

@@ -3884,7 +3884,7 @@
           "source_sha256": "6744df624a2896924dfac527223c685d4c6bf28cad9194931ffdabdc87a13dab"
         }
       ],
-      "remaining_gap": "Supplied arbitrary nested Python gate extra metadata is unsupported. Rust supplies checked categorical fault identities,not arbitrary Python gate dictionaries."
+      "remaining_gap": "The original Python NoiseDraw/test-hook projection, Native input validation and anchor-only lowered-output interface are not reproduced. Its hook discards extra annotations; mutation stability does not establish extra retention. Rust owns checked physical categorical actions through a distinct typed interface."
     },
     {
       "id": "test_query_reuse.OwnershipAndDependencies.test_ordered_distinct_dependencies_keep_callback_duplicates",
@@ -4643,7 +4643,7 @@
           "source_sha256": "6744df624a2896924dfac527223c685d4c6bf28cad9194931ffdabdc87a13dab"
         }
       ],
-      "remaining_gap": "No arbitrary Python metadata mutation,metadata-keyed certificate LRU or cache_hit dictionary exists. Typed source/JSON isolation is witnessed,but the original complete metadata/cache method remains partial."
+      "remaining_gap": "The scoped acyclic nested Python metadata mutation,metadata-keyed certificate LRU and cache_hit interface are not implemented. The pinned prepared fingerprint rejects cyclic metadata; its cache test does not assert alias identity. Typed source/JSON isolation is witnessed,but the complete original method remains partial."
     },
     {
       "id": "test_simulator_optimization.OptimizationTests.test_probability_batch_snapshot_and_zero_cache_budget",

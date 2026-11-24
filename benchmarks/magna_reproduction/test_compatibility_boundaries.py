@@ -11,6 +11,22 @@ import compatibility_boundaries as compatibility
 import remaining_contracts
 
 
+# Selected pinned pure functions. The real CLI extracts these functions from
+# hash-verified upstream files; these small fixtures let CI test probe behavior
+# without installing or importing the Native package.
+HOOK_SOURCE = """
+def lower(circuit, outputs, values, noise, *, feedback_plan=None):
+    native_testing.load().lower_circuit_file(
+        _circuit_handle(circuit), tuple(outputs), (),
+        tuple((oid, tuple((g['kind'], g['qubits'][0]) for g in gates)) for oid, gates in noise.gates.items()),
+        None)
+"""
+IR_SOURCE = """
+def fingerprint(value):
+    return sha256(json.dumps(value, sort_keys=True, separators=(',', ':'), default=str).encode()).hexdigest()
+"""
+
+
 class CompatibilityBoundaryTests(unittest.TestCase):
     def setUp(self):
         read = remaining_contracts.read_json
@@ -116,6 +132,8 @@ class CompatibilityBoundaryTests(unittest.TestCase):
             lambda d: d["policies"]["metadata_domain"].update(json_tree_annotation_api="implemented"),
             lambda d: d["policies"]["graph_model_if_selected"].update(status="implemented"),
             lambda d: d["policies"]["certificate_identity"].update(metadata_certificate_lru="implemented"),
+            lambda d: d["policies"]["certificate_identity"].update(pinned_prepared_domain="cyclic_cached_certificates_supported"),
+            lambda d: d["policies"]["supplied_noise_lowering"].update(pinned_hook="retains_arbitrary_extra"),
             lambda d: d["policies"]["installation"].update(cpython_extension_loader="implemented"),
             lambda d: d["policies"]["installation"].update(diagnostic_inside_missing_program=True),
             lambda d: d.update(parity_claim="all352_verified"),
@@ -130,10 +148,40 @@ class CompatibilityBoundaryTests(unittest.TestCase):
         graph = self.catalogue["policies"]["graph_model_if_selected"]
         self.assertEqual(graph["status"], "prospective_not_implemented")
         self.assertEqual(graph["rust_feasibility"], "cycles_and_aliases_are_possible_with_an_explicit_model")
-        for node in ["G2", "G3", "S1", "I1"]:
+        for node in ["G2", "G3", "N1", "S1", "I1"]:
             changed = copy.deepcopy(self.catalogue)
             changed["implementation_plan"][node]["depends_on"] = ["I1"]
             with self.subTest(node=node), self.assertRaisesRegex(ValueError, "dependency/order"):
+                self.check(changed)
+
+    def test_pinned_projection_and_fingerprint_probes_reject_overstated_metadata_domains(self):
+        result = compatibility.probe_source_semantics(HOOK_SOURCE, IR_SOURCE)
+        self.assertEqual(result["noise_projection"], "kind_first_qubit_only_nested_and_cyclic_extras_discarded")
+        self.assertEqual(result["captured_payload_isolation"], "unchanged_after_caller_qubit_and_extra_mutation")
+        self.assertEqual(result["fingerprint"], "acyclic_metadata_sensitive_alias_identity_insensitive_dict_list_cycles_rejected")
+        self.assertEqual(result["native_anchor_lowering"], "source_bound_only_not_executed")
+        self.assertEqual(result["cached_certificate_execution"], "not_run_no_cyclic_certificate_qualification")
+        retaining_hook = HOOK_SOURCE.replace("g['kind'], g['qubits'][0]", "g['kind'], g['qubits'][0], g['extra']")
+        with self.assertRaisesRegex(ValueError, "discard nested/cyclic extras"):
+            compatibility.probe_source_semantics(retaining_hook, IR_SOURCE)
+        accepting_cycles = IR_SOURCE.replace("def fingerprint(value):", "def fingerprint(value):\n    if isinstance(value, dict) and 'self' in value.get('metadata', {}): return '0' * 64")
+        with self.assertRaisesRegex(ValueError, "unexpectedly accepts cyclic metadata"):
+            compatibility.probe_source_semantics(HOOK_SOURCE, accepting_cycles)
+
+    def test_original_noise_hook_and_acyclic_cache_obligations_do_not_invent_graph_requirements(self):
+        noise = next(r for r in self.catalogue["methods"] if r["id"] == compatibility.NOISE)
+        cache = next(r for r in self.catalogue["methods"] if r["id"].startswith(compatibility.OPTIMIZATION))
+        self.assertEqual(noise["implementation_dependencies"], ["N1"])
+        self.assertEqual(self.catalogue["implementation_plan"]["N1"]["depends_on"], [])
+        self.assertEqual([o["id"] for o in noise["original_obligations"]], ["noise_hook_projection"])
+        self.assertIn("discarded, not preserved", noise["original_obligations"][0]["requirement"])
+        self.assertIn("cyclic prepared fingerprints are rejected", cache["original_obligations"][2]["requirement"])
+        for name, false_requirement in [(noise["id"], "Lowering snapshots arbitrary nested gate extra metadata."),
+                                        (cache["id"], "Cached branch certificates preserve aliases/cycles.")]:
+            changed = copy.deepcopy(self.catalogue)
+            row = next(r for r in changed["methods"] if r["id"] == name)
+            row["original_obligations"][0]["requirement"] = false_requirement
+            with self.assertRaisesRegex(ValueError, "original obligation"):
                 self.check(changed)
 
     def test_denominator_unknown_ids_exclusions_duplicates_and_unknown_claim_fields_fail(self):

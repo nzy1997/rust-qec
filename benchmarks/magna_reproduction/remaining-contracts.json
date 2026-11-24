@@ -1267,7 +1267,7 @@
           "import unittest"
         ]
       },
-      "remaining_requirement": "Supplied arbitrary nested Python gate extra metadata is unsupported. Rust supplies checked categorical fault identities,not arbitrary Python gate dictionaries.",
+      "remaining_requirement": "The original Python NoiseDraw/test-hook projection, Native input validation and anchor-only lowered-output interface are not reproduced. Its hook discards extra annotations; mutation stability does not establish extra retention. Rust owns checked physical categorical actions through a distinct typed interface.",
       "assessment": "Both causal compilers own the guarded source and supplied categorical fault inputs; caller replacement and source/program drop leave the physical -Z result intact.",
       "rust_owners": [
         {
@@ -1367,7 +1367,7 @@
           "import unittest"
         ]
       },
-      "remaining_requirement": "No arbitrary Python metadata mutation,metadata-keyed certificate LRU or cache_hit dictionary exists. Typed source/JSON isolation is witnessed,but the original complete metadata/cache method remains partial.",
+      "remaining_requirement": "The scoped acyclic nested Python metadata mutation,metadata-keyed certificate LRU and cache_hit interface are not implemented. The pinned prepared fingerprint rejects cyclic metadata; its cache test does not assert alias identity. Typed source/JSON isolation is witnessed,but the complete original method remains partial.",
       "assessment": "Returned certificate JSON owns its arrays; explicit operation/initial replacements affect fresh sessions while existing sessions/batches keep captured values.",
       "rust_owners": [
         {

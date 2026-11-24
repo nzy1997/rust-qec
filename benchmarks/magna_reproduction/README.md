@@ -4563,8 +4563,8 @@ separate evidence and never turn a policy decision into original parity.
 | Original area | Supported boundary | Unimplemented original capability |
 | --- | --- | --- |
 | Public/deferred IR ownership (two methods) | Typed operation ownership; borrowed snapshots and owned transfer; explicit source replacement | Arbitrary annotation aliases/cycles, graph-preserving public deepcopy, mutable-leaf identity and nested prepared matching |
-| Guarded-noise lowering | Owned categorical actions and physical fault identities | Arbitrary gate dictionaries and nested extra annotations |
-| Prepared mutation/certificate caching | Owned returned JSON, explicit immutable source sessions and exact probability-value LRU | Nested annotation mutation detection, metadata-keyed branch-certificate LRU and metadata-preserving cached branch copies |
+| Guarded-noise lowering | Owned physical categorical actions and fault identities, distinct from the pinned inspection hook | Python NoiseDraw/hook projection/validation and anchor-only lowered-output interface; the hook discards extra rather than retaining it |
+| Prepared mutation/certificate caching | Owned returned JSON, explicit immutable source sessions and exact probability-value LRU | Scoped acyclic nested metadata mutation detection, metadata-keyed branch-certificate LRU and metadata-preserving cached branch copies; pinned prepared fingerprints reject cycles |
 | Source navigation | Explicit manifest-relative paths, existence/hash/symlink admission | Unique recursive basename lookup with zero/one/multiple-match semantics |
 | Installation | Independent Rust executable/API; missing-program OS error belongs to caller/launcher | CPython extension-import/build-script diagnostic and circular-import behavior |
 
@@ -4585,13 +4585,35 @@ returned graph isolation. These are prospective requirements, not implemented
 Rust or JSON-tree APIs. Exact arbitrary Python custom-object/copy-hook behavior
 may require a declared compatibility layer rather than only a container arena.
 
-S1 (recursive source lookup) and I1 (explicit CPython distribution/loader
+N1 (literal Python NoiseDraw/test-hook projection, validation and anchor-only
+lowering), S1 (recursive source lookup) and I1 (explicit CPython distribution/loader
 compatibility) have no graph dependency and are additional, unselected scope.
 No wrapper is added merely to relabel coverage. A missing executable cannot
 execute its own diagnostic: its OS-level failure is observed by the caller,
 which may choose a launcher/build hint as a separate product feature.
 
-The compatibility probe actually exercises missing, unique and duplicate
+The pinned guarded-noise hook passes only kind/first-qubit pairs to Native;
+`extra` never crosses that boundary. Its C++ lowering ignores those supplied
+actions and retains an assignment anchor. The original mutation-equality test
+therefore establishes stable output, not retention of extra or compilation of
+the supplied action. N1 records that literal interface separately from the
+stronger Rust physical-action ownership witness. No metadata graph is required
+to implement this projection.
+
+Public IR/defer copies preserve aliases/cycles, but prepared initialization
+computes a JSON fingerprint that rejects cyclic containers. The scoped cache
+test uses acyclic `metadata={"marks": [1]}` and asserts returned-copy isolation
+and metadata-only invalidation, not alias identity or cyclic certificates. The
+prospective graph model above is additional scope; it must not be attributed to
+that original prepared/cache path.
+
+The compatibility probe executes selected pinned pure-source functions without
+importing Native: it captures the hook projection before a recording Native
+boundary, confirms dropped nested/cyclic extras and captured-payload isolation,
+and runs the original fingerprint on acyclic metadata, metadata-only edits,
+shared/unshared equal values and cyclic dict/list rejection. It does not execute
+Native lowering, Simulator preparation or cached certificates. It also actually
+exercises missing, unique and duplicate
 basenames through exact-path admission; with pinned source it also runs the
 original pure-Python `native_source` helper's zero/unique/ambiguous cases.
 Duplicate basenames remain distinct through explicit paths, so that observation
