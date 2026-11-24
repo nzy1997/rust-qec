@@ -2598,16 +2598,188 @@ fn original_opt_in_global_success_matches_literal_without_literal_compilation() 
             }
         }
     }
-    // Non-dyadic exact masses make a constant-probability adapter insufficient.
-    let source = plan(1, None, None);
-    let mut executor = source.executor(
-        OriginalAssignmentExecutionPolicy::PrepareOrLiteral,
-        Default::default(),
-    );
-    for high in [false, true] {
-        let found = executor.compile(ordinary(!high)).unwrap();
-        assert_eq!(found.probability(), &mass(high));
-        assert_eq!(found.statistics().literal_compilation_attempts, 0);
+    // Analytic single-wire masses distinguish true/reported coordinates, signed
+    // readouts and faults. X commutes with MX; Y and Z interchange its masses.
+    for strategy in [
+        CompilerStrategy::ParityCopies,
+        CompilerStrategy::SharedCommutingLayer,
+    ] {
+        for inverted in [false, true] {
+            let raw = instrument(1, None, None);
+            let mut operations = raw.operations().to_vec();
+            if let OriginalGate::Measure { inverted: flag, .. } =
+                &mut operations.last_mut().unwrap().gate
+            {
+                *flag = inverted;
+            } else {
+                panic!("expected original MX fixture");
+            }
+            let source = OriginalAssignmentPlan::from_owned(
+                raw.with_operations(operations, &ScalarArithmetic::default())
+                    .unwrap(),
+                strategy,
+                ScalarArithmetic::default(),
+            );
+            let mut executor = source.executor(
+                OriginalAssignmentExecutionPolicy::PrepareOrLiteral,
+                Default::default(),
+            );
+            for high in [false, true] {
+                for flip in [false, true] {
+                    for pauli in [
+                        OriginalPauli::I,
+                        OriginalPauli::X,
+                        OriginalPauli::Y,
+                        OriginalPauli::Z,
+                    ] {
+                        let found = executor
+                            .compile(OriginalAssignment {
+                                true_values: vec![("m".into(), !high ^ inverted)],
+                                faults: vec![fault(pauli)],
+                                report_flips: if flip { vec!["m".into()] } else { vec![] },
+                            })
+                            .unwrap();
+                        let swapped = matches!(pauli, OriginalPauli::Y | OriginalPauli::Z);
+                        assert_eq!(found.probability(), &mass(high ^ swapped));
+                        assert_eq!(
+                            found.route(),
+                            OriginalAssignmentExecutionRoute::PreparedGlobal
+                        );
+                        assert_eq!(found.statistics().literal_compilation_attempts, 0);
+                    }
+                }
+            }
+        }
+    }
+    // A separate measured wire drives T^(1+2*reported_m) on |+>. Its MX mass
+    // changes with feedback, unlike the pinned single-wire 1/4 fixture. The
+    // independent oracle is one fair MZ times (1 +/- 1/sqrt(2))/2.
+    let a = ScalarArithmetic::default();
+    let l = ControlRuleLimits::default();
+    for strategy in [
+        CompilerStrategy::ParityCopies,
+        CompilerStrategy::SharedCommutingLayer,
+    ] {
+        for inverted_m in [false, true] {
+            for inverted_n in [false, true] {
+                let exponent = ControlExpression::compose(
+                    ControlOperator::Add,
+                    vec![
+                        ControlExpression::constant(1),
+                        ControlExpression::compose(
+                            ControlOperator::Multiply,
+                            vec![
+                                ControlExpression::constant(2),
+                                ControlExpression::record("m".into(), l).unwrap(),
+                            ],
+                            l,
+                        )
+                        .unwrap(),
+                    ],
+                    l,
+                )
+                .unwrap();
+                let declaration = OriginalDeclaredControl::new(
+                    "c".into(),
+                    vec!["m".into()],
+                    "correlated-v1".into(),
+                    ControlRule::new(
+                        vec![
+                            ControlGate::new(
+                                ControlGateKind::T,
+                                vec![1],
+                                Some(exponent),
+                                ControlExpression::constant(1),
+                                l,
+                            )
+                            .unwrap(),
+                        ],
+                        l,
+                    )
+                    .unwrap(),
+                )
+                .unwrap();
+                let initial = rmagna::stabilizer::AffineKet::new(
+                    bits(2, 0),
+                    vec![bits(2, 1), bits(2, 2)],
+                    rmagna::quadratic::QuadraticForm::new(
+                        0,
+                        vec![0, 0],
+                        vec![bits(2, 0), bits(2, 0)],
+                    )
+                    .unwrap(),
+                    a.omega(0, -2).unwrap(),
+                )
+                .unwrap();
+                let raw = OriginalInstrument::new_with_declared_controls(
+                    vec![0, 1],
+                    vec![0, 1],
+                    initial,
+                    vec![
+                        OriginalOperation {
+                            id: "m".into(),
+                            gate: OriginalGate::Measure {
+                                factors: vec![(0, OriginalPauli::Z)],
+                                inverted: inverted_m,
+                                record: "m".into(),
+                            },
+                        },
+                        OriginalOperation {
+                            id: "c".into(),
+                            gate: OriginalGate::Control,
+                        },
+                        OriginalOperation {
+                            id: "n".into(),
+                            gate: OriginalGate::Measure {
+                                factors: vec![(1, OriginalPauli::X)],
+                                inverted: inverted_n,
+                                record: "n".into(),
+                            },
+                        },
+                    ],
+                    vec![declaration],
+                    Default::default(),
+                    &a,
+                )
+                .unwrap();
+                let source = OriginalAssignmentPlan::from_owned(raw, strategy, a);
+                let mut executor = source.executor(
+                    OriginalAssignmentExecutionPolicy::PrepareOrLiteral,
+                    Default::default(),
+                );
+                for word in 0..4 {
+                    for flip_m in [false, true] {
+                        for flip_n in [false, true] {
+                            let m = word & 1 != 0;
+                            let n = word & 2 != 0;
+                            let input = OriginalAssignment {
+                                true_values: vec![("m".into(), m), ("n".into(), n)],
+                                report_flips: [("m", flip_m), ("n", flip_n)]
+                                    .into_iter()
+                                    .filter_map(|(r, on)| on.then_some(r.into()))
+                                    .collect(),
+                                ..Default::default()
+                            };
+                            let expected = a
+                                .multiply(&half(), &mass((n ^ inverted_n) == (m ^ flip_m)))
+                                .unwrap();
+                            assert_eq!(
+                                source.compile(input.clone()).unwrap().probability(),
+                                &expected
+                            );
+                            let found = executor.compile(input).unwrap();
+                            assert_eq!(found.probability(), &expected);
+                            assert_eq!(
+                                found.route(),
+                                OriginalAssignmentExecutionRoute::PreparedGlobal
+                            );
+                            assert_eq!(found.statistics().control_evaluations, 1);
+                            assert_eq!(found.statistics().literal_compilation_attempts, 0);
+                        }
+                    }
+                }
+            }
+        }
     }
 }
 #[test]

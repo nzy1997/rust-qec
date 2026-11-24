@@ -4511,7 +4511,9 @@ private prepared-plan, normal/resource dictionaries or rule-evaluation ABI.
 
 The six additional tests also cover actual prepared success, all four record
 words and Pauli faults/report flips for affine `1 + 6*record_bit`, non-dyadic
-masses, fresh per-call observations, foreign ownership, invalid inputs, source
+masses with signed readouts and Pauli faults,128 correlated two-wire feedback/
+report-flip/readout-sign cases against an independent analytic oracle, fresh
+per-call observations, foreign ownership, invalid inputs, source
 hard caps, chronological callback failures, and refusal to retry query/boundary
 or literal failures. Actual compiled mutations replay a rule, repack modified
 scratch, compile a second literal branch or retry an unexpected boundary error;
