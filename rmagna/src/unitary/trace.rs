@@ -15,6 +15,8 @@ pub struct TraceQuery {
 pub struct TraceOptions {
     pub max_queries: usize,
     /// Conservative matrix/metadata/scratch words, excluding caller input.
+    /// Bounds trace-family closing after the common Clifford compilation,
+    /// whose raw paths are bounded separately by `max_path_bits`.
     /// Includes retained transport metadata. Phase resources have their own
     /// `phase` bounds. This is not allocator bytes or process RSS.
     pub max_geometry_words: usize,

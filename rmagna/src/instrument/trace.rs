@@ -49,7 +49,8 @@ impl CompiledInstrument {
             }
             .into());
         }
-        let word_cost = |word: &PauliWord| 8 + 2 * word.x().words().len() as u128;
+        // Include both BitVector headers, the Pauli phase and padding.
+        let word_cost = |word: &PauliWord| 16 + 2 * word.x().words().len() as u128;
         let mut words = self
             .initial_insertions
             .iter()

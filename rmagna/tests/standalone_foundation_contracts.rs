@@ -5081,7 +5081,7 @@ fn sealed_file_trace_keeps_selection_parity_constants_and_fault_validation() {
         // Admission of instrument metadata alone must not waive the unitary
         // closed-kernel cost in the same budget.
         TraceOptions {
-            max_geometry_words: 32,
+            max_geometry_words: 128,
             ..Default::default()
         },
     ] {
