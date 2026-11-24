@@ -4039,36 +4039,50 @@ Rust compilation witness. This qualifies the original header-availability method
 not either aggregate's numerical behavior.
 
 The source-bound decomposition has 22 helpers, 66 groups, 217 assertions and
-226 loop headers. With matching compiler/process receipts, 64 groups cover all25
-causal assertions and179/192 foundation assertions. Without execution receipts,
-those groups are reported as unexecuted. The two remaining foundation groups
-retain13 assertions and six loop headers conservatively at whole-group granularity:
+226 loop headers. With matching compiler/process receipts, all66 groups cover
+all25 causal and192/192 foundation assertions, including all14 foundation helper
+contexts and197 loop headers. Without execution receipts, those groups remain
+unexecuted; declarations alone cannot pass the strict completion gate.
 
-| Group | Validated numerical behavior | Unresolved contract |
-| --- | --- | --- |
-| `foundation/main.trace-purpose` | Full dilation, all66 original-location Pauli frames, rotation geometry and exact dense moments | Purpose-specific omission of amplitude-only objects |
-| `foundation/main.prepared-trace-runtime` | Record marginal1/2, moment+/-1/2 under report flips, prepared-owner reuse without new resource factories | Runtime release of the output-open amplitude network |
+`UnitaryCircuit::compile_trace` explicitly compiles sealed fixed scalar families.
+The shared compiler omits its separate open query projection. Preparation can use
+the common exact full Clifford dilation, then sums every physical bra/ket output.
+`TraceRuntime` retains event/magic-coordinate kernels, frozen Gaussian/phase maps
+and independent original-location fault/rotation metadata. It owns neither the
+original program nor its raw/query output-open kets. Actual `Weak` probes observe
+their release; an external ordinary prepared plan can keep its own owners alive,
+and its final drop is visible through the same probe. Structural kernel dimensions
+and real factory observations supplement this evidence; they are not RSS.
 
-[#1335](https://github.com/nzy1997/rust-qec/issues/1335) tracks this implementation
-gap. Rust still retains shared raw/query `AffineKet` reference boundaries;
-unchanged factory counts and numerical equality do not prove release. These groups
-remain unresolved, the foundation aggregate stays `unmapped`, and the strict
-completion command must fail until their storage obligations are implemented:
+`CompiledInstrument::into_trace_runtime` consumes an already parsed/lowered
+coherent instrument, releases its warmed amplitude caches/catalog/program owners,
+and preserves report-flip moments, exact record marginals, selection/parity
+constants and physical fault validation. `TraceRuntime::sample_event_chain` draws
+a declared identity-observable prefix chain from those closed kernels, retaining
+exact absolute prefix and conditioning masses. Tests cover all66 original-location
+Pauli frames, both compilers, complex dense moments, dependent event rows,
+noncommuting updates, cross-word frames and owner/shape/resource refusals.
+
+This mode is opt-in: callers declare all scalar layouts before release. Ordinary
+amplitude-capable file/task evaluators stay available. Late arbitrary layouts,
+callback/target-density migration, Native private arrays/counters, RNG-word ABI,
+RSS and performance equivalence are outside this storage contract.
 
 ```sh
 cargo test --locked -p rmagna --test standalone_foundation_contracts
 python3 benchmarks/magna_reproduction/remaining_contracts.py standalone \
   --upstream "$MAGNA_UPSTREAM" --require-complete \
-  --rust-run drafts/magna-standalone-execution.json
+  --record-rust-run drafts/magna-standalone-execution.json
 ```
 
-The expected current strict result is refusal with13 unresolved assertions, not a
-complete-foundation claim. Run without `--require-complete` to obtain the full
-covered/unresolved report and separate causal/header status. `--catalogue-only`
-skips the external consumer and makes no header-compilation claim; it still
-validates Rust execution. Ordinary `remaining_contracts.py check` validates the
-retained discovery snapshot offline; only the standalone command re-discovers the
-actual pinned C++ source.
+The strict result requires192/192 executed foundation assertions,58 groups,
+14 helpers,197 loops and zero unresolved groups. Use `--rust-run PATH` to reuse
+that receipt without recompiling unchanged sources. Missing trace groups,
+unsupported aggregate promotions and stale source/compiler/binary identities
+fail. `--catalogue-only` skips the external consumer and makes no header-compilation
+claim; it still validates Rust execution. Ordinary `remaining_contracts.py check`
+validates the discovery snapshot offline; the standalone command re-discovers the
+actual pinned C++ source and reports causal/header qualification separately.
 
 The foundation fixture retains the original random schedules and complete helper
 contexts, including the1025-variable quadratic cases, all4374 composed-feedback
@@ -4086,8 +4100,8 @@ condition views replace mutable boundary sessions; separately compiled ideal-sta
 overlap replaces inverse-target measurement records. Rust accepts equivalent
 parity spellings after Clifford-difference validation rather than exposing Native's
 private strict flag. Numeric conditional laws are interned separately from action
-metadata, and RNG words/private wire allocation are not a Native ABI. The trace
-storage gap is not waived by any of these adaptations. Root and transitive fixture
+metadata, and RNG words/private wire allocation are not a Native ABI. The sealed trace
+storage boundary is qualified separately. Root and transitive fixture
 sources, including the original MT generator and literal dense-gate helper, are
 identity-bound.
 
@@ -4105,12 +4119,13 @@ The prepared owner holds the proposal law in this adapter, so its
 [#1319](https://github.com/nzy1997/rust-qec/issues/1319) and
 [#1320](https://github.com/nzy1997/rust-qec/issues/1320) are merged: they provide
 value-aware incremental classical knowledge and complete certificate snapshots.
-[#1321](https://github.com/nzy1997/rust-qec/issues/1321) now has explicit coverage
-for the foundation fixture and the concrete trace-storage follow-up above.
+[#1321](https://github.com/nzy1997/rust-qec/issues/1321) and its trace-storage
+follow-up [#1335](https://github.com/nzy1997/rust-qec/issues/1335) have complete
+source-specific foundation bindings, subject to the execution gate above.
 Missing entire groups/helpers/loops, adjacent fixture substitutions, stale
 source/binary identities, incomplete compiler/run observations and unsupported
-promotions fail validation. The current ledger remains342 verified /7 partial /
-3 unmapped, with10 outstanding methods. This does not establish full352-method
+promotions fail validation. The current ledger records343 verified /7 partial /
+2 unmapped, with9 outstanding methods. This does not establish full352-method
 parity, Python/private-container identity or paper performance.
 
 ### B03 Bravyi-Haah paper campaign

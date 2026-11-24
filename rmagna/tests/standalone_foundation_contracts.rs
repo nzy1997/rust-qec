@@ -3838,12 +3838,24 @@ fn trace_purpose_preserves_dilation_axes_and_every_fault_location() {
     let word = PauliWord::new(bits(3, 0), bits(3, 2), 0).unwrap();
     let mut native = NativePhaseOptions::default();
     native.transport.mode = rmagna::phase::NativeTransportMode::Prepared;
-    let plan = trace
-        .prepare_pauli_moment(&word, &[], &a)
-        .unwrap()
-        .with_native_phase_resource(256, native, None, &a)
+    let probe = trace.amplitude_ownership_probe();
+    let runtime = trace
+        .into_trace_runtime(
+            &[rmagna::unitary::TraceQuery {
+                word,
+                event_rows: vec![],
+            }],
+            rmagna::unitary::TraceOptions {
+                max_terms: 256,
+                phase: native,
+                ..Default::default()
+            },
+            &a,
+        )
         .unwrap();
-    let prepared = prepared_counts(trace.query_work_statistics());
+    assert!(probe.is_released());
+    assert!(runtime.amplitude_ownership_probe().is_released());
+    let prepared = prepared_counts(runtime.query_work_statistics());
     let mut cases = 0;
     for position in 1..=gates.len() {
         for wire in 0..2 {
@@ -3856,9 +3868,9 @@ fn trace_purpose_preserves_dilation_axes_and_every_fault_location() {
                     word: PauliWord::new(bits(3, x), bits(3, z), phase).unwrap(),
                 };
                 let direct = amplitude.with_insertions(&[insertion.clone()], &a).unwrap();
-                let view = trace.with_insertions(&[insertion], &a).unwrap();
+                let view = runtime.assignment(&[insertion]).unwrap();
                 let p = direct.assignment_frame().unwrap();
-                let q = view.assignment_frame().unwrap();
+                let q = view.transported_frame();
                 assert_eq!((p.x(), p.z(), p.phase()), (q.x(), q.z(), q.phase()));
                 let mut literal = gates[..position].to_vec();
                 literal.extend(match pauli {
@@ -3899,23 +3911,21 @@ fn trace_purpose_preserves_dilation_axes_and_every_fault_location() {
                             }
                         });
                 assert_eq!(
-                    plan.evaluate(&view, &bits(0, 0), 256, &a).unwrap().value,
+                    runtime.evaluate(0, &view, &bits(0, 0), &a).unwrap().value,
                     moment
                 );
-                assert_eq!(prepared_counts(trace.query_work_statistics()), prepared);
+                assert_eq!(prepared_counts(runtime.query_work_statistics()), prepared);
                 cases += 1;
             }
         }
     }
     assert_eq!(cases, 66);
-    assert_eq!(trace.query_work_statistics().fixed_evaluations, 66);
-    // Rust retains its shared raw affine reference for transport, rather than
-    // Native's purpose-specific private arrays. Scalar query evaluation above
-    // owns fixed closed geometry and never constructs a side expansion.
-    let retained = trace.reference_storage_statistics().unwrap();
-    assert_eq!(retained.physical_width, 3);
-    assert_eq!(retained.raw_phase_variables, 2);
-    assert!(retained.unique_reference_boundaries <= 2);
+    assert_eq!(runtime.query_work_statistics().fixed_evaluations, 66);
+    assert!(probe.is_released());
+    let retained = runtime.storage_statistics();
+    assert_eq!(retained.phase_variables, 2);
+    assert_eq!(retained.event_phase_widths, [4]);
+    assert_eq!(retained.original_positions, 11);
 }
 #[test]
 fn coherent_file_pipeline_and_prepared_trace_runtime() {
@@ -3996,6 +4006,113 @@ fn coherent_file_pipeline_and_prepared_trace_runtime() {
     assert_eq!(sampled.values, [false]);
     assert_eq!(sampled.mass, half);
     assert_eq!(sampled.condition_mass, ExactScalar::one());
+    // Seal the actual parsed/lowered instrument, including its already warm
+    // ordinary caches. Every original amplitude owner must then expire.
+    use rmagna::instrument::InstrumentTraceQuery as TQ;
+    let probe = ir.amplitude_ownership_probe();
+    assert!(!probe.is_released());
+    let trace = ir
+        .into_trace_runtime(
+            &[
+                TQ {
+                    outputs: vec![0, 1],
+                    word: z,
+                    parities: vec![],
+                    accepted: true,
+                },
+                TQ {
+                    outputs: vec![0, 1],
+                    word: z1,
+                    parities: vec![],
+                    accepted: true,
+                },
+                TQ {
+                    outputs: vec![],
+                    word: PauliWord::identity(0).unwrap(),
+                    parities: vec![report(1)],
+                    accepted: false,
+                },
+                TQ {
+                    outputs: vec![],
+                    word: PauliWord::identity(0).unwrap(),
+                    parities: vec![],
+                    accepted: false,
+                },
+            ],
+            rmagna::unitary::TraceOptions {
+                max_terms: 256,
+                phase: native,
+                ..Default::default()
+            },
+            &a,
+        )
+        .unwrap();
+    assert!(probe.is_released());
+    let before = prepared_counts(trace.runtime().query_work_statistics());
+    let retained = trace.runtime().storage_statistics();
+    for flipped in [false, true] {
+        let faults = if flipped {
+            vec![FaultSelection {
+                site: 0,
+                alternative: 0,
+            }]
+        } else {
+            vec![]
+        };
+        let assignment = trace.assignment(&faults).unwrap();
+        assert_eq!(
+            trace
+                .evaluate(0, &assignment, &bits(0, 0), &a)
+                .unwrap()
+                .value,
+            if flipped {
+                half.negated()
+            } else {
+                half.clone()
+            }
+        );
+        assert_eq!(
+            trace
+                .evaluate(1, &assignment, &bits(0, 0), &a)
+                .unwrap()
+                .value,
+            half
+        );
+        for bit in 0..2 {
+            assert_eq!(
+                trace
+                    .evaluate(2, &assignment, &bits(1, bit), &a)
+                    .unwrap()
+                    .value,
+                half
+            );
+        }
+        let mut entropy = 0;
+        let draw = trace
+            .runtime()
+            .sample_event_chain(
+                &[3, 2],
+                &assignment,
+                &bits(0, 0),
+                &mut || {
+                    entropy += 1;
+                    false
+                },
+                64,
+                &a,
+            )
+            .unwrap();
+        assert_eq!(draw.values, bits(1, 0));
+        assert_eq!(draw.mass, half);
+        assert_eq!(draw.condition_mass, ExactScalar::one());
+        assert_eq!((draw.entropy_bits, entropy), (1, 1));
+        assert_eq!(
+            prepared_counts(trace.runtime().query_work_statistics()),
+            before
+        );
+        assert_eq!(trace.runtime().storage_statistics(), retained);
+        assert!(probe.is_released());
+    }
 }
 #[test]
 fn fixed_virtual_template_and_selection_offset() {
@@ -4457,4 +4574,640 @@ fn exact_categorical_zero_channel_uses_one_caller_word() {
             }
         );
     }
+}
+
+fn literal_projected_moment(
+    dense: &[ExactScalar],
+    p: &PauliWord,
+    rows: &[BitVector],
+    outcome: usize,
+    a: &ScalarArithmetic,
+) -> ExactScalar {
+    let allowed = |v: usize| {
+        rows.iter()
+            .enumerate()
+            .all(|(j, row)| ((v & index(row)).count_ones() as usize & 1) == (outcome >> j & 1))
+    };
+    let mut sum = ExactScalar::zero();
+    for (u, value) in dense.iter().enumerate() {
+        let v = u ^ index(p.x());
+        if !allowed(u) || !allowed(v) {
+            continue;
+        }
+        let phase = i64::from(p.phase()) + 4 * i64::from((u & index(p.z())).count_ones() & 1);
+        let product = a.multiply(&dense[v].conjugate(), value).unwrap();
+        sum = a
+            .add(
+                &sum,
+                &a.multiply(&product, &a.omega(phase, 0).unwrap()).unwrap(),
+            )
+            .unwrap();
+    }
+    sum
+}
+#[test]
+fn sealed_trace_both_compilers_preserve_complex_moments_dependent_events_and_frames() {
+    use rmagna::unitary::{TraceOptions, TraceQuery};
+    let a = ScalarArithmetic::default();
+    let gates = vec![
+        U::Clifford(C::H(0)),
+        U::Clifford(C::H(1)),
+        U::Clifford(C::Cx {
+            control: 1,
+            target: 2,
+        }),
+        U::T { qubit: 0, turns: 1 },
+        U::Clifford(C::Cx {
+            control: 0,
+            target: 1,
+        }),
+        U::Clifford(C::H(0)),
+        U::T { qubit: 1, turns: 3 },
+        U::Clifford(C::Cx {
+            control: 1,
+            target: 2,
+        }),
+        U::Clifford(C::H(2)),
+    ];
+    let circuit = UnitaryCircuit::new(3, gates.clone()).unwrap();
+    let mut queries = vec![
+        TraceQuery {
+            word: PauliWord::identity(3).unwrap(),
+            event_rows: vec![bits(3, 1), bits(3, 2), bits(3, 3)],
+        },
+        TraceQuery {
+            word: PauliWord::new(bits(3, 1), bits(3, 3), 2).unwrap(),
+            event_rows: vec![bits(3, 4)],
+        },
+        TraceQuery {
+            word: PauliWord::new(bits(3, 1), bits(3, 0), 2).unwrap(),
+            event_rows: vec![bits(3, 4)],
+        },
+        TraceQuery {
+            word: PauliWord::new(bits(3, 1), bits(3, 0), 0).unwrap(),
+            event_rows: vec![bits(3, 1)],
+        },
+    ];
+    queries.push(TraceQuery {
+        word: PauliWord::new(bits(3, 0), bits(3, 4), 2).unwrap(),
+        event_rows: vec![bits(3, 4)],
+    });
+    // All three-wire Pauli words expose coherent off-diagonal signs, rather
+    // than relying on observables whose exact value might vanish accidentally.
+    for x in 0..8 {
+        for z in 0..8usize {
+            queries.push(TraceQuery {
+                word: PauliWord::new(bits(3, x), bits(3, z), 2 * (x & z).count_ones() as u8)
+                    .unwrap(),
+                event_rows: vec![],
+            });
+        }
+    }
+    let mut cases = 0;
+    for strategy in [
+        CompilerStrategy::ParityCopies,
+        CompilerStrategy::SharedCommutingLayer,
+    ] {
+        for initial in [0, 5] {
+            let source = circuit
+                .compile_with_strategy(&bits(3, initial), &a, strategy)
+                .unwrap();
+            let baseline = circuit
+                .compile_with_strategy(&bits(3, initial), &a, strategy)
+                .unwrap();
+            let diagnostic = source.compilation().clone();
+            let trace = source
+                .into_trace_runtime(
+                    &queries,
+                    TraceOptions {
+                        max_terms: 4096,
+                        ..Default::default()
+                    },
+                    &a,
+                )
+                .unwrap();
+            assert!(trace.amplitude_ownership_probe().is_released());
+            assert_eq!(trace.compilation(), &diagnostic);
+            let prepared = prepared_counts(trace.query_work_statistics());
+            for position in 0..=gates.len() {
+                for letter in 0..4 {
+                    let wire = position % 3;
+                    let x = if letter == 0 || letter == 2 {
+                        1 << wire
+                    } else {
+                        0
+                    };
+                    let z = if letter == 1 || letter == 2 {
+                        1 << wire
+                    } else {
+                        0
+                    };
+                    let insertion = rmagna::unitary::PauliInsertion {
+                        before_gate: position,
+                        word: PauliWord::new(
+                            bits(3, x),
+                            bits(3, z),
+                            if letter == 2 {
+                                2
+                            } else if letter == 3 {
+                                3
+                            } else {
+                                0
+                            },
+                        )
+                        .unwrap(),
+                    };
+                    let assigned = trace.assignment(&[insertion.clone()]).unwrap();
+                    let ordinary = baseline.with_insertions(&[insertion], &a).unwrap();
+                    assert_eq!(
+                        assigned.transported_frame(),
+                        ordinary.assignment_frame().unwrap()
+                    );
+                    let mut literal = gates[..position].to_vec();
+                    if z != 0 {
+                        literal.push(U::Clifford(C::Z(wire)));
+                    }
+                    if x != 0 {
+                        literal.push(U::Clifford(C::X(wire)));
+                    }
+                    literal.extend_from_slice(&gates[position..]);
+                    let dense = raw_dense_unitary(3, initial, &literal, &a);
+                    for (i, q) in queries.iter().enumerate() {
+                        for outcome in 0..1usize << q.event_rows.len() {
+                            let expected = literal_projected_moment(
+                                &dense,
+                                &q.word,
+                                &q.event_rows,
+                                outcome,
+                                &a,
+                            );
+                            let actual = trace
+                                .evaluate(i, &assigned, &bits(q.event_rows.len(), outcome), &a)
+                                .unwrap();
+                            assert_eq!(
+                                actual.value, expected,
+                                "{strategy:?} gate{position} letter{letter} query{i} outcome{outcome}"
+                            );
+                        }
+                    }
+                    assert_eq!(prepared_counts(trace.query_work_statistics()), prepared);
+                    cases += 1;
+                }
+            }
+        }
+    }
+    assert_eq!(cases, 160);
+}
+#[test]
+fn trace_release_is_observed_even_with_external_ordinary_plans_and_invalid_requests() {
+    use rmagna::unitary::{TraceOptions, TraceQuery, UnitaryError};
+    let a = ScalarArithmetic::default();
+    let circuit =
+        UnitaryCircuit::new(1, vec![U::Clifford(C::H(0)), U::T { qubit: 0, turns: 1 }]).unwrap();
+    let q = TraceQuery {
+        word: PauliWord::identity(1).unwrap(),
+        event_rows: vec![],
+    };
+    assert!(matches!(
+        circuit
+            .compile(&bits(1, 0), &a)
+            .unwrap()
+            .into_trace_runtime(
+                &[q.clone()],
+                TraceOptions {
+                    max_path_bits: 0,
+                    ..Default::default()
+                },
+                &a
+            ),
+        Err(UnitaryError::RawPathLimit { .. })
+    ));
+    let source = circuit.compile(&bits(1, 0), &a).unwrap();
+    let held = source.prepare_probability(&[], &a).unwrap();
+    let probe = source.amplitude_ownership_probe();
+    assert!(!probe.is_released());
+    let trace = source
+        .into_trace_runtime(&[q.clone()], TraceOptions::default(), &a)
+        .unwrap();
+    assert!(
+        !probe.is_released(),
+        "the independent ordinary family still owns its amplitude input"
+    );
+    drop(held);
+    assert!(probe.is_released());
+    let assigned = trace.assignment(&[]).unwrap();
+    assert_eq!(
+        trace.evaluate(0, &assigned, &bits(0, 0), &a).unwrap().value,
+        ExactScalar::one()
+    );
+    let foreign = circuit
+        .compile_trace(
+            &bits(1, 0),
+            CompilerStrategy::SharedCommutingLayer,
+            &[q.clone()],
+            TraceOptions::default(),
+            &a,
+        )
+        .unwrap();
+    let other = foreign.assignment(&[]).unwrap();
+    assert!(matches!(
+        trace.evaluate(0, &other, &bits(0, 0), &a),
+        Err(UnitaryError::IncompatibleProgram)
+    ));
+    assert!(matches!(
+        trace.evaluate(1, &assigned, &bits(0, 0), &a),
+        Err(UnitaryError::InvalidTraceQuery { .. })
+    ));
+    assert!(matches!(
+        trace.evaluate(0, &assigned, &bits(1, 0), &a),
+        Err(UnitaryError::DimensionMismatch)
+    ));
+    assert!(
+        circuit
+            .compile_trace(
+                &bits(1, 0),
+                CompilerStrategy::ParityCopies,
+                &[q.clone()],
+                TraceOptions {
+                    max_queries: 0,
+                    ..Default::default()
+                },
+                &a
+            )
+            .is_err()
+    );
+    assert!(
+        circuit
+            .compile_trace(
+                &bits(1, 0),
+                CompilerStrategy::ParityCopies,
+                &[q.clone()],
+                TraceOptions {
+                    max_geometry_words: 0,
+                    ..Default::default()
+                },
+                &a
+            )
+            .is_err()
+    );
+    assert!(
+        circuit
+            .compile_trace(
+                &bits(1, 0),
+                CompilerStrategy::ParityCopies,
+                &[q.clone()],
+                TraceOptions {
+                    max_terms: 0,
+                    ..Default::default()
+                },
+                &a
+            )
+            .is_err()
+    );
+    assert!(
+        circuit
+            .compile_trace(
+                &bits(1, 0),
+                CompilerStrategy::ParityCopies,
+                &[TraceQuery {
+                    word: PauliWord::identity(2).unwrap(),
+                    event_rows: vec![]
+                }],
+                TraceOptions::default(),
+                &a
+            )
+            .is_err()
+    );
+    let source = circuit.compile(&bits(1, 0), &a).unwrap();
+    let changed = source
+        .with_insertions(
+            &[rmagna::unitary::PauliInsertion {
+                before_gate: 0,
+                word: PauliWord::identity(1).unwrap(),
+            }],
+            &a,
+        )
+        .unwrap();
+    assert!(matches!(
+        changed.into_trace_runtime(&[q], TraceOptions::default(), &a),
+        Err(UnitaryError::AssignedTraceReference)
+    ));
+    let mut bits_called = 0;
+    let bad = trace.sample_event_chain(
+        &[],
+        &assigned,
+        &bits(0, 0),
+        &mut || {
+            bits_called += 1;
+            false
+        },
+        64,
+        &a,
+    );
+    assert!(matches!(
+        bad,
+        Err(rmagna::unitary::TraceSamplingError::InvalidChain)
+    ));
+    assert_eq!(bits_called, 0);
+    drop(trace);
+    assert!(probe.is_released());
+}
+#[test]
+fn trace_cross_word_frames_and_prefix_sampling_keep_exact_conditional_mass() {
+    use rmagna::unitary::{TraceOptions, TraceQuery, TraceSamplingError};
+    let a = ScalarArithmetic::default();
+    let gates = vec![
+        U::Clifford(C::H(64)),
+        U::Clifford(C::Cx {
+            control: 64,
+            target: 0,
+        }),
+        U::T {
+            qubit: 64,
+            turns: 1,
+        },
+        U::Clifford(C::H(0)),
+        U::T { qubit: 0, turns: 3 },
+    ];
+    let small = vec![
+        U::Clifford(C::H(1)),
+        U::Clifford(C::Cx {
+            control: 1,
+            target: 0,
+        }),
+        U::T { qubit: 1, turns: 1 },
+        U::Clifford(C::H(0)),
+        U::T { qubit: 0, turns: 3 },
+    ];
+    let high = BitVector::from_indices(65, [64]).unwrap();
+    let word = PauliWord::new(
+        bits(65, 1),
+        BitVector::from_indices(65, [0, 64]).unwrap(),
+        2,
+    )
+    .unwrap();
+    let queries = vec![
+        TraceQuery {
+            word: word.clone(),
+            event_rows: vec![high.clone()],
+        },
+        TraceQuery {
+            word: PauliWord::identity(65).unwrap(),
+            event_rows: vec![],
+        },
+        TraceQuery {
+            word: PauliWord::identity(65).unwrap(),
+            event_rows: vec![high.clone()],
+        },
+        TraceQuery {
+            word: PauliWord::identity(65).unwrap(),
+            event_rows: vec![high.clone(), high.clone()],
+        },
+        TraceQuery {
+            word: PauliWord::identity(65).unwrap(),
+            event_rows: vec![bits(65, 0)],
+        },
+    ];
+    let mut cases = 0;
+    for strategy in [
+        CompilerStrategy::ParityCopies,
+        CompilerStrategy::SharedCommutingLayer,
+    ] {
+        let trace = UnitaryCircuit::new(65, gates.clone())
+            .unwrap()
+            .compile_trace(
+                &bits(65, 0),
+                strategy,
+                &queries,
+                TraceOptions {
+                    max_terms: 1024,
+                    ..Default::default()
+                },
+                &a,
+            )
+            .unwrap();
+        assert!(trace.amplitude_ownership_probe().is_released());
+        let work = prepared_counts(trace.query_work_statistics());
+        for position in 0..=gates.len() {
+            let insertion = rmagna::unitary::PauliInsertion {
+                before_gate: position,
+                word: PauliWord::new(high.clone(), high.clone(), 2).unwrap(),
+            };
+            let assigned = trace.assignment(&[insertion]).unwrap();
+            let mut literal = small[..position].to_vec();
+            literal.extend([U::Clifford(C::Z(1)), U::Clifford(C::X(1))]);
+            literal.extend_from_slice(&small[position..]);
+            let dense = raw_dense_unitary(2, 0, &literal, &a);
+            let expected_word = PauliWord::new(bits(2, 1), bits(2, 3), 2).unwrap();
+            for outcome in 0..2 {
+                assert_eq!(
+                    trace
+                        .evaluate(0, &assigned, &bits(1, outcome), &a)
+                        .unwrap()
+                        .value,
+                    literal_projected_moment(&dense, &expected_word, &[bits(2, 2)], outcome, &a)
+                );
+            }
+            let mut n = 0;
+            let draw = trace
+                .sample_event_chain(
+                    &[1, 2, 3],
+                    &assigned,
+                    &bits(0, 0),
+                    &mut || {
+                        n += 1;
+                        false
+                    },
+                    64,
+                    &a,
+                )
+                .unwrap();
+            assert_eq!(draw.values, bits(2, 0));
+            assert_eq!(draw.mass, a.omega(0, -2).unwrap());
+            assert_eq!(draw.condition_mass, ExactScalar::one());
+            assert_eq!((draw.entropy_bits, n), (1, 1));
+            let mut forbidden = || panic!("invalid trace chain requested entropy");
+            assert!(matches!(
+                trace.sample_event_chain(&[1, 0], &assigned, &bits(0, 0), &mut forbidden, 64, &a),
+                Err(TraceSamplingError::InvalidChain)
+            ));
+            assert!(
+                trace
+                    .sample_event_chain(&[4], &assigned, &bits(1, 1), &mut forbidden, 64, &a)
+                    .is_err()
+            );
+            assert!(
+                trace
+                    .sample_event_chain(&[1, 2], &assigned, &bits(0, 0), &mut forbidden, 0, &a)
+                    .is_err()
+            );
+            assert_eq!(prepared_counts(trace.query_work_statistics()), work);
+            cases += 1;
+        }
+    }
+    assert_eq!(cases, 12);
+}
+
+#[test]
+fn sealed_file_trace_keeps_selection_parity_constants_and_fault_validation() {
+    use rmagna::instrument::{InstrumentError, InstrumentTraceQuery as TQ};
+    use rmagna::unitary::TraceOptions;
+    let a = ScalarArithmetic::default();
+    let source = parse_circuit(
+        "H 0\nM(1/4) 0\nDETECTOR rec[-1]\nPOSTSELECT det[0]\n",
+        &Default::default(),
+    )
+    .unwrap();
+    let ir = compile_affine(&source, &Default::default(), &a).unwrap();
+    let flipped = BitExpr {
+        constant: true,
+        terms: [BitAtom::Record(0)].into_iter().collect(),
+    };
+    let q = |accepted| TQ {
+        outputs: vec![],
+        word: PauliWord::identity(0).unwrap(),
+        parities: vec![flipped.clone()],
+        accepted,
+    };
+    for options in [
+        TraceOptions {
+            max_queries: 0,
+            ..Default::default()
+        },
+        TraceOptions {
+            max_geometry_words: 0,
+            ..Default::default()
+        },
+        // Admission of instrument metadata alone must not waive the unitary
+        // closed-kernel cost in the same budget.
+        TraceOptions {
+            max_geometry_words: 32,
+            ..Default::default()
+        },
+    ] {
+        assert!(matches!(
+            ir.clone().into_trace_runtime(&[q(true)], options, &a),
+            Err(InstrumentError::Unitary(
+                rmagna::unitary::UnitaryError::QueryCacheLimit { .. }
+            ))
+        ));
+    }
+    let probe = ir.amplitude_ownership_probe();
+    let other = ir.clone();
+    let trace = ir
+        .into_trace_runtime(&[q(false), q(true)], TraceOptions::default(), &a)
+        .unwrap();
+    assert!(!probe.is_released());
+    for fault in [false, true] {
+        let faults = if fault {
+            vec![FaultSelection {
+                site: 0,
+                alternative: 0,
+            }]
+        } else {
+            vec![]
+        };
+        let assigned = trace.assignment(&faults).unwrap();
+        for outcome in 0..2 {
+            assert_eq!(
+                trace
+                    .evaluate(0, &assigned, &bits(1, outcome), &a)
+                    .unwrap()
+                    .value,
+                other
+                    .reported_probability(&[flipped.clone()], &bits(1, outcome), &faults, 256, &a)
+                    .unwrap()
+                    .value
+            );
+            assert_eq!(
+                trace
+                    .evaluate(1, &assigned, &bits(1, outcome), &a)
+                    .unwrap()
+                    .value,
+                if outcome == 1 {
+                    a.omega(0, -2).unwrap()
+                } else {
+                    ExactScalar::zero()
+                }
+            );
+        }
+    }
+    drop(other);
+    assert!(probe.is_released());
+    assert!(matches!(
+        trace.assignment(&[FaultSelection {
+            site: 1,
+            alternative: 0
+        }]),
+        Err(InstrumentError::InvalidFault { .. })
+    ));
+    assert!(matches!(
+        trace.assignment(&[FaultSelection {
+            site: 0,
+            alternative: 1
+        }]),
+        Err(InstrumentError::InvalidFault { .. })
+    ));
+    assert!(matches!(
+        trace.assignment(
+            &[FaultSelection {
+                site: 0,
+                alternative: 0
+            }; 2]
+        ),
+        Err(InstrumentError::RepeatedFault { .. })
+    ));
+}
+
+#[test]
+fn explicit_trace_compilation_omits_the_open_query_projection() {
+    use rmagna::unitary::{TraceOptions, TraceQuery};
+    let a = ScalarArithmetic::default();
+    // A fixed Z observation has rankzero on |0>. The ordinary compiler builds
+    // a separate reduced query boundary; trace purpose deliberately omits it.
+    let circuit = UnitaryCircuit::new(1, vec![U::T { qubit: 0, turns: 1 }]).unwrap();
+    let open = circuit
+        .compile_with_strategy(&bits(1, 0), &a, CompilerStrategy::SharedCommutingLayer)
+        .unwrap();
+    let open_probe = open.amplitude_ownership_probe();
+    assert!(open_probe.has_distinct_query_boundary());
+    assert_eq!(open.phase_legs(), 0);
+    let trace = circuit
+        .compile_trace(
+            &bits(1, 0),
+            CompilerStrategy::SharedCommutingLayer,
+            &[TraceQuery {
+                word: PauliWord::identity(1).unwrap(),
+                event_rows: vec![],
+            }],
+            TraceOptions::default(),
+            &a,
+        )
+        .unwrap();
+    let probe = trace.amplitude_ownership_probe();
+    assert!(!probe.has_distinct_query_boundary());
+    assert!(probe.is_released());
+    assert_eq!(trace.reference_phase().num_variables(), 1);
+    assert_eq!(trace.reference_phase().terms().len(), 1);
+    assert_eq!(
+        trace.compilation().reference_coherent_width,
+        open.compilation().reference_coherent_width
+    );
+    let assignment = trace.assignment(&[]).unwrap();
+    assert_eq!(
+        trace
+            .evaluate(0, &assignment, &bits(0, 0), &a)
+            .unwrap()
+            .value,
+        ExactScalar::one()
+    );
+    // Amplitude behavior is separately retained and includes exact globalphase.
+    assert_eq!(
+        open.amplitude(&bits(1, 0), 256, &a).unwrap().value,
+        ExactScalar::one()
+    );
+    assert_eq!(
+        open.amplitude(&bits(1, 1), 256, &a).unwrap().value,
+        ExactScalar::zero()
+    );
 }

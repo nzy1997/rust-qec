@@ -16,6 +16,8 @@ pub use query_cache::QueryCachePolicy;
 mod scalar_cache;
 pub use scalar_cache::InstrumentScalarQuery;
 mod support;
+mod trace;
+pub use trace::{InstrumentTraceQuery, InstrumentTraceRuntime};
 mod vacuum;
 use crate::circuit::{BitAtom, BitExpr, Circuit};
 use crate::gf2::{AffineSupport, BitVector, Gf2Error};

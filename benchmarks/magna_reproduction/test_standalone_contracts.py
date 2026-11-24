@@ -30,31 +30,44 @@ class StandaloneContractsTests(unittest.TestCase):
         self.assertEqual((result['helpers'], result['groups'], result['assertions'], result['loop_headers']),
                          (22, 66, 217, 226))
         self.assertEqual((result['covered_groups'], result['covered_assertions']), (0, 0))
-        self.assertEqual((result['unresolved_groups'], result['unresolved_assertions']), (2, 13))
-        self.assertEqual((result['unexecuted_groups'], result['unexecuted_assertions']), (64, 204))
-        self.assertEqual(result['aggregate_statuses'], dict(causal='requires_execution', foundation='unmapped'))
-        self.assertEqual(result['assessments'], dict(implementation_gap=2, source_bound_witness=64))
+        self.assertEqual((result['unresolved_groups'], result['unresolved_assertions']), (0, 0))
+        self.assertEqual((result['unexecuted_groups'], result['unexecuted_assertions']), (66, 217))
+        self.assertEqual(result['aggregate_statuses'], dict(causal='requires_execution', foundation='requires_execution'))
+        self.assertEqual(result['assessments'], dict(source_bound_witness=66))
 
-    def test_foundation_completion_refuses_the_real_trace_storage_gaps(self):
+    def test_foundation_completion_requires_execution_and_rejects_missing_trace_groups(self):
         result = self.check()
         foundation = result['suites']['foundation']
         self.assertEqual((foundation['helpers'], foundation['groups'], foundation['assertions'],
                           foundation['loop_headers']), (14, 58, 192, 197))
-        self.assertEqual(foundation['unresolved_groups'], [
-            'foundation/main.trace-purpose', 'foundation/main.prepared-trace-runtime'])
-        self.assertEqual(result['follow_up_issues'], [1335])
+        self.assertEqual(foundation['unresolved_groups'], [])
+        self.assertEqual(result['follow_up_issues'], [])
         with self.assertRaisesRegex(ValueError, 'actual pinned source'):
             contracts.require_complete(result)
         result['upstream_verified'] = True
-        result['execution'] = dict(status='PASS', source_bound=True, compiler_bound=True)
-        with self.assertRaisesRegex(ValueError, '13 assertions remain'):
+        with self.assertRaisesRegex(ValueError, 'source/compiler/process receipts'):
             contracts.require_complete(result)
-        changed = copy.deepcopy(self.catalogue)
-        for group in changed['groups']:
-            if group['status'] == 'unresolved':
-                group['status'] = 'bound'
-        with self.assertRaisesRegex(ValueError, 'no reviewed Rust qualification'):
-            self.check(catalogue=changed)
+        for group_id, assertions in [('foundation/main.trace-purpose', 6),
+                                     ('foundation/main.prepared-trace-runtime', 7)]:
+            changed = copy.deepcopy(self.catalogue)
+            group = next(g for g in changed['groups'] if g['id'] == group_id)
+            group['status'] = 'unresolved'
+            del group['qualification']
+            # Keeping a promoted aggregate after losing either whole group fails.
+            with self.assertRaisesRegex(ValueError, 'aggregate cannot be promoted'):
+                self.check(catalogue=changed)
+            ledger = copy.deepcopy(self.ledger)
+            row = next(r for r in ledger['cases'] if r['id'] == contracts.AGGREGATES['foundation'])
+            row.clear()
+            row.update(id=contracts.AGGREGATES['foundation'], status='unmapped', reason='Missing trace group')
+            incomplete = self.check(catalogue=changed, ledger=ledger)
+            incomplete['upstream_verified'] = True
+            with self.assertRaisesRegex(ValueError, str(assertions)+' assertions remain'):
+                contracts.require_complete(incomplete)
+            changed = copy.deepcopy(self.catalogue)
+            del next(g for g in changed['groups'] if g['id'] == group_id)['qualification']
+            with self.assertRaisesRegex(ValueError, 'source-specific standalone qualification'):
+                self.check(catalogue=changed)
 
     def test_foundation_qualification_rejects_an_existing_adjacent_fixture(self):
         changed = copy.deepcopy(self.catalogue)
@@ -100,7 +113,7 @@ class StandaloneContractsTests(unittest.TestCase):
                 with self.assertRaises(ValueError):
                     self.check(catalogue=altered)
         for name, method in contracts.AGGREGATES.items():
-            invalid = ['architecture_specific', 'partial', 'unmapped' if name == 'causal' else 'verified']
+            invalid = ['architecture_specific', 'partial', 'unmapped']
             for status in invalid:
                 altered = copy.deepcopy(self.ledger)
                 next(r for r in altered['cases'] if r['id'] == method)['status'] = status

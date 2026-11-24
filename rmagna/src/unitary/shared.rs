@@ -9,6 +9,7 @@ struct Slot {
     coefficient: u8,
     axis: PauliWord,
 }
+#[derive(Clone)]
 struct Selected {
     gate: usize,
     qubits: Vec<usize>,
@@ -16,6 +17,7 @@ struct Selected {
     coefficient: u8,
     negative: bool,
 }
+#[derive(Clone)]
 pub(super) struct PhaseUpdates {
     width: usize,
     cut_gate: usize,
@@ -25,6 +27,19 @@ pub(super) struct PhaseUpdates {
     coordinates: usize,
 }
 impl PhaseUpdates {
+    pub(super) fn retained_words(&self) -> u128 {
+        32 + 8 * self.cliffords.len() as u128
+            + self
+                .selected
+                .iter()
+                .map(|s| 16 + s.qubits.len() as u128 + s.coordinates.words().len() as u128)
+                .sum::<u128>()
+            + self
+                .outside
+                .iter()
+                .map(|(axis, _)| 8 + axis.words().len() as u128)
+                .sum::<u128>()
+    }
     pub(super) fn phase_axes(&self) -> impl Iterator<Item = &BitVector> {
         self.outside.iter().map(|(axis, _)| axis).chain(
             self.selected
@@ -455,6 +470,7 @@ pub(super) fn compile(
     input: &AffineKet,
     arithmetic: &ScalarArithmetic,
     max_path_bits: usize,
+    purpose: CompilationPurpose,
 ) -> Result<CompiledUnitary, UnitaryError> {
     if input.width() != source.width {
         return Err(UnitaryError::DimensionMismatch);
@@ -591,8 +607,12 @@ pub(super) fn compile(
             .evolve(&initial, arithmetic)?
             .expect("Clifford observation circuit is unitary"),
     );
-    let observation_reduction =
-        observations::ObservationReduction::new(&boundary, source.width, rank)?;
+    let observation_reduction = match purpose {
+        CompilationPurpose::Open => {
+            observations::ObservationReduction::new(&boundary, source.width, rank)?
+        }
+        CompilationPurpose::Trace => None,
+    };
     let reduced_rank = observation_reduction
         .as_ref()
         .map_or(rank, observations::ObservationReduction::rank);
