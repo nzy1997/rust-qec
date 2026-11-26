@@ -461,6 +461,50 @@ fn no_match_limits_signature_errors_and_zero_coefficients_have_separate_contract
 }
 
 #[test]
+fn rank_zero_resource_preserves_global_phase_and_labelled_clifford_updates() {
+    let a = ScalarArithmetic::default();
+    let reference = ParityPhase::new(3, 5, [(bits(3, 7), 2)]).unwrap();
+    let updated = ParityPhase::new(3, 2, [(bits(3, 5), 6), (bits(3, 3), 2)]).unwrap();
+    let resource = PreparedCataloguePhase::new(
+        &reference,
+        &catalogue(),
+        &CataloguePreparationOptions::default(),
+        &a,
+    )
+    .unwrap()
+    .unwrap();
+    assert_eq!(resource.quotient_rank(), 0);
+    let boundary = AffineKet::new(
+        bits(2, 1),
+        vec![bits(2, 1), bits(2, 2), bits(2, 3)],
+        QuadraticForm::new(3, vec![1, 2, 0], vec![bits(3, 4), bits(3, 4), bits(3, 0)]).unwrap(),
+        a.omega(1, -1).unwrap(),
+    )
+    .unwrap();
+    assert_eq!(
+        resource
+            .evaluate(&updated, boundary.phase(), boundary.coefficient(), &a)
+            .unwrap(),
+        direct(&updated, boundary.phase(), boundary.coefficient())
+    );
+    let plan = std::sync::Arc::new(resource)
+        .prepare_boundary(&reference, &boundary, &Default::default(), &a)
+        .unwrap();
+    let expansion = plan.expand(&updated, &boundary, &a).unwrap();
+    assert_eq!(expansion.states.len(), 1);
+    let expanded = &expansion.states[0];
+    assert_eq!(
+        amplitudes(&zero(expanded.columns().len()), expanded),
+        amplitudes(&updated, &boundary)
+    );
+    let t = ParityPhase::new(3, 2, [(bits(3, 1), 1)]).unwrap();
+    assert!(matches!(
+        plan.expand(&t, &boundary, &a),
+        Err(PhaseError::NotClifford)
+    ));
+}
+
+#[test]
 fn inconsistent_and_zero_terms_keep_counts_without_geometry_and_errors_do_not_poison_reuse() {
     let a = ScalarArithmetic::default();
     let mut db = PhaseCatalogue::new();

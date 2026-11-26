@@ -34,6 +34,7 @@ struct Entropy<'a, R> {
     limit: usize,
 }
 impl<R: RandomSource> Entropy<'_, R> {
+    #[inline]
     fn below(&mut self, bound: u64) -> Result<u64> {
         if bound == 0 {
             return Err("cultivation range must have a positive bound".into());
@@ -55,6 +56,49 @@ impl<R: RandomSource> Entropy<'_, R> {
                 return Ok(value);
             }
         }
+    }
+
+    fn physical_occurrences(
+        &mut self,
+        sites: usize,
+        bound: u64,
+        threshold: u64,
+    ) -> Result<Vec<usize>> {
+        let mut active = Vec::new();
+        let mask = u64::MAX >> (bound - 1).leading_zeros();
+        let mut site = 0;
+        // Read no farther than the site and entropy limits. Rejected words
+        // consume entropy without advancing the site, including within a block.
+        const BLOCK: usize = 8;
+        while sites - site >= BLOCK && self.limit - self.used >= BLOCK {
+            let words: [u64; BLOCK] = std::array::from_fn(|_| self.random.next_u64() & mask);
+            self.used += words.len();
+            let contains_fault = words
+                .iter()
+                .fold(false, |found, &word| found | (word < threshold));
+            if !contains_fault {
+                site += words
+                    .map(|word| usize::from(word < bound))
+                    .iter()
+                    .sum::<usize>();
+            } else {
+                for word in words {
+                    if word < bound {
+                        if word < threshold {
+                            active.push(site);
+                        }
+                        site += 1;
+                    }
+                }
+            }
+        }
+        while site < sites {
+            if self.below(bound)? < threshold {
+                active.push(site);
+            }
+            site += 1;
+        }
+        Ok(active)
     }
 }
 
@@ -159,6 +203,32 @@ impl Sampler {
         })
     }
 
+    /// Test the exact selected-detector constraints for a draw from this sampler.
+    pub(crate) fn passes_detector_constraints(
+        &self,
+        closure: &DetectorClosure,
+        draw: &Draw,
+        residual: &mut [u64],
+    ) -> bool {
+        if self.closure.is_some() {
+            // Closing already checked the entire assignment, including the
+            // unchanged prefix. The ordinary mixture branch may fail this test.
+            return draw.weight.passes;
+        }
+        residual.copy_from_slice(closure.offset.words());
+        for fault in &draw.faults {
+            let site = self
+                .sites
+                .binary_search(&fault.site)
+                .expect("draw uses the sampler's original sites");
+            let signature = &closure.signatures[site][fault.alternative];
+            for (word, signature) in residual.iter_mut().zip(signature.words()) {
+                *word ^= signature;
+            }
+        }
+        residual.iter().all(|&word| word == 0)
+    }
+
     pub(crate) fn num_sites(&self) -> usize {
         self.sites.len()
     }
@@ -169,7 +239,14 @@ impl Sampler {
             used: 0,
             limit: max_words,
         };
-        let (faults, weight) = self.draw_ranges(|bound| entropy.below(bound))?;
+        let bound = self.occurrence_denominator;
+        let (faults, weight) = if self.closure.is_none() && bound > 1 {
+            let active =
+                entropy.physical_occurrences(self.sites.len(), bound, self.occurrence_numerator)?;
+            self.assign_ranges(&active, |bound| entropy.below(bound))?
+        } else {
+            self.draw_ranges(|bound| entropy.below(bound))?
+        };
         Ok(Draw {
             faults,
             weight,
@@ -183,19 +260,29 @@ impl Sampler {
         mut range: impl FnMut(u64) -> Result<u64>,
     ) -> Result<(Vec<FaultSelection>, WeightKey)> {
         let mut active = Vec::new();
+        // Closing follows the upper interval of the [1-q,q] CDF, and
+        // physical draws use the lower interval. The range requests are identical.
+        let closing = self.closure.is_some();
+        let bound = self.occurrence_denominator;
+        let threshold = if closing {
+            bound - self.occurrence_numerator
+        } else {
+            self.occurrence_numerator
+        };
         for site in 0..self.sites.len() {
-            let value = choose(&mut range, self.occurrence_denominator)?;
-            // The closing proposal follows the [1-q,q] CDF of B02. Physical
-            // draws use the ordinary lower interval. Both laws remain exact.
-            let occurs = if self.closure.is_some() {
-                value >= self.occurrence_denominator - self.occurrence_numerator
-            } else {
-                value < self.occurrence_numerator
-            };
-            if occurs {
+            let value = choose(&mut range, bound)?;
+            if (value < threshold) ^ closing {
                 active.push(site);
             }
         }
+        self.assign_ranges(&active, range)
+    }
+
+    fn assign_ranges(
+        &self,
+        active: &[usize],
+        mut range: impl FnMut(u64) -> Result<u64>,
+    ) -> Result<(Vec<FaultSelection>, WeightKey)> {
         let mut weight = WeightKey {
             occurrences: active.len(),
             tail_candidates: 0,
@@ -295,6 +382,7 @@ impl Sampler {
     }
 }
 
+#[inline]
 fn choose(range: &mut impl FnMut(u64) -> Result<u64>, bound: u64) -> Result<u64> {
     if bound == 0 {
         return Err("cultivation range must have a positive bound".into());

@@ -126,11 +126,14 @@ def close(actual, expected, label):
             f'BH regenerated {label} differs from exported metrics')
 
 
-def validate_inventory(inventory, shots):
+def validate_inventory(inventory, shots, *, preparation_assignments=0, skipped_terminal_queries=0,
+                       terminal_queries_per_assignment=2):
     require(set(inventory) == {'after_preparation', 'after_warmup', 'after_sampling'},
             'missing BH inventory stage')
     first = inventory['after_preparation']
-    for name, assignments in [('after_preparation',0), ('after_warmup',1), ('after_sampling',shots+1)]:
+    for name, assignments in [('after_preparation', preparation_assignments),
+                              ('after_warmup', preparation_assignments+1),
+                              ('after_sampling', preparation_assignments+1+shots)]:
         stage = inventory[name]
         require(type(stage['source_assignments']) is int and stage['source_assignments'] == assignments,
                 'BH source assignment duplicated or warmup pooled')
@@ -143,7 +146,9 @@ def validate_inventory(inventory, shots):
             for key, value in baseline.items():
                 if key not in {'closure_evaluations', 'fixed_evaluations'}:
                     require(actual[key] == value, 'BH per-draw construction detected: '+key)
-            expected = 2*assignments if owner == 'source' else 0
+            expected = terminal_queries_per_assignment*assignments if owner == 'source' else 0
+            if owner == 'source' and name == 'after_sampling':
+                expected -= skipped_terminal_queries
             require(actual['closure_evaluations'] == actual['fixed_evaluations'] == expected,
                     'BH terminal family evaluation count changed')
 

@@ -68,10 +68,21 @@ struct Target {
 enum Execution {
     Linear {
         instrument: Box<CompiledInstrument>,
-        model: NoiseModel,
-        sampler: Box<NoiseSampler>,
+        noise: Option<Box<LinearNoise>>,
     },
     Causal(Box<CausalProgram>),
+}
+struct LinearNoise {
+    model: NoiseModel,
+    sampler: NoiseSampler,
+}
+fn linear_noise(noise: &Option<Box<LinearNoise>>) -> Result<&LinearNoise, TaskError> {
+    noise.as_deref().ok_or_else(|| {
+        TaskError::new(
+            "noise",
+            "prescribed contribution evaluator has no internal noise model",
+        )
+    })
 }
 /// Independent retained source/target program snapshots. This excludes cold
 /// transient owners, manual phase APIs and logical query-cache cardinalities.
@@ -232,7 +243,7 @@ impl TaskEvaluator {
         options: EvaluationOptions,
         sampling: &NoiseSampling,
     ) -> Result<Self, TaskError> {
-        Self::new_observed(physical, modules, registry, options, sampling, None)
+        Self::new_observed(physical, modules, registry, options, Some(sampling), None)
     }
     /// Prepare while recording actual compiler and target-normalization work.
     pub fn new_with_costs(
@@ -243,14 +254,39 @@ impl TaskEvaluator {
         sampling: &NoiseSampling,
         meter: &ExecutionMeter,
     ) -> Result<Self, TaskError> {
-        Self::new_observed(physical, modules, registry, options, sampling, Some(meter))
+        Self::new_observed(
+            physical,
+            modules,
+            registry,
+            options,
+            Some(sampling),
+            Some(meter),
+        )
+    }
+    /// Prepare exact contributions for an externally sampled linear fault
+    /// law. Integrated scoring and query preparation are available. Methods
+    /// requiring the evaluator's own noise sampler or model are unsupported.
+    pub fn new_linear_prescribed_with_costs(
+        physical: &Circuit,
+        modules: &LoadedModules,
+        options: EvaluationOptions,
+        meter: &ExecutionMeter,
+    ) -> Result<Self, TaskError> {
+        Self::new_observed(
+            physical,
+            modules,
+            &ControllerRegistry::default(),
+            options,
+            None,
+            Some(meter),
+        )
     }
     fn new_observed(
         physical: &Circuit,
         modules: &LoadedModules,
         registry: &ControllerRegistry,
         options: EvaluationOptions,
-        sampling: &NoiseSampling,
+        sampling: Option<&NoiseSampling>,
         meter: Option<&ExecutionMeter>,
     ) -> Result<Self, TaskError> {
         let a = &options.scalars;
@@ -333,6 +369,12 @@ impl TaskEvaluator {
             .map(|&record| BitExpr::atom(BitAtom::Record(record)))
             .collect::<Vec<_>>();
         let execution = if composed.needs_history_sampling() || !requested.is_empty() {
+            let sampling = sampling.ok_or_else(|| {
+                TaskError::new(
+                    "runtime",
+                    "prescribed contribution preparation requires a linear task",
+                )
+            })?;
             let mut program = CausalProgram::new_vacuum_task_observed(
                 &composed,
                 &task.outputs,
@@ -354,19 +396,23 @@ impl TaskEvaluator {
                 compile_vacuum_task(&composed, &layout, &options.runtime.compile, a, false)
                     .map_err(|e| error("circuit", e))
             })?;
-            let model = NoiseModel::physical(&instrument, &options.runtime.noise)
-                .map_err(|e| error("noise", e))?;
-            let sampler = NoiseSampler::configured(
-                model.clone(),
-                sampling,
-                &Default::default(),
-                options.runtime.noise,
-            )
-            .map_err(|e| error("sampling", e))?;
+            let noise = if let Some(sampling) = sampling {
+                let model = NoiseModel::physical(&instrument, &options.runtime.noise)
+                    .map_err(|e| error("noise", e))?;
+                let sampler = NoiseSampler::configured(
+                    model.clone(),
+                    sampling,
+                    &Default::default(),
+                    options.runtime.noise,
+                )
+                .map_err(|e| error("sampling", e))?;
+                Some(Box::new(LinearNoise { model, sampler }))
+            } else {
+                None
+            };
             Execution::Linear {
                 instrument: Box::new(instrument),
-                model,
-                sampler: Box::new(sampler),
+                noise,
             }
         };
         Ok(Self {
@@ -376,14 +422,14 @@ impl TaskEvaluator {
             requested,
             execution,
             options,
-            sampling: sampling.clone(),
+            sampling: sampling.cloned().unwrap_or(NoiseSampling::Physical),
             diagnostic_record_width: composed.num_records(),
             protocol_call_boundary: physical.external_calls(),
         })
     }
     pub fn scaled_proposal_summary(&self) -> Option<&ScaledProposalSummary> {
         match &self.execution {
-            Execution::Linear { sampler, .. } => sampler.scaled_proposal_summary(),
+            Execution::Linear { noise, .. } => noise.as_ref()?.sampler.scaled_proposal_summary(),
             Execution::Causal(program) => program.scaled_proposal_summary(),
         }
     }
@@ -562,12 +608,11 @@ impl TaskEvaluator {
                     self.evaluate_observed(EvaluationInput::history(&history), meter)?;
                 Ok((evaluation, captured))
             }
-            Execution::Linear {
-                instrument,
-                sampler,
-                ..
-            } => {
-                let draw = sampler.draw(random).map_err(|e| error("noise", e))?;
+            Execution::Linear { instrument, noise } => {
+                let draw = linear_noise(noise)?
+                    .sampler
+                    .draw(random)
+                    .map_err(|e| error("noise", e))?;
                 let captured = diagnostics.map(|_| TaskSampleDiagnostics {
                     noise_entropy_words: draw.entropy_words,
                     ..Default::default()
@@ -595,6 +640,31 @@ impl TaskEvaluator {
         self.sample_with_faults(faults, BigRational::one(), random, None)
     }
 
+    /// Return XOR-composable labels for the joint acceptance and target-error
+    /// masses of a prepared linear target task without moment requests.
+    ///
+    /// Two assignments with the same label have identical phase updates,
+    /// virtual-wire Paulis, output Paulis and postselection flips. They differ
+    /// only by a global phase and a unitary on traced physical wires that
+    /// commutes with the selected parity projectors. This preserves both
+    /// integrated masses. Labels do not describe unselected record marginals.
+    /// The word cap covers the packed label payload. Inapplicable or oversized
+    /// plans return `None`.
+    pub fn linear_target_fault_signatures(
+        &self,
+        max_words: usize,
+    ) -> Result<Option<Vec<Vec<BitVector>>>, TaskError> {
+        let Execution::Linear { instrument, .. } = &self.execution else {
+            return Ok(None);
+        };
+        if self.target.is_none() || !self.task.observables.is_empty() {
+            return Ok(None);
+        }
+        instrument
+            .score_signatures(&self.task.outputs, max_words)
+            .map_err(|e| error("fault_signatures", e))
+    }
+
     /// Evaluate linear task contributions for a prescribed fault assignment.
     /// This computes the same unit-weight joint masses as `sample_prescribed`
     /// on linear tasks, without evaluating the original categorical probability.
@@ -603,6 +673,30 @@ impl TaskEvaluator {
     pub fn linear_prescribed_contributions(
         &self,
         faults: &[FaultSelection],
+    ) -> Result<LinearPrescribedContributions, TaskError> {
+        self.linear_prescribed_contributions_with_screen(faults, false)
+    }
+
+    /// Evaluate the accepted and target-error masses of a linear target task.
+    /// Exact zero acceptance implies a zero postselected positive operator,
+    /// so its target score is zero and `target_resources` is absent.
+    pub fn screened_linear_target_contributions(
+        &self,
+        faults: &[FaultSelection],
+    ) -> Result<LinearPrescribedContributions, TaskError> {
+        if self.target.is_none() || !self.task.observables.is_empty() {
+            return Err(error(
+                "runtime",
+                "screened target scoring requires a target and no moments",
+            ));
+        }
+        self.linear_prescribed_contributions_with_screen(faults, true)
+    }
+
+    fn linear_prescribed_contributions_with_screen(
+        &self,
+        faults: &[FaultSelection],
+        screen_target: bool,
     ) -> Result<LinearPrescribedContributions, TaskError> {
         let Execution::Linear { instrument, .. } = &self.execution else {
             return Err(error(
@@ -613,14 +707,18 @@ impl TaskEvaluator {
         let unit = BigRational::one();
         // The private evaluation result uses the supplied probability only as
         // metadata. This endpoint returns contributions and omits that metadata.
-        let result = self.evaluate(EvaluationInput {
-            instrument,
-            faults,
-            history_mass: &ExactScalar::one(),
-            noise_probability: &unit,
-            likelihood: &unit,
-            history: None,
-        })?;
+        let result = self.evaluate_with_target_screen(
+            EvaluationInput {
+                instrument,
+                faults,
+                history_mass: &ExactScalar::one(),
+                noise_probability: &unit,
+                likelihood: &unit,
+                history: None,
+            },
+            None,
+            screen_target,
+        )?;
         Ok(LinearPrescribedContributions {
             acceptance_resources: result.acceptance_resources,
             target_resources: result.target_resources,
@@ -700,10 +798,11 @@ impl TaskEvaluator {
                     .map_err(|e| error("runtime", e))?;
                 self.evaluate_observed(EvaluationInput::history(&history), meter)
             }
-            Execution::Linear {
-                instrument, model, ..
-            } => {
-                let probability = model.probability(faults).map_err(|e| error("noise", e))?;
+            Execution::Linear { instrument, noise } => {
+                let probability = linear_noise(noise)?
+                    .model
+                    .probability(faults)
+                    .map_err(|e| error("noise", e))?;
                 self.evaluate_observed(
                     EvaluationInput {
                         instrument,
@@ -756,6 +855,14 @@ impl TaskEvaluator {
         input: EvaluationInput<'_>,
         meter: Option<&ExecutionMeter>,
     ) -> Result<TaskEvaluation, TaskError> {
+        self.evaluate_with_target_screen(input, meter, false)
+    }
+    fn evaluate_with_target_screen(
+        &self,
+        input: EvaluationInput<'_>,
+        meter: Option<&ExecutionMeter>,
+        screen_target: bool,
+    ) -> Result<TaskEvaluation, TaskError> {
         let a = &self.options.scalars;
         let f = &self.options.fields;
         let max_terms = self.options.runtime.sampling.max_terms;
@@ -784,7 +891,10 @@ impl TaskEvaluator {
                 input.likelihood,
             )
             .map_err(|e| error("acceptance", e))?;
-        let target_query = if let Some(target) = &self.target {
+        let skipped_target = screen_target && raw_acceptance.is_zero();
+        let target_query = if let Some(target) = &self.target
+            && !skipped_target
+        {
             Some(observe(meter, OperationKind::Query, || {
                 assignment
                     .target_density_weight(
@@ -821,7 +931,9 @@ impl TaskEvaluator {
             } else {
                 None
             };
-        let raw_error = if let (Some(target), Some(success)) = (&self.target, &raw_target_success) {
+        let raw_error = if skipped_target {
+            ExactScalar::zero()
+        } else if let (Some(target), Some(success)) = (&self.target, &raw_target_success) {
             a.subtract(
                 &a.multiply(&raw_acceptance, &target.norm)
                     .map_err(|e| error("error", e))?,

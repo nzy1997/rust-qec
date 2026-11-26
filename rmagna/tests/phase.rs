@@ -773,6 +773,40 @@ fn wide_clifford_extraction_preserves_odd_identities_and_packed_carries() {
 }
 
 #[test]
+fn single_word_clifford_validation_includes_the_highest_coordinate() {
+    let width = 64;
+    let coordinates = [0, 17, 42, 63];
+    let axis = |mask: u8| {
+        BitVector::from_indices(
+            width,
+            coordinates
+                .into_iter()
+                .enumerate()
+                .filter_map(|(bit, coordinate)| (mask >> bit & 1 != 0).then_some(coordinate)),
+        )
+        .unwrap()
+    };
+    // The 15 odd parities sum to 0 or 8 on every assignment.
+    let cancelled = (1..16).map(|mask| (axis(mask), 1));
+    let phase = ParityPhase::new(width, 3, cancelled.clone().chain([(axis(9), 2)])).unwrap();
+    let (global, quadratic) = phase.clifford().unwrap();
+    for mask in 0..16 {
+        let value = axis(mask);
+        assert_eq!(
+            (global + 2 * quadratic.evaluate(&value).unwrap()) & 7,
+            3 + 2 * ((mask & 9).count_ones() % 2) as u8,
+            "assignment {mask}"
+        );
+    }
+
+    let t = ParityPhase::new(width, 0, [(axis(8), 1)]).unwrap();
+    let ccz = (1..8).map(|mask| (axis(mask << 1), 1));
+    let cubic = ParityPhase::new(width, 0, cancelled.chain(ccz)).unwrap();
+    assert_eq!(t.clifford(), Err(PhaseError::NotClifford));
+    assert_eq!(cubic.clifford(), Err(PhaseError::NotClifford));
+}
+
+#[test]
 fn packed_clifford_validation_checks_cubic_terms_beyond_the_first_word() {
     let width = 131;
     let cancelled = (0..5).flat_map(|block| {

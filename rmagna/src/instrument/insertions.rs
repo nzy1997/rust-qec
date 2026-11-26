@@ -59,3 +59,44 @@ pub(super) fn prepare(
         decisions: indices,
     })
 }
+
+impl CompiledInstrument {
+    pub(crate) fn score_signatures(
+        &self,
+        outputs: &[usize],
+        max_words: usize,
+    ) -> Result<Option<Vec<Vec<BitVector>>>, InstrumentError> {
+        let Some(catalog) = &self.insertion_catalog else {
+            return Ok(None);
+        };
+        if !self.initial_prepared_insertions.is_empty() {
+            return Ok(None);
+        }
+        let outputs = self.output_wires(outputs)?;
+        let Some(signatures) = catalog.plan.score_signatures(
+            &self.event_rows,
+            &outputs,
+            self.coherent_qubits(),
+            max_words,
+        )?
+        else {
+            return Ok(None);
+        };
+        self.sites
+            .iter()
+            .map(|site| {
+                site.alternatives
+                    .iter()
+                    .map(|alternative| {
+                        alternative
+                            .catalog_index
+                            .and_then(|index| signatures.get(index))
+                            .cloned()
+                            .ok_or(InstrumentError::PreparedInsertionCatalogUnavailable)
+                    })
+                    .collect()
+            })
+            .collect::<Result<Vec<_>, _>>()
+            .map(Some)
+    }
+}

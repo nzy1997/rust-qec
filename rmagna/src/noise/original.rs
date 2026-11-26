@@ -1,7 +1,6 @@
 //! Original physical noise declarations, separate from coherent compiler sites.
 use crate::circuit::{Basis, BitExpr, Circuit, NoiseKind, Operation, SourceLocation};
 use crate::probability::{Probability, ProbabilityError};
-use num_rational::BigRational;
 use std::{collections::BTreeMap, fmt};
 
 /// Bounds on the complete returned description, including zero-mass channels.
@@ -202,9 +201,7 @@ pub fn original_noise_categories(
                     });
                 } else {
                     let alternatives = pauli_channels(kind, probabilities, qubits)?;
-                    let identity_probability =
-                        Probability::checked_sum(alternatives.iter().map(|(p, _)| p.clone()))?
-                            .complement();
+                    let identity_probability = pauli_identity(kind, probabilities)?;
                     result.push(OriginalNoiseCategory {
                         internal_site: site,
                         source_operations: vec![anchor()],
@@ -244,6 +241,31 @@ pub(crate) fn correlated_channel(
 /// physical labels. Sharing this law never shares actions between locations.
 pub(crate) type PauliChannels = Vec<(Probability, Vec<(usize, Basis)>)>;
 
+pub(crate) fn pauli_identity(
+    kind: &NoiseKind,
+    probabilities: &[Probability],
+) -> Result<Probability, ProbabilityError> {
+    match kind {
+        NoiseKind::Pauli1 | NoiseKind::Pauli2 => {
+            Ok(Probability::checked_sum(probabilities.iter().cloned())?.complement())
+        }
+        NoiseKind::X
+        | NoiseKind::Y
+        | NoiseKind::Z
+        | NoiseKind::Depolarize1
+        | NoiseKind::Depolarize2 => Ok(probabilities[0].complement()),
+        NoiseKind::Correlated { .. } => unreachable!("correlated law requires survival state"),
+    }
+}
+
+fn depolarizing_alternative(
+    probability: &Probability,
+    count: u32,
+) -> Result<Probability, ProbabilityError> {
+    let value = probability.value();
+    Probability::from_ratio(value.numer().clone(), value.denom() * count)
+}
+
 pub(crate) fn pauli_channels(
     kind: &NoiseKind,
     probabilities: &[Probability],
@@ -255,14 +277,14 @@ pub(crate) fn pauli_channels(
         NoiseKind::Z => vec![(probabilities[0].clone(), vec![(qubits[0], Basis::Z)])],
         NoiseKind::Depolarize1 | NoiseKind::Pauli1 => {
             let mut alternatives = Vec::with_capacity(3);
+            let uniform = matches!(kind, NoiseKind::Depolarize1)
+                .then(|| depolarizing_alternative(&probabilities[0], 3))
+                .transpose()?;
             for (j, basis) in [Basis::X, Basis::Y, Basis::Z].into_iter().enumerate() {
-                let probability = if matches!(kind, NoiseKind::Depolarize1) {
-                    Probability::from_rational(
-                        probabilities[0].value() / BigRational::from_integer(3.into()),
-                    )?
-                } else {
-                    probabilities[j].clone()
-                };
+                let probability = uniform
+                    .as_ref()
+                    .unwrap_or_else(|| &probabilities[j])
+                    .clone();
                 alternatives.push((probability, vec![(qubits[0], basis)]));
             }
             alternatives
@@ -270,14 +292,14 @@ pub(crate) fn pauli_channels(
         NoiseKind::Depolarize2 | NoiseKind::Pauli2 => {
             let bases = [None, Some(Basis::X), Some(Basis::Y), Some(Basis::Z)];
             let mut alternatives = Vec::with_capacity(15);
+            let uniform = matches!(kind, NoiseKind::Depolarize2)
+                .then(|| depolarizing_alternative(&probabilities[0], 15))
+                .transpose()?;
             for index in 1..16 {
-                let probability = if matches!(kind, NoiseKind::Depolarize2) {
-                    Probability::from_rational(
-                        probabilities[0].value() / BigRational::from_integer(15.into()),
-                    )?
-                } else {
-                    probabilities[index - 1].clone()
-                };
+                let probability = uniform
+                    .as_ref()
+                    .unwrap_or_else(|| &probabilities[index - 1])
+                    .clone();
                 let mut factors = Vec::with_capacity(2);
                 if let Some(basis) = bases[index / 4] {
                     factors.push((qubits[0], basis));

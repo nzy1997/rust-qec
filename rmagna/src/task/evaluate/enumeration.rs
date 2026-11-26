@@ -254,7 +254,7 @@ impl TaskEvaluator {
         }
         limit("max_branches", options.histories.max_branches, 1)?;
         let model = match &self.execution {
-            Execution::Linear { model, .. } => model,
+            Execution::Linear { noise, .. } => &linear_noise(noise)?.model,
             Execution::Causal(program) => program.potential_noise_model(),
         };
         let sector =

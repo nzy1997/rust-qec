@@ -97,6 +97,47 @@ fn rational(n: i64, d: i64) -> ExactField {
 }
 
 #[test]
+fn externally_sampled_linear_tasks_prepare_exact_scores_without_an_internal_noise_model() {
+    let files = Files::new();
+    files.put("ideal.magna", "H 0\nT 0");
+    let parse = ParseOptions::default();
+    let physical = parse_circuit("H 0\nT 0\nZ_ERROR(1/5) 0", &parse).unwrap();
+    let task = parse_task(
+        r#"{"schema_version":1,"outputs":[0],"ideal_state":"ideal.magna"}"#,
+        &files.0,
+        &TaskOptions::default(),
+    )
+    .unwrap();
+    let modules = task.load_modules(&physical, &parse).unwrap();
+    let registry = ControllerRegistry::default();
+    let normal = TaskEvaluator::new(&physical, &modules, &registry, Default::default()).unwrap();
+    let mut options = EvaluationOptions::default();
+    options.runtime.noise.max_denominator_bits = 1;
+    assert!(TaskEvaluator::new(&physical, &modules, &registry, options).is_err());
+    let meter = rmagna::costs::ExecutionMeter::new(Default::default());
+    let external =
+        TaskEvaluator::new_linear_prescribed_with_costs(&physical, &modules, options, &meter)
+            .unwrap();
+    for faults in [
+        &[][..],
+        &[FaultSelection {
+            site: 0,
+            alternative: 0,
+        }],
+    ] {
+        assert_eq!(
+            external.linear_prescribed_contributions(faults).unwrap(),
+            normal.linear_prescribed_contributions(faults).unwrap(),
+        );
+    }
+    let mut random = Words::new(vec![]);
+    assert!(external.sample(&mut random).is_err());
+    assert!(external.sample_prescribed(&[], &mut random).is_err());
+    assert!(external.enumerate_physical(&Default::default()).is_err());
+    assert_eq!(random.at, 0);
+}
+
+#[test]
 fn linear_importance_draws_weight_acceptance_error_target_and_moments_exactly_once() {
     let files = Files::new();
     files.put("ideal.magna", "I 0");

@@ -327,6 +327,73 @@ fn pauli_order_and_tensor_boundary_order_keep_complex_phase() {
 }
 
 #[test]
+fn tensor_preserves_boundary_and_quadratic_coordinates_across_packed_words() {
+    let arithmetic = ScalarArithmetic::default();
+    let ket = |width: usize, paths: usize, constant: u8| {
+        let offset = BitVector::from_indices(width, (0..width).step_by(2)).unwrap();
+        let columns = (0..paths)
+            .map(|i| BitVector::from_indices(width, (i % 5..width).step_by(5)).unwrap())
+            .collect::<Vec<_>>();
+        let upper = (0..paths)
+            .map(|i| BitVector::from_indices(paths, (i + 1..paths).step_by(3)).unwrap())
+            .collect();
+        let phase =
+            QuadraticForm::new(constant, (0..paths).map(|i| (i % 4) as u8).collect(), upper)
+                .unwrap();
+        let coefficient = arithmetic.omega(i64::from(constant), -1).unwrap();
+        AffineKet::new(offset, columns, phase, coefficient).unwrap()
+    };
+    let joined_rows =
+        |left: &[BitVector], right: &[BitVector], shift, width| {
+            left.iter()
+                .map(|row| BitVector::from_indices(width, row.ones()).unwrap())
+                .chain(right.iter().map(|row| {
+                    BitVector::from_indices(width, row.ones().map(|j| shift + j)).unwrap()
+                }))
+                .collect::<Vec<_>>()
+        };
+    for (width, paths) in [(0, 0), (0, 3), (63, 65), (64, 63), (65, 64), (129, 127)] {
+        let left = ket(width, paths, 3);
+        let right = ket(70, 69, 2);
+        let product = left.tensor(&right, &arithmetic).unwrap();
+        assert_eq!(
+            product.offset(),
+            &BitVector::from_indices(
+                width + 70,
+                left.offset()
+                    .ones()
+                    .chain(right.offset().ones().map(|i| width + i)),
+            )
+            .unwrap()
+        );
+        assert_eq!(
+            product.columns(),
+            joined_rows(left.columns(), right.columns(), width, width + 70)
+        );
+        assert_eq!(product.phase().constant(), 1);
+        assert_eq!(
+            product.phase().linear(),
+            [left.phase().linear(), right.phase().linear()].concat()
+        );
+        assert_eq!(
+            product.phase().upper(),
+            joined_rows(
+                left.phase().upper(),
+                right.phase().upper(),
+                paths,
+                paths + 69
+            )
+        );
+        assert_eq!(
+            product.coefficient(),
+            &arithmetic
+                .multiply(left.coefficient(), right.coefficient())
+                .unwrap()
+        );
+    }
+}
+
+#[test]
 fn wide_boundary_and_zero_kets_do_not_inherit_a_fixed_qubit_cap() {
     let arithmetic = ScalarArithmetic::default();
     let width = 4097;

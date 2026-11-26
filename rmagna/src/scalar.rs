@@ -98,6 +98,11 @@ impl ExactScalar {
         self.coefficients.iter().all(Zero::is_zero)
     }
 
+    fn is_one(&self) -> bool {
+        let [constant, rest @ ..] = &self.coefficients;
+        self.power == 0 && constant.is_one() && rest.iter().all(Zero::is_zero)
+    }
+
     pub fn is_real(&self) -> bool {
         self.coefficients[2].is_zero() && self.coefficients[1] == -&self.coefficients[3]
     }
@@ -269,10 +274,22 @@ impl ScalarArithmetic {
         if a.is_zero() || b.is_zero() {
             return Ok(ExactScalar::zero());
         }
+        if a.is_one() {
+            return Ok(b.clone());
+        }
+        if b.is_one() {
+            return Ok(a.clone());
+        }
         let power = i128::from(a.power) + i128::from(b.power);
         let mut coefficients: [BigInt; 4] = std::array::from_fn(|_| BigInt::zero());
         for (i, x) in a.coefficients.iter().enumerate() {
+            if x.is_zero() {
+                continue;
+            }
             for (j, y) in b.coefficients.iter().enumerate() {
+                if y.is_zero() {
+                    continue;
+                }
                 let product = x * y;
                 if i + j < 4 {
                     coefficients[(i + j) % 4] += product;

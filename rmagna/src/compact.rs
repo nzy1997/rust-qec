@@ -51,15 +51,39 @@ impl CompactBitVector {
         Self { width, storage }
     }
     pub fn from_dense(bits: &BitVector) -> Self {
-        Self::from_sorted(
-            bits.width(),
-            bits.words()
-                .iter()
-                .copied()
-                .enumerate()
-                .filter(|&(_, value)| value != 0)
-                .collect(),
-        )
+        Self::from_word_slice(bits.width(), bits.words())
+    }
+    fn from_word_slice(width: usize, words: &[u64]) -> Self {
+        let Some(first) = words.iter().position(|&word| word != 0) else {
+            return Self::zeros(width);
+        };
+        let last = words
+            .iter()
+            .rposition(|&word| word != 0)
+            .expect("nonempty mask");
+        let span = &words[first..=last];
+        let nonzero = span.iter().filter(|&&word| word != 0).count();
+        let storage = if first == last {
+            Storage::Single {
+                at: first,
+                value: words[first],
+            }
+        } else if span.len() <= 2 * nonzero {
+            Storage::Span {
+                first,
+                words: span.to_vec(),
+            }
+        } else {
+            let mut rows = Vec::with_capacity(nonzero);
+            rows.extend(
+                span.iter()
+                    .copied()
+                    .enumerate()
+                    .filter_map(|(j, word)| (word != 0).then_some((first + j, word))),
+            );
+            Storage::Sparse(rows)
+        };
+        Self { width, storage }
     }
     pub fn from_indices(
         width: usize,
@@ -212,6 +236,23 @@ impl CompactBitVector {
                 expected: self.width,
                 actual: right.width,
             });
+        }
+        if matches!(self.storage, Storage::Empty) {
+            return Ok(right.clone());
+        }
+        if matches!(right.storage, Storage::Empty) {
+            return Ok(self.clone());
+        }
+        let limit = self.word_limit().max(right.word_limit());
+        let mut words = [0; 8];
+        if limit <= words.len() {
+            for (index, value) in self.words() {
+                words[index] = value;
+            }
+            for (index, value) in right.words() {
+                words[index] ^= value;
+            }
+            return Ok(Self::from_word_slice(self.width, &words[..limit]));
         }
         let (mut a, mut b) = (self.words().peekable(), right.words().peekable());
         let mut rows = Vec::new();

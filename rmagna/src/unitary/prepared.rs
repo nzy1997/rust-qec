@@ -291,7 +291,7 @@ impl PreparedProbability {
             .ok_or(UnitaryError::DimensionOverflow)?;
         let reference = &state.program.query_reference;
         let half = reference.width();
-        let joint = reference.tensor(&reference.conjugate(), arithmetic)?;
+        let joint = reference.conjugate_tensor(arithmetic)?;
         let total = joint.width();
         let mut constraints = (0..state.width())
             .map(|j| BitVector::from_indices(total, [j, half + j]))
@@ -353,9 +353,7 @@ impl PreparedProbability {
             self.physical_width + self.event_count,
             outcomes.ones().map(|j| self.physical_width + j),
         )?;
-        let joint = state
-            .boundary
-            .tensor(&state.boundary.conjugate(), arithmetic)?;
+        let joint = state.boundary.conjugate_tensor(arithmetic)?;
         self.closure.evaluate(
             &joint,
             &rhs,
@@ -685,10 +683,7 @@ pub(super) fn density_joint(
     right: &AffineKet,
     arithmetic: &ScalarArithmetic,
 ) -> Result<AffineKet, UnitaryError> {
-    Ok(left
-        .tensor(&left.conjugate(), arithmetic)?
-        .tensor(&right.conjugate(), arithmetic)?
-        .tensor(right, arithmetic)?)
+    Ok(left.density_tensor(right, arithmetic)?)
 }
 pub(super) fn density_rhs(
     trace: usize,

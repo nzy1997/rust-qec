@@ -129,6 +129,42 @@ impl BitVector {
         Ok(())
     }
 
+    /// Append a coordinate without copying the existing packed words.
+    pub(crate) fn push_bit(&mut self, bit: bool) -> Result<(), Gf2Error> {
+        let width = self
+            .width
+            .checked_add(1)
+            .ok_or(Gf2Error::AllocationFailed)?;
+        let tail = self.width % 64;
+        if tail == 0 {
+            self.words
+                .try_reserve(1)
+                .map_err(|_| Gf2Error::AllocationFailed)?;
+            self.words.push(u64::from(bit));
+        } else {
+            *self.words.last_mut().expect("partial word exists") |= u64::from(bit) << tail;
+        }
+        self.width = width;
+        Ok(())
+    }
+
+    /// Remove a coordinate, shifting higher coordinates down by one.
+    pub(crate) fn without_bit(&self, index: usize) -> Result<Self, Gf2Error> {
+        self.check_index(index)?;
+        let mut result = self.clone();
+        let first = index / 64;
+        let low = (1u64 << (index % 64)) - 1;
+        for j in first..self.words.len() {
+            let word = self.words[j];
+            let carry = self.words.get(j + 1).copied().unwrap_or_default() << 63;
+            let preserve = if j == first { low } else { 0 };
+            result.words[j] = (word & preserve) | (((word >> 1) | carry) & !preserve);
+        }
+        result.width -= 1;
+        result.words.truncate(result.width.div_ceil(64));
+        Ok(result)
+    }
+
     pub fn xor_assign(&mut self, other: &Self) -> Result<(), Gf2Error> {
         other.check_width(self.width)?;
         for (left, right) in self.words.iter_mut().zip(&other.words) {
@@ -146,13 +182,30 @@ impl BitVector {
             .checked_add(offset)
             .ok_or(Gf2Error::AllocationFailed)?;
         let mut result = Self::zeros(width)?;
+        result.or_shifted_from(self, offset);
+        Ok(result)
+    }
+
+    /// Merge packed coordinates at `offset`. The entire source must fit.
+    pub(crate) fn or_shifted_from(&mut self, source: &Self, offset: usize) {
+        assert!(offset <= self.width && source.width <= self.width - offset);
         let (words, bits) = (offset / 64, offset % 64);
-        for (j, &value) in self.words.iter().enumerate() {
-            result.words[j + words] |= value << bits;
-            if bits != 0 && j + words + 1 < result.words.len() {
-                result.words[j + words + 1] |= value >> (64 - bits);
+        for (j, &value) in source.words.iter().enumerate() {
+            self.words[j + words] |= value << bits;
+            if bits != 0 && j + words + 1 < self.words.len() {
+                self.words[j + words + 1] |= value >> (64 - bits);
             }
         }
+    }
+
+    /// Append zero coordinates without unpacking any set bits.
+    pub(crate) fn zero_extended(&self, additional: usize) -> Result<Self, Gf2Error> {
+        let width = self
+            .width
+            .checked_add(additional)
+            .ok_or(Gf2Error::AllocationFailed)?;
+        let mut result = Self::zeros(width)?;
+        result.words[..self.words.len()].copy_from_slice(&self.words);
         Ok(result)
     }
 

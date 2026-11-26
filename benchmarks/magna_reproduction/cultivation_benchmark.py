@@ -137,6 +137,43 @@ def valid_seconds(value):
     return type(value) in (float, int) and 0 <= value < 1e10 and math.isfinite(value)
 
 
+def validate_score_work(payload, histogram):
+    completed = payload['completed']
+    if 'score_work' not in payload:
+        validate_inventory(payload['inventory'], completed)
+        return
+    observable_count = payload.get('observable_count', 0)
+    require(type(observable_count) is int and observable_count >= 0,
+            'invalid cultivation observable count')
+    counts = payload['score_work']
+    require(isinstance(counts, dict) and set(counts) ==
+            {'rejected_by_detectors', 'reused_no_fault', 'reused_signature', 'evaluated_full_t'}
+            and all(type(count) is int and count >= 0 for count in counts.values())
+            and sum(counts.values()) == completed, 'invalid cultivation score work')
+    skipped = payload.get('skipped_zero_targets', 0)
+    if observable_count:
+        require(counts['evaluated_full_t'] == completed and type(skipped) is int and skipped == 0,
+                'cultivation observable tasks require complete scoring')
+        validate_inventory(payload['inventory'], completed, preparation_assignments=1,
+                           terminal_queries_per_assignment=2+observable_count)
+        return
+    empty = sum(count for (key, _, _), count in histogram.items() if key[0] == 0)
+    rejected = sum(count for (key, acceptance, _), count in histogram.items()
+                   if key[0] != 0 and acceptance == exact.ZERO)
+    require(counts['reused_no_fault'] == empty and counts['rejected_by_detectors'] <= rejected,
+            'cultivation reuse or rejection does not match the exact histogram')
+    if payload['configuration']['closing_sites']:
+        failed_constraints = sum(count for (key, _, _), count in histogram.items()
+                                 if key[0] != 0 and not key[-1])
+        require(counts['rejected_by_detectors'] == failed_constraints,
+                'cultivation closing rejection does not match the exact constraints')
+    require(type(skipped) is int and 0 <= skipped <= min(
+        counts['evaluated_full_t'], rejected - counts['rejected_by_detectors']),
+        'invalid cultivation skipped zero-target work')
+    validate_inventory(payload['inventory'], counts['evaluated_full_t'], preparation_assignments=1,
+                       skipped_terminal_queries=skipped)
+
+
 def validate_stage(stage, case, plan, receipt):
     require(digest_json(stage['case']) == digest_json(case) and stage['status'] == 'complete'
             and type(stage['returncode']) is int and stage['returncode'] == 0,
@@ -186,8 +223,12 @@ def validate_stage(stage, case, plan, receipt):
         family_resources = payload['resources'][key]
         require(digest_json(family_resources) == digest_json(dict(queries=1, resources=1, maximum_quotient_rank=0, maximum_terms=1)),
                 'cultivation prepared resource changed: '+key)
-    validate_inventory(payload['inventory'],n)
-    return exact.histogram(payload)
+    observable_count = payload.get('observable_count', 0)
+    require(type(observable_count) is int and observable_count == 0,
+            'pinned cultivation benchmark requires target-only scoring')
+    histogram = exact.histogram(payload)
+    validate_score_work(payload, histogram)
+    return histogram
 
 
 def stage_path(root, case):

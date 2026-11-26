@@ -222,6 +222,9 @@ impl FieldArithmetic {
         value: &ExactField,
         weight: &BigRational,
     ) -> Result<ExactField, FieldError> {
+        if self.max_bits > 0 && weight.numer().is_one() && weight.denom().is_one() {
+            return self.check(value.clone());
+        }
         let weight = self.from_rational(weight.clone())?;
         self.multiply(value, &weight)
     }
@@ -243,6 +246,13 @@ impl FieldArithmetic {
     ) -> Result<ExactField, FieldError> {
         if denominator.is_zero() {
             return Err(FieldError::DivisionByZero);
+        }
+        // A unit denominator keeps the intermediate norm at one and the
+        // intermediate product equal to the numerator. A zero-bit budget
+        // must still reject the unit norm before checking the numerator.
+        let [constant, rest @ ..] = &denominator.coefficients;
+        if self.max_bits > 0 && constant.is_one() && rest.iter().all(Zero::is_zero) {
+            return self.check(numerator.clone());
         }
         let other = self.multiply(
             &self.multiply(&denominator.automorphism(3), &denominator.automorphism(5))?,

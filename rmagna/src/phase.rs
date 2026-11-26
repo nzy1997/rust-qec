@@ -368,6 +368,9 @@ impl ParityPhase {
     /// Return `omega^global * i^quadratic`. Non-Clifford phases are rejected.
     pub fn clifford(&self) -> Result<(u8, QuadraticForm), PhaseError> {
         self.check_clifford_signature()?;
+        if self.width <= 64 {
+            return self.clifford_single_word();
+        }
         let mut linear = vec![0_u8; self.width];
         let mut pair = Vec::with_capacity(self.width);
         for (axis, coefficient) in &self.terms {
@@ -405,27 +408,77 @@ impl ParityPhase {
         ))
     }
 
+    fn clifford_single_word(&self) -> Result<(u8, QuadraticForm), PhaseError> {
+        let mut linear = vec![0_u8; self.width];
+        let mut low = [0u64; 64];
+        let mut high = [0u64; 64];
+        for (axis, coefficient) in &self.terms {
+            let word = axis.words()[0];
+            for i in axis.ones() {
+                linear[i] = (linear[i] + coefficient) & 7;
+                // Accumulate pair coefficients modulo four, from the low
+                // plane's carry and the term's second bit.
+                if coefficient & 1 != 0 {
+                    high[i] ^= low[i] & word;
+                    low[i] ^= word;
+                }
+                if coefficient & 2 != 0 {
+                    high[i] ^= word;
+                }
+            }
+        }
+        debug_assert!(low.iter().all(|&word| word == 0));
+        debug_assert!(linear.iter().all(|c| c & 1 == 0));
+        let pair = high[..self.width]
+            .iter()
+            .enumerate()
+            .map(|(i, &word)| {
+                let strictly_above = !(u64::MAX >> (63 - i));
+                BitVector::from_words(self.width, vec![word & strictly_above])
+            })
+            .collect::<Result<Vec<_>, _>>()?;
+        for coefficient in &mut linear {
+            *coefficient /= 2;
+        }
+        Ok((self.constant, QuadraticForm::new(0, linear, pair)?))
+    }
+
     fn check_clifford_signature(&self) -> Result<(), PhaseError> {
         let odd = self
             .terms
             .iter()
-            .filter(|(_, c)| c & 1 != 0)
-            .map(|(axis, _)| axis.clone())
-            .collect::<Vec<_>>();
-        if odd.is_empty() {
-            return Ok(());
-        }
+            .filter_map(|(axis, c)| (c & 1 != 0).then_some(axis));
         if self.width <= 64 {
-            for i in 0..self.width {
-                for j in i..self.width {
-                    if !self.signature_slice(i, j)?.is_zero() {
-                        return Err(PhaseError::NotClifford);
+            let odd = odd.map(|axis| axis.words()[0]).collect::<Vec<_>>();
+            let mut active = odd.iter().fold(0, |active, axis| active | axis);
+            while active != 0 {
+                let i = active.trailing_zeros();
+                active &= active - 1;
+
+                // Accumulate all slices (i, j, *) for j >= i in one pass.
+                // A term contributes its axis exactly when both bits are set.
+                let mut slices = [0_u64; 64];
+                for &axis in &odd {
+                    let mut suffix = axis >> i;
+                    if suffix & 1 == 0 {
+                        continue;
                     }
+                    while suffix != 0 {
+                        slices[suffix.trailing_zeros() as usize] ^= axis;
+                        suffix &= suffix - 1;
+                    }
+                }
+                if slices.iter().any(|&slice| slice != 0) {
+                    return Err(PhaseError::NotClifford);
                 }
             }
             return Ok(());
         }
 
+        let odd = odd.cloned().collect::<Vec<_>>();
+        if odd.is_empty() {
+            return Ok(());
+        }
         // Pivot coordinates restrict the span of the odd axes injectively.
         // The signature is symmetric trilinear, so triples of these coordinates
         // with i <= j <= k determine all ambient values, including repeats.
