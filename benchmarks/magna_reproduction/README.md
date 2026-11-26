@@ -4216,18 +4216,21 @@ noise category, including explicit readout errors. It preserves the equal
 conditional channel probabilities in these four inputs. Failure batches use
 `q=p+3/N` and the exact 19/20 closing mixture on the last occupied site, or the
 last two occupied sites at RP2 d5. The full-support branch remains available.
-Reverse Pauli propagation derives the selected signs and drops proposal constraints
-that anticommute at a T rotation. All observed contributions are evaluated on
-the original full T circuits. An exact histogram stores the unit-weight joint
-acceptance and error masses together with a sufficient description of P/Q.
+Reverse Pauli propagation retains the selected signs that commute through the
+T rotations. These constraints also certify zero contributions for rejected
+fault assignments. Assignments with equivalent score signatures reuse exact
+contributions, and cache misses use the original full T circuit. A zero
+acceptance mass certifies zero target-error mass. An exact histogram stores the
+unit-weight joint acceptance and error masses with a description of P/Q.
 
 The report recomputes conditional error by dividing the closing batch's weighted
 mean joint error by the physical batch's mean acceptance. Its delta variance
 includes both independent means. No positive error observation gives an
-unresolved conditional estimate. Timing reports sampling per attempted draw with
-query preparation separate. Time to the observed precision reports worker
-elapsed seconds and the attained relative standard error. Parallel worker seconds
-sum elapsed intervals and can exceed campaign wall time.
+unresolved conditional estimate. Timing reports sampling per attempted draw
+and reports preparation separately. Preparation includes input loading, detector
+and sampler setup, compilation, and exact query preparation. Time to the observed
+precision reports worker elapsed seconds and the attained relative standard error.
+Parallel worker seconds sum elapsed intervals and can exceed campaign wall time.
 
 Place the verified matched replay in the full results directory as `matched-peers`
 before running the full `check` command. The deposited 20-point curves and 20 Table II records are checked against their

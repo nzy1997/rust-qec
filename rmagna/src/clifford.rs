@@ -4,7 +4,6 @@ use crate::gf2::{BitVector, Gf2Error, transpose_columns};
 use crate::quadratic::{QuadraticError, QuadraticForm};
 use crate::scalar::{ExactScalar, ScalarArithmetic, ScalarError};
 use crate::stabilizer::{AffineKet, StabilizerError};
-use std::collections::BTreeMap;
 use std::fmt;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -253,21 +252,17 @@ fn apply(
             };
             let n = columns.len();
             let paths = n.checked_add(1).ok_or(CliffordError::DimensionOverflow)?;
-            let mut upper = phase
-                .upper()
-                .iter()
-                .map(|row| BitVector::from_indices(paths, row.ones()))
-                .collect::<Result<Vec<_>, _>>()?;
-            for (i, column) in columns.iter_mut().enumerate() {
-                upper[i].set(n, column.get(qubit)?)?;
+            phase = phase.append_variable(
+                2 * u8::from(offset.get(qubit)?),
+                columns
+                    .iter()
+                    .map(|column| column.get(qubit).expect("validated qubit")),
+            )?;
+            for column in &mut columns {
                 column.set(qubit, false)?;
             }
-            upper.push(BitVector::zeros(paths)?);
-            let mut linear = phase.linear().to_vec();
-            linear.push(2 * u8::from(offset.get(qubit)?));
             offset.set(qubit, false)?;
             columns.push(BitVector::from_indices(width, [qubit])?);
-            phase = QuadraticForm::new(phase.constant(), linear, upper)?;
             coefficient = arithmetic.multiply(&coefficient, &arithmetic.omega(0, -1)?)?;
             let next = AffineKet::new(offset, columns, phase, coefficient)?;
             return if let Some(kernel) = kernel {
@@ -300,7 +295,8 @@ fn deleted_row_kernel(
     let Some(first) = columns.first() else {
         return Ok(None);
     };
-    let mut echelon = BTreeMap::<usize, BitVector>::new();
+    let mut echelon = vec![None::<BitVector>; count];
+    let mut rank = 0;
     for (index, mut row) in transpose_columns(first.width(), columns)?
         .into_iter()
         .enumerate()
@@ -312,26 +308,30 @@ fn deleted_row_kernel(
             let Some(pivot) = row.ones().next() else {
                 break;
             };
-            if let Some(previous) = echelon.get(&pivot) {
+            if let Some(previous) = &echelon[pivot] {
                 row.xor_assign(previous)?;
             } else {
-                echelon.insert(pivot, row);
+                echelon[pivot] = Some(row);
+                rank += 1;
                 break;
             }
         }
-        if echelon.len() == count {
+        if rank == count {
             return Ok(None);
         }
     }
-    if echelon.len().checked_add(1) != Some(count) {
+    if rank.checked_add(1) != Some(count) {
         return Err(CliffordError::InvalidCanonicalSupport);
     }
-    let free = (0..count)
-        .find(|j| !echelon.contains_key(j))
+    let free = echelon
+        .iter()
+        .position(Option::is_none)
         .ok_or(CliffordError::InvalidCanonicalSupport)?;
     let mut kernel = BitVector::from_indices(count, [free])?;
-    for (&pivot, row) in echelon.iter().rev() {
-        kernel.set(pivot, row.dot(&kernel)?)?;
+    for (pivot, row) in echelon.iter().enumerate().rev() {
+        if let Some(row) = row {
+            kernel.set(pivot, row.dot(&kernel)?)?;
+        }
     }
     Ok(Some(kernel))
 }

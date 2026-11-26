@@ -162,6 +162,61 @@ fn canonical_rationals_raw_inputs_and_resource_limits_are_explicit() {
     ));
 }
 #[test]
+fn unit_field_operations_preserve_exact_coefficients_and_intermediate_limits() {
+    let arithmetic = FieldArithmetic::new(3);
+    let value = arithmetic
+        .value([
+            R::new(3.into(), 5.into()),
+            R::new((-7).into(), 4.into()),
+            R::zero(),
+            R::one(),
+        ])
+        .unwrap();
+    let one = ExactField::one();
+    assert_eq!(arithmetic.divide(&value, &one), Ok(value.clone()));
+    assert_eq!(arithmetic.scale(&value, &R::one()), Ok(value.clone()));
+    assert_eq!(
+        FieldArithmetic::new(2).scale(&value, &R::one()),
+        Err(FieldError::ResourceLimit {
+            limit: 2,
+            required: 3
+        })
+    );
+    assert_eq!(
+        FieldArithmetic::new(0).scale(&ExactField::zero(), &R::one()),
+        Err(FieldError::ResourceLimit {
+            limit: 0,
+            required: 1
+        })
+    );
+    assert_eq!(
+        arithmetic.scale(&value, &R::new_raw(0.into(), 0.into())),
+        Err(FieldError::ZeroDenominator)
+    );
+    assert_eq!(
+        FieldArithmetic::new(2).divide(&value, &one),
+        Err(FieldError::ResourceLimit {
+            limit: 2,
+            required: 3,
+        })
+    );
+    assert_eq!(
+        FieldArithmetic::new(0).divide(&ExactField::zero(), &one),
+        Err(FieldError::ResourceLimit {
+            limit: 0,
+            required: 1,
+        })
+    );
+    let non_unit = FieldArithmetic::default()
+        .value([R::one(), R::one(), R::zero(), R::zero()])
+        .unwrap();
+    assert_eq!(
+        FieldArithmetic::default().divide(&non_unit, &non_unit),
+        Ok(one)
+    );
+}
+
+#[test]
 fn exact_real_order_handles_rational_denominators_and_severe_pell_cancellation() {
     let a = FieldArithmetic::default();
     for x in -10..=10 {

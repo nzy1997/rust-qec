@@ -106,6 +106,25 @@ fn omega_group_conjugation_and_square_root_scales_are_exact() {
 }
 
 #[test]
+fn unit_products_preserve_normalization_and_check_both_operands() {
+    let arithmetic = ScalarArithmetic::default();
+    let one = ExactScalar::one();
+    let value = value(&arithmetic, [3, 0, 7, 0], i64::MIN);
+    assert_eq!(arithmetic.multiply(&value, &one), Ok(value.clone()));
+    assert_eq!(arithmetic.multiply(&one, &value), Ok(value.clone()));
+    let limited = ScalarArithmetic::new(2).unwrap();
+    for (a, b) in [(&one, &value), (&value, &one)] {
+        assert_eq!(
+            limited.multiply(a, b),
+            Err(ScalarError::CoefficientLimit {
+                required: 3,
+                limit: 2
+            })
+        );
+    }
+}
+
+#[test]
 fn interference_and_tiny_accepted_error_survive_exact_subtraction() {
     let arithmetic = ScalarArithmetic::default();
     let one = ExactScalar::one();

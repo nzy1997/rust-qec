@@ -63,7 +63,12 @@ impl Probability {
         Self(BigRational::one())
     }
     pub fn complement(&self) -> Self {
-        Self(BigRational::one() - &self.0)
+        // Subtracting a reduced numerator from its denominator preserves
+        // coprimality, including the normalized zero and one endpoints.
+        Self(BigRational::new_raw(
+            self.0.denom() - self.0.numer(),
+            self.0.denom().clone(),
+        ))
     }
     pub fn checked_sum(values: impl IntoIterator<Item = Self>) -> Result<Self, ProbabilityError> {
         let mut sum = BigRational::zero();

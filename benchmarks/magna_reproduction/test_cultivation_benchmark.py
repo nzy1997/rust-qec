@@ -69,6 +69,53 @@ class CultivationBenchmarkTests(unittest.TestCase):
             stats.weight_key(dict(occurrences=0,tail_candidates=1,passing_candidates=0,passes=False),
                              (1,1,1,1),1,[])
 
+    def test_shortcut_inventory_tracks_only_full_t_evaluations(self):
+        baseline = dict(storage={'source': {}, 'target': {}},
+                        work={'source': {}, 'target': {}})
+        inventory = {}
+        for stage, n in [('after_preparation', 1), ('after_warmup', 2), ('after_sampling', 3)]:
+            inventory[stage] = dict(
+                **baseline, source_assignments=n,
+            )
+            inventory[stage]['work'] = {
+                'source': dict(saturated=False, closure_evaluations=2*n, fixed_evaluations=2*n),
+                'target': dict(saturated=False, closure_evaluations=0, fixed_evaluations=0),
+            }
+        payload = dict(completed=6, inventory=inventory, configuration={'closing_sites': 1},
+                       score_work=dict(rejected_by_detectors=2, reused_no_fault=1,
+                                       reused_signature=2, evaluated_full_t=1))
+        histogram = {
+            ((0, 1, 1, True), stats.ONE, stats.ZERO): 1,
+            ((1, 3, 1, False), stats.ZERO, stats.ZERO): 2,
+            ((1, 3, 1, True), stats.ONE, stats.ZERO): 3,
+        }
+        benchmark.validate_score_work(payload, histogram)
+        with patch.dict(payload['score_work'], reused_no_fault=2, reused_signature=1):
+            with self.assertRaisesRegex(ValueError, 'exact histogram'):
+                benchmark.validate_score_work(payload, histogram)
+        with patch.dict(payload['score_work'], rejected_by_detectors=1, reused_signature=3):
+            with self.assertRaisesRegex(ValueError, 'exact constraints'):
+                benchmark.validate_score_work(payload, histogram)
+        with patch.dict(inventory['after_sampling'], source_assignments=7):
+            with self.assertRaisesRegex(ValueError, 'source assignment'):
+                benchmark.validate_score_work(payload, histogram)
+        # Physical batches may finish one full-T acceptance at exact zero.
+        physical = {
+            ((0,0,0,False), stats.ONE, stats.ZERO): 1,
+            ((1,0,0,False), stats.ZERO, stats.ZERO): 3,
+            ((2,0,0,False), stats.ONE, stats.ZERO): 2,
+        }
+        payload['configuration']['closing_sites'] = 0
+        payload['skipped_zero_targets'] = 1
+        work = inventory['after_sampling']['work']['source']
+        with patch.dict(work, closure_evaluations=5, fixed_evaluations=5):
+            benchmark.validate_score_work(payload, physical)
+        with self.assertRaisesRegex(ValueError, 'evaluation count'):
+            benchmark.validate_score_work(payload, physical)
+        with patch.dict(payload, skipped_zero_targets=2):
+            with self.assertRaisesRegex(ValueError, 'skipped zero-target'):
+                benchmark.validate_score_work(payload, physical)
+
     def test_sampled_peer_readout_preserves_signed_absolute_detector_rows(self):
         source = '''RX 0
 T 0

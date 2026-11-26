@@ -142,6 +142,7 @@ impl Lowering<'_> {
         &mut self,
         source: usize,
         alternatives: Vec<(Probability, Vec<(usize, Basis)>)>,
+        identity: Probability,
     ) -> Result<usize, InstrumentError> {
         if self.sites.len() >= self.options.max_noise_sites {
             return Err(InstrumentError::ResourceLimit {
@@ -150,8 +151,6 @@ impl Lowering<'_> {
                 required: self.sites.len().saturating_add(1),
             });
         }
-        let identity =
-            Probability::checked_sum(alternatives.iter().map(|(p, _)| p.clone()))?.complement();
         let index = self.sites.len();
         self.sites.push(PendingSite {
             source_operations: vec![source],
@@ -198,7 +197,11 @@ impl Lowering<'_> {
             self.extend([U::Clifford(C::X(record))])?;
         }
         self.records.push(record);
-        self.site(source, vec![(flip.clone(), vec![(record, Basis::X)])])?;
+        self.site(
+            source,
+            vec![(flip.clone(), vec![(record, Basis::X)])],
+            flip.complement(),
+        )?;
         if reset {
             let (q, basis) = product.factors[0];
             self.reset(q, basis)?;
@@ -222,7 +225,11 @@ impl Lowering<'_> {
                 .map(|&(q, b)| (self.wire(q), b))
                 .collect::<Vec<_>>();
             if *alternative == 0 {
-                let index = self.site(source, vec![(probabilities[0].clone(), factors)])?;
+                let index = self.site(
+                    source,
+                    vec![(probabilities[0].clone(), factors)],
+                    probabilities[0].complement(),
+                )?;
                 self.chains.insert(*chain, index);
             } else {
                 let index = self.chains[chain];
@@ -237,7 +244,11 @@ impl Lowering<'_> {
         }
         let live_qubits = qubits.iter().map(|&q| self.wire(q)).collect::<Vec<_>>();
         let alternatives = crate::noise::pauli_channels(kind, probabilities, &live_qubits)?;
-        self.site(source, alternatives)?;
+        self.site(
+            source,
+            alternatives,
+            crate::noise::pauli_identity(kind, probabilities)?,
+        )?;
         Ok(())
     }
 }

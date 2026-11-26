@@ -30,7 +30,7 @@ pub use original::{
     OriginalNoiseAction, OriginalNoiseAnchor, OriginalNoiseCategory, OriginalNoiseChannel,
     OriginalNoiseError, OriginalNoiseOptions, original_noise_categories,
 };
-pub(crate) use original::{correlated_channel, pauli_channels};
+pub(crate) use original::{correlated_channel, pauli_channels, pauli_identity};
 pub use sequential::{
     ChannelSelection, RandRangeSource, SequentialDrawError, SequentialNoiseDraw,
     SequentialNoiseError, SequentialNoiseOptions, SequentialNoiseSampler, SequentialNoiseSite,
@@ -173,6 +173,7 @@ impl SplitMix64 {
     }
 }
 impl RandomSource for SplitMix64 {
+    #[inline]
     fn next_u64(&mut self) -> u64 {
         self.state = self.state.wrapping_add(0x9e3779b97f4a7c15);
         let mut z = self.state;

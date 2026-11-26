@@ -42,6 +42,29 @@ fn constraints_that_anticommute_at_t_are_separate_from_exact_safe_constraints() 
 }
 
 #[test]
+fn detector_words_keep_unsafe_lanes_and_fault_signs_across_word_boundaries() {
+    let mut text = String::from("R 0\nX_ERROR(1/7) 0\nM 0\nRX 1\nT 1\nMX 1\n");
+    for index in 0..130 {
+        let record = if index == 63 || index == 128 {
+            "-1"
+        } else {
+            "-2"
+        };
+        text.push_str(&format!("DETECTOR rec[{record}]\n"));
+    }
+    text.push_str("POSTSELECT !det[0] det[63]");
+    let result = prepare(&text);
+    let safe: Vec<_> = (0..130)
+        .filter(|index| ![63, 128].contains(index))
+        .collect();
+    assert_eq!(result.unsafe_t, [63, 128]);
+    assert_eq!(result.retained, safe);
+    assert_eq!(result.offset.ones().collect::<Vec<_>>(), safe);
+    assert_eq!(result.signatures[0][0].ones().collect::<Vec<_>>(), safe);
+    assert_eq!(result.signature_words, 3);
+}
+
+#[test]
 fn y_preparation_and_adjoint_clifford_phases_keep_the_selected_baseline() {
     for prefix in ["RY 0", "R 0\nH 0\nS 0"] {
         let result = prepare(&format!(

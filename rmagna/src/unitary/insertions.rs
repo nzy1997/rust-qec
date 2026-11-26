@@ -86,6 +86,82 @@ impl PreparedInsertions {
         Ok((frame, effects))
     }
 
+    pub(crate) fn score_signatures(
+        &self,
+        rows: &[BitVector],
+        outputs: &[usize],
+        physical: usize,
+        max_words: usize,
+    ) -> Result<Option<Vec<BitVector>>, UnitaryError> {
+        let width = self.program.reference.width();
+        let virtual_width = width - physical;
+        let shared_width = self
+            .program
+            .shared
+            .as_ref()
+            .map_or(0, |s| s.effect_dimensions().1);
+        let signature_width = rows
+            .len()
+            .checked_add(shared_width)
+            .and_then(|prefix| {
+                outputs
+                    .len()
+                    .checked_add(virtual_width)?
+                    .checked_mul(2)?
+                    .checked_add(prefix)
+            })
+            .ok_or(UnitaryError::DimensionOverflow)?;
+        if self.len().saturating_mul(signature_width.div_ceil(64)) > max_words {
+            return Ok(None);
+        }
+        let event_columns = if physical.saturating_mul(signature_width.div_ceil(64)) <= max_words {
+            let mut columns = vec![BitVector::zeros(signature_width)?; physical];
+            for (event, row) in rows.iter().enumerate() {
+                for wire in row.ones() {
+                    columns[wire].set(event, true)?;
+                }
+            }
+            Some(columns)
+        } else {
+            None
+        };
+        self.lookup
+            .iter()
+            .map(|&index| {
+                let entry = &self.entries[index];
+                let x = entry.transported.x();
+                let z = entry.transported.z();
+                let mut key = BitVector::zeros(signature_width)?;
+                if let Some(columns) = &event_columns {
+                    for wire in x.ones().take_while(|&wire| wire < physical) {
+                        key.xor_assign(&columns[wire])?;
+                    }
+                } else {
+                    for (j, row) in rows.iter().enumerate() {
+                        let mut parity = false;
+                        for bit in row.ones() {
+                            parity ^= x.get(bit)?;
+                        }
+                        key.set(j, parity)?;
+                    }
+                }
+                let start = rows.len();
+                if let Some(effects) = &entry.shared_effect {
+                    for j in effects.ones() {
+                        key.set(start + j, true)?;
+                    }
+                }
+                let start = start + shared_width;
+                for (j, bit) in outputs.iter().copied().chain(physical..width).enumerate() {
+                    key.set(start + 2 * j, x.get(bit)?)?;
+                    key.set(start + 2 * j + 1, z.get(bit)?)?;
+                }
+                Ok(key)
+            })
+            .collect::<Result<Vec<_>, _>>()
+            .map(Some)
+    }
+
     pub fn storage_statistics(&self) -> PreparedInsertionStorageStatistics {
         self.storage
     }

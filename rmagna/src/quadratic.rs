@@ -102,6 +102,25 @@ impl QuadraticForm {
         &self.upper
     }
 
+    pub(crate) fn append_variable(
+        mut self,
+        linear: u8,
+        couplings: impl ExactSizeIterator<Item = bool>,
+    ) -> Result<Self, QuadraticError> {
+        if couplings.len() != self.num_variables() {
+            return Err(QuadraticError::DimensionMismatch);
+        }
+        if linear > 3 {
+            return Err(QuadraticError::InvalidPhase);
+        }
+        for (row, coupled) in self.upper.iter_mut().zip(couplings) {
+            row.push_bit(coupled)?;
+        }
+        self.linear.push(linear);
+        self.upper.push(BitVector::zeros(self.num_variables())?);
+        Ok(self)
+    }
+
     fn check_vector(&self, value: &BitVector) -> Result<(), QuadraticError> {
         if value.width() != self.num_variables() {
             return Err(QuadraticError::DimensionMismatch);
@@ -134,6 +153,38 @@ impl QuadraticForm {
     /// Substitute `x = shift XOR sum_j basis[j]*y[j]`. The basis may be dependent.
     pub fn restrict(&self, shift: &BitVector, basis: &[BitVector]) -> Result<Self, QuadraticError> {
         Ok(self.restrict_with_images(shift, basis)?.0)
+    }
+
+    /// Pull back to the coordinate directions except `omitted`, followed by
+    /// one arbitrary direction, without rebuilding the retained cross terms.
+    pub(crate) fn isolate_direction(
+        &self,
+        omitted: usize,
+        direction: &BitVector,
+    ) -> Result<Self, QuadraticError> {
+        self.check_vector(direction)?;
+        let width = self.num_variables();
+        if omitted >= width {
+            return Err(QuadraticError::DimensionMismatch);
+        }
+        let mut lower = BitVector::zeros(width)?;
+        for j in direction.ones() {
+            lower.xor_assign(&self.upper[j])?;
+        }
+        let mut linear = Vec::with_capacity(width);
+        let mut upper = Vec::with_capacity(width);
+        for i in (0..width).filter(|&i| i != omitted) {
+            let mut row = self.upper[i].without_bit(omitted)?;
+            let coupled = lower.get(i)?
+                ^ self.upper[i].dot(direction)?
+                ^ (self.linear[i] & 1 != 0 && direction.get(i)?);
+            row.push_bit(coupled)?;
+            upper.push(row);
+            linear.push(self.linear[i]);
+        }
+        upper.push(BitVector::zeros(width)?);
+        linear.push((self.evaluate(direction)? + 4 - self.constant) & 3);
+        Ok(Self::new(self.constant, linear, upper)?)
     }
 
     /// Substitute the same affine map as [`Self::restrict`], then explicitly
@@ -268,6 +319,45 @@ impl QuadraticForm {
             }
         }
         state.scalar(arithmetic)
+    }
+}
+
+#[cfg(test)]
+mod coordinate_restriction_tests {
+    use super::*;
+
+    #[test]
+    fn isolating_one_direction_matches_full_pullback_across_packed_words() {
+        for width in [1, 64, 65, 129] {
+            let phase = QuadraticForm::new(
+                3,
+                (0..width).map(|i| (i % 4) as u8).collect(),
+                (0..width)
+                    .map(|i| {
+                        BitVector::from_indices(width, (i + 1..width).filter(|j| (i + j) % 7 == 0))
+                            .unwrap()
+                    })
+                    .collect(),
+            )
+            .unwrap();
+            let shift = BitVector::zeros(width).unwrap();
+            for omitted in [0, 63.min(width - 1), 64.min(width - 1), width - 1] {
+                let direction = BitVector::from_indices(
+                    width,
+                    (0..width).filter(|&i| i == omitted || i % 3 == 1),
+                )
+                .unwrap();
+                let basis = (0..width)
+                    .filter(|&i| i != omitted)
+                    .map(|i| BitVector::from_indices(width, [i]).unwrap())
+                    .chain([direction.clone()])
+                    .collect::<Vec<_>>();
+                assert_eq!(
+                    phase.isolate_direction(omitted, &direction).unwrap(),
+                    phase.restrict(&shift, &basis).unwrap(),
+                );
+            }
+        }
     }
 }
 
@@ -457,14 +547,22 @@ impl QuadraticElimination {
             .filter_map(|(i, &active)| active.then_some(i))
             .collect::<Vec<_>>();
         let linear = keep.iter().map(|&i| self.values.linear[i]).collect();
-        let mut upper = Vec::new();
+        let mut positions = vec![0; self.active.len()];
         for (i, &old) in keep.iter().enumerate() {
-            let mut row = BitVector::zeros(keep.len())?;
-            for (j, &other) in keep.iter().enumerate().skip(i + 1) {
-                row.set(j, self.adjacency[old].get(other)?)?;
-            }
-            upper.push(row);
+            positions[old] = i;
         }
+        let upper = keep
+            .iter()
+            .map(|&old| {
+                BitVector::from_indices(
+                    keep.len(),
+                    self.adjacency[old]
+                        .ones()
+                        .filter(|&other| other > old && self.active[other])
+                        .map(|other| positions[other]),
+                )
+            })
+            .collect::<Result<Vec<_>, _>>()?;
         Ok((QuadraticForm::new(0, linear, upper)?, keep))
     }
 }

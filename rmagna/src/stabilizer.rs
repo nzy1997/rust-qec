@@ -247,12 +247,20 @@ impl AffineKet {
             ket.coefficient = arithmetic.multiply(&self.coefficient, &ExactScalar::one())?;
             return Ok(Some(ket));
         }
-        let mut basis = pivots
-            .iter()
-            .map(|&j| BitVector::from_indices(count, [j]))
-            .collect::<Result<Vec<_>, _>>()?;
-        basis.extend_from_slice(kernel);
-        let phase = self.phase.restrict(&BitVector::zeros(count)?, &basis)?;
+        let phase = if let [direction] = kernel {
+            let omitted = pivots
+                .iter()
+                .enumerate()
+                .position(|(i, &j)| i != j)
+                .unwrap_or(pivots.len());
+            if pivots[omitted..].iter().copied().eq(omitted + 1..count) {
+                self.phase.isolate_direction(omitted, direction)?
+            } else {
+                self.phase_for_contraction(pivots, kernel)?
+            }
+        } else {
+            self.phase_for_contraction(pivots, kernel)?
+        };
         let mut columns = pivots
             .iter()
             .map(|&j| self.columns[j].clone())
@@ -288,6 +296,20 @@ impl AffineKet {
         let coefficient =
             arithmetic.multiply(&self.coefficient, &elimination.scalar(arithmetic)?)?;
         Ok(Some(Self::new(offset, columns, phase, coefficient)?))
+    }
+
+    fn phase_for_contraction(
+        &self,
+        pivots: &[usize],
+        kernel: &[BitVector],
+    ) -> Result<QuadraticForm, StabilizerError> {
+        let count = self.columns.len();
+        let mut basis = pivots
+            .iter()
+            .map(|&j| BitVector::from_indices(count, [j]))
+            .collect::<Result<Vec<_>, _>>()?;
+        basis.extend_from_slice(kernel);
+        Ok(self.phase.restrict(&BitVector::zeros(count)?, &basis)?)
     }
 
     /// Apply `X^x Z^z`; the Z phase is evaluated before the X shift.
@@ -450,28 +472,102 @@ impl AffineKet {
         other: &Self,
         arithmetic: &ScalarArithmetic,
     ) -> Result<Self, StabilizerError> {
-        let width = self
-            .width()
-            .checked_add(other.width())
+        let left_width = self.width();
+        let right_width = other.width();
+        left_width
+            .checked_add(right_width)
             .ok_or(StabilizerError::DimensionOverflow)?;
-        let mut offset = BitVector::from_indices(width, self.offset.ones())?;
-        for j in other.offset.ones() {
-            offset.set(self.width() + j, true)?;
-        }
-        let mut columns = self
+        let paths = self
             .columns
-            .iter()
-            .map(|c| BitVector::from_indices(width, c.ones()))
-            .collect::<Result<Vec<_>, _>>()?;
+            .len()
+            .checked_add(other.columns.len())
+            .ok_or(StabilizerError::DimensionOverflow)?;
+        let mut offset = self.offset.zero_extended(right_width)?;
+        for j in other.offset.ones() {
+            offset.set(left_width + j, true)?;
+        }
+        let mut columns = Vec::with_capacity(paths);
+        for column in &self.columns {
+            columns.push(column.zero_extended(right_width)?);
+        }
         for column in &other.columns {
-            columns.push(BitVector::from_indices(
-                width,
-                column.ones().map(|j| self.width() + j),
-            )?);
+            columns.push(column.shifted_left(left_width)?);
         }
         let phase = combined_phase(&self.phase, &other.phase, false)?;
         let coefficient = arithmetic.multiply(&self.coefficient, &other.coefficient)?;
         Self::new(offset, columns, phase, coefficient)
+    }
+
+    /// Form `self ⊗ conj(self)` without materializing a separate conjugated ket.
+    pub(crate) fn conjugate_tensor(
+        &self,
+        arithmetic: &ScalarArithmetic,
+    ) -> Result<Self, StabilizerError> {
+        Self::tensor_blocks([(self, false), (self, true)], || {
+            arithmetic.multiply(&self.coefficient, &self.coefficient.conjugate())
+        })
+    }
+
+    /// Form `self ⊗ conj(self) ⊗ conj(other) ⊗ other` in boundary order.
+    pub(crate) fn density_tensor(
+        &self,
+        other: &Self,
+        arithmetic: &ScalarArithmetic,
+    ) -> Result<Self, StabilizerError> {
+        Self::tensor_blocks(
+            [(self, false), (self, true), (other, true), (other, false)],
+            || {
+                // Keep the coefficient limits at the same three left-associated products.
+                let coefficient =
+                    arithmetic.multiply(&self.coefficient, &self.coefficient.conjugate())?;
+                let coefficient =
+                    arithmetic.multiply(&coefficient, &other.coefficient.conjugate())?;
+                arithmetic.multiply(&coefficient, &other.coefficient)
+            },
+        )
+    }
+
+    fn tensor_blocks<const N: usize>(
+        blocks: [(&Self, bool); N],
+        coefficient: impl FnOnce() -> Result<ExactScalar, ScalarError>,
+    ) -> Result<Self, StabilizerError> {
+        let (width, paths) =
+            blocks
+                .iter()
+                .try_fold((0usize, 0usize), |(width, paths), (ket, _)| {
+                    width
+                        .checked_add(ket.width())
+                        .zip(paths.checked_add(ket.columns.len()))
+                        .ok_or(StabilizerError::DimensionOverflow)
+                })?;
+        let embed = |row: &BitVector, width, start| -> Result<BitVector, Gf2Error> {
+            let mut result = BitVector::zeros(width)?;
+            result.or_shifted_from(row, start);
+            Ok(result)
+        };
+        let mut offset = BitVector::zeros(width)?;
+        let mut columns = Vec::with_capacity(paths);
+        let mut constant = 0;
+        let mut linear = Vec::with_capacity(paths);
+        let mut upper = Vec::with_capacity(paths);
+        let mut boundary_start = 0;
+        for (ket, conjugated) in blocks {
+            let path_start = linear.len();
+            let signed = |value: u8| if conjugated { (4 - value) & 3 } else { value };
+            offset.or_shifted_from(&ket.offset, boundary_start);
+            for column in &ket.columns {
+                columns.push(embed(column, width, boundary_start)?);
+            }
+            constant = (constant + signed(ket.phase.constant())) & 3;
+            linear.extend(ket.phase.linear().iter().map(|&value| signed(value)));
+            for row in ket.phase.upper() {
+                upper.push(embed(row, paths, path_start)?);
+            }
+            boundary_start += ket.width();
+        }
+        let phase = QuadraticForm::new(constant, linear, upper)?;
+
+        Self::new(offset, columns, phase, coefficient()?)
     }
 }
 
@@ -673,20 +769,22 @@ fn combined_phase(
     right: &QuadraticForm,
     conjugate_left: bool,
 ) -> Result<QuadraticForm, StabilizerError> {
-    let n = left.num_variables();
-    let width = n
-        .checked_add(right.num_variables())
+    let left_width = left.num_variables();
+    let right_width = right.num_variables();
+    let width = left_width
+        .checked_add(right_width)
         .ok_or(StabilizerError::DimensionOverflow)?;
     let signed = |v: u8| if conjugate_left { (4 - v) & 3 } else { v };
     let constant = (signed(left.constant()) + right.constant()) & 3;
-    let mut linear = left.linear().iter().map(|&v| signed(v)).collect::<Vec<_>>();
+    let mut linear = Vec::with_capacity(width);
+    linear.extend(left.linear().iter().map(|&v| signed(v)));
     linear.extend_from_slice(right.linear());
-    let mut upper = Vec::new();
+    let mut upper = Vec::with_capacity(width);
     for row in left.upper() {
-        upper.push(BitVector::from_indices(width, row.ones())?);
+        upper.push(row.zero_extended(right_width)?);
     }
     for row in right.upper() {
-        upper.push(BitVector::from_indices(width, row.ones().map(|i| n + i))?);
+        upper.push(row.shifted_left(left_width)?);
     }
     Ok(QuadraticForm::new(constant, linear, upper)?)
 }
@@ -694,6 +792,66 @@ fn combined_phase(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn conjugated_tensor_blocks_match_ordered_products_across_word_boundaries() {
+        let arithmetic = ScalarArithmetic::default();
+        let ket = |width, paths, constant| {
+            let offset = BitVector::from_indices(width, (0..width).step_by(2)).unwrap();
+            let columns = (0..paths)
+                .map(|i| BitVector::from_indices(width, (i % 5..width).step_by(5)).unwrap())
+                .collect();
+            let phase = QuadraticForm::new(
+                constant,
+                (0..paths).map(|i| ((i + 1) % 4) as u8).collect(),
+                (0..paths)
+                    .map(|i| BitVector::from_indices(paths, (i + 1..paths).step_by(3)).unwrap())
+                    .collect(),
+            )
+            .unwrap();
+            let coefficient = arithmetic
+                .scalar([3, -2, i32::from(constant), 1].map(Into::into), -2)
+                .unwrap();
+            AffineKet::new(offset, columns, phase, coefficient).unwrap()
+        };
+        for (left_shape, right_shape) in [
+            ((0, 0), (0, 0)),
+            ((0, 3), (65, 64)),
+            ((63, 65), (70, 69)),
+            ((64, 63), (129, 127)),
+            ((129, 127), (0, 0)),
+        ] {
+            let left = ket(left_shape.0, left_shape.1, 3);
+            let right = ket(right_shape.0, right_shape.1, 1);
+            let expected = left.tensor(&left.conjugate(), &arithmetic).unwrap();
+            assert_eq!(left.conjugate_tensor(&arithmetic).unwrap(), expected);
+            let expected = expected
+                .tensor(&right.conjugate(), &arithmetic)
+                .unwrap()
+                .tensor(&right, &arithmetic)
+                .unwrap();
+            assert_eq!(left.density_tensor(&right, &arithmetic).unwrap(), expected);
+        }
+    }
+
+    #[test]
+    fn density_tensor_checks_intermediate_scalar_limits_before_later_zero_factors() {
+        let arithmetic = ScalarArithmetic::new(2).unwrap();
+        let vacuum = |coefficient| {
+            let offset = BitVector::zeros(0).unwrap();
+            let phase = QuadraticForm::new(0, vec![], vec![]).unwrap();
+            AffineKet::new(offset, vec![], phase, coefficient).unwrap()
+        };
+        let left = vacuum(arithmetic.integer(3).unwrap());
+        let right = vacuum(ExactScalar::zero());
+        assert_eq!(
+            left.density_tensor(&right, &arithmetic),
+            Err(StabilizerError::Scalar(ScalarError::CoefficientLimit {
+                required: 4,
+                limit: 2,
+            }))
+        );
+    }
 
     #[test]
     fn deferred_constraints_and_public_projection_match_literal_hidden_paths_and_scalar_sums() {

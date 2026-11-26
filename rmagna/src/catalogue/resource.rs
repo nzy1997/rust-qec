@@ -274,6 +274,14 @@ impl PreparedCataloguePhase {
         if updated.num_variables() != width || boundary.num_variables() != width {
             return Err(PhaseError::DimensionMismatch);
         }
+        if self.quotient.rank() == 0 {
+            // The nullspace of the empty signature system is the coordinate
+            // basis. Its retained core is constant, so neither form needs
+            // restriction before the Clifford correction.
+            let (global, correction) = updated.clifford()?;
+            let global = (global + 8 - self.reference_resource.constant()) & 7;
+            return Ok((global, add_quadratic(boundary, &correction)?));
+        }
         let zero = BitVector::zeros(width)?;
         let phase = updated.restrict(&zero, self.quotient.basis())?;
         let (global, correction) = phase.subtract(&self.reference_resource)?.clifford()?;

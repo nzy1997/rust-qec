@@ -9,7 +9,7 @@ use num_rational::BigRational;
 use proposal::{Sampler, WeightKey};
 use rmagna::circuit::{ParseOptions, parse_circuit};
 use rmagna::gf2::BitVector;
-use rmagna::noise::{OriginalNoiseOptions, RandomSource, original_noise_categories};
+use rmagna::noise::{OriginalNoiseOptions, RandomSource, SplitMix64, original_noise_categories};
 use serde::Deserialize;
 use sha2::{Digest, Sha256};
 use std::collections::BTreeSet;
@@ -146,7 +146,7 @@ impl RandomSource for Words {
 
 #[test]
 fn physical_ranges_retain_exact_endpoints_and_bounded_rejection_entropy() {
-    let signatures = vec![vec![0]; 4];
+    let signatures = vec![vec![1], vec![0], vec![0], vec![2]];
     let sampler = sampler(&signatures, 0, None, "1/3");
     assert_eq!(sampler.num_sites(), 4);
     let mut random = Words {
@@ -163,6 +163,21 @@ fn physical_ranges_retain_exact_endpoints_and_bounded_rejection_entropy() {
         sampler.likelihood(draw.weight).unwrap(),
         "1".parse().unwrap()
     );
+    let bits = |value| BitVector::from_words(4, vec![value]).unwrap();
+    let mut closure = DetectorClosure {
+        signatures: signatures
+            .iter()
+            .map(|row| row.iter().copied().map(bits).collect())
+            .collect(),
+        offset: bits(3),
+        retained: (0..4).collect(),
+        unsafe_t: Vec::new(),
+        signature_words: 4,
+    };
+    let mut residual = [0];
+    assert!(sampler.passes_detector_constraints(&closure, &draw, &mut residual));
+    closure.offset = bits(2);
+    assert!(!sampler.passes_detector_constraints(&closure, &draw, &mut residual));
     let mut random = Words {
         words: vec![3; 4],
         used: 0,
@@ -186,6 +201,54 @@ fn physical_ranges_retain_exact_endpoints_and_bounded_rejection_entropy() {
         let draw = sampler.draw(&mut random, 0).unwrap();
         assert_eq!(draw.faults.len(), count);
         assert_eq!(draw.entropy_words, 0);
+    }
+}
+
+#[test]
+fn physical_blocks_preserve_ranges_and_final_entropy_state() {
+    let signatures = vec![vec![0, 1, 2]; 21];
+    for rate in [
+        "1/3",
+        "1/1000",
+        "3/4",
+        "15000000000000000000/18446744073709551613",
+    ] {
+        let sampler = sampler(&signatures, 0, None, rate);
+        for seed in 0..32 {
+            for limit in [3, 4, 20, 21, 40, 100] {
+                let mut expected_random = SplitMix64::new(seed);
+                let mut used = 0;
+                let expected = sampler.draw_ranges(|bound| {
+                    let mask = u64::MAX >> (bound - 1).leading_zeros();
+                    loop {
+                        if used == limit {
+                            return Err("reference entropy exhausted".into());
+                        }
+                        used += 1;
+                        let value = expected_random.next_u64() & mask;
+                        if value < bound {
+                            return Ok(value);
+                        }
+                    }
+                });
+                let mut random = SplitMix64::new(seed);
+                let draw = sampler.draw(&mut random, limit);
+                match (draw, expected) {
+                    (Ok(draw), Ok((faults, weight))) => {
+                        assert_eq!(draw.faults, faults);
+                        assert_eq!(draw.weight, weight);
+                        assert_eq!(draw.entropy_words, used);
+                    }
+                    (Err(error), Err(_)) => {
+                        assert!(error.to_string().contains("max_entropy_words"))
+                    }
+                    _ => {
+                        panic!("physical block differs at rate {rate}, seed {seed}, limit {limit}")
+                    }
+                }
+                assert_eq!(random.state(), expected_random.state());
+            }
+        }
     }
 }
 

@@ -11,16 +11,16 @@ use num_rational::BigRational;
 use rmagna::circuit::{ParseOptions, parse_circuit};
 use rmagna::costs::{ExecutionLimits, ExecutionMeter};
 use rmagna::field::ExactField;
-use rmagna::instrument::{InsertionPreparation, QueryPreparation};
-use rmagna::noise::{NoiseSampling, OriginalNoiseOptions, original_noise_categories};
+use rmagna::instrument::{FaultSelection, InsertionPreparation, QueryPreparation};
+use rmagna::noise::{OriginalNoiseOptions, original_noise_categories};
 use rmagna::phase::{NativePhaseOptions, NativeTransportMode};
-use rmagna::runtime::{ControllerRegistry, HistorySampler};
+use rmagna::runtime::HistorySampler;
 use rmagna::task::{EvaluationOptions, TaskEvaluator, TaskOptions, parse_task};
 use rmagna::unitary::{CompilerStrategy, InsertionPreparationOptions};
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
-use std::{collections::HashMap, error::Error, path::Path, time::Instant};
+use std::{borrow::Cow, collections::HashMap, error::Error, path::Path, time::Instant};
 
 #[derive(Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
@@ -38,10 +38,36 @@ struct Configuration {
 }
 
 #[derive(PartialEq, Eq, Hash)]
-struct Contribution {
+struct Contribution<'a> {
     weight: WeightKey,
-    accepted: ExactField,
-    error: ExactField,
+    accepted: Cow<'a, ExactField>,
+    error: Cow<'a, ExactField>,
+}
+
+fn full_t_masses(
+    evaluator: &TaskEvaluator,
+    faults: &[FaultSelection],
+    screen_target: bool,
+) -> Result<(ExactField, ExactField, bool), Box<dyn Error>> {
+    let result = if screen_target {
+        evaluator.screened_linear_target_contributions(faults)?
+    } else {
+        evaluator.linear_prescribed_contributions(faults)?
+    };
+    let skipped_target = result.target_resources.is_none();
+    if result.acceptance_resources.quotient_rank != 0
+        || result.acceptance_resources.terms > 1
+        || result
+            .target_resources
+            .is_some_and(|s| s.quotient_rank != 0 || s.terms > 1)
+        || skipped_target
+            && (!screen_target || !result.accepted.is_zero() || !result.error.is_zero())
+    {
+        return Err(
+            "cultivation draw violated its fixed prepared full-T contribution policy".into(),
+        );
+    }
+    Ok((result.accepted, result.error, skipped_target))
 }
 
 fn sha(bytes: &[u8]) -> String {
@@ -94,6 +120,7 @@ pub(crate) fn run(mut args: impl Iterator<Item = String>) -> Result<Value, Box<d
     {
         return Err("invalid bounded cultivation configuration".into());
     }
+    let preparation_started = Instant::now();
     let physical_text = std::fs::read_to_string(&physical_path)?;
     let task_text = std::fs::read_to_string(&task_path)?;
     let parse = ParseOptions {
@@ -129,8 +156,17 @@ pub(crate) fn run(mut args: impl Iterator<Item = String>) -> Result<Value, Box<d
     let flow = json!({"retained":closure.retained,"unsafe_t":closure.unsafe_t,
         "signature_words":closure.signature_words,"offset":closure.offset.ones().collect::<Vec<_>>()});
     let physical_rate: BigRational = config.physical_rate.parse()?;
-    let closing = (config.mode == "closing").then_some((closure, config.closing_sites));
+    let (closing, physical_closure) = if config.mode == "closing" {
+        (Some((closure, config.closing_sites)), None)
+    } else {
+        (None, Some(closure))
+    };
     let sampler = Sampler::new(&categories, physical_rate, closing)?;
+    let closure = physical_closure
+        .as_ref()
+        .or(sampler.closure.as_ref())
+        .expect("one detector closure is retained");
+    let mut residual = vec![0; closure.offset.words().len()];
     let mut native = NativePhaseOptions::default();
     native.selection.max_quotient_rank = 0;
     native.selection.max_signature_work = u128::from(config.max_signature_work);
@@ -149,17 +185,10 @@ pub(crate) fn run(mut args: impl Iterator<Item = String>) -> Result<Value, Box<d
     options.runtime.compile.probability_preparation = QueryPreparation::Native(native);
     options.runtime.compile.density_preparation = QueryPreparation::Native(native);
     options.runtime.compile.moment_preparation = QueryPreparation::Native(native);
-    let registry = ControllerRegistry::default();
     let meter = ExecutionMeter::new(ExecutionLimits::default());
     let started = Instant::now();
-    let evaluator = TaskEvaluator::new_with_costs(
-        &physical,
-        &modules,
-        &registry,
-        options,
-        &NoiseSampling::Physical,
-        &meter,
-    )?;
+    let evaluator =
+        TaskEvaluator::new_linear_prescribed_with_costs(&physical, &modules, options, &meter)?;
     let compile_seconds = started.elapsed().as_secs_f64();
     let insertions = evaluator
         .prepared_insertion_statistics()
@@ -169,14 +198,29 @@ pub(crate) fn run(mut args: impl Iterator<Item = String>) -> Result<Value, Box<d
     if !prepared.all_families_retained() {
         return Err("cultivation query preparation was not fully retained".into());
     }
-    let preparation_seconds = started.elapsed().as_secs_f64();
+    let (no_fault_accepted, no_fault_error, _) = full_t_masses(&evaluator, &[], false)?;
+    let screen_target = modules.task().observables().is_empty();
+    let signatures = evaluator.linear_target_fault_signatures(1 << 20)?;
+    let mut signature = signatures
+        .as_ref()
+        .and_then(|rows| rows.iter().flatten().next())
+        .map(|first| vec![0u64; first.words().len()])
+        .unwrap_or_default();
+    let mut score_cache = HashMap::<Vec<u64>, (ExactField, ExactField)>::new();
+    let preparation_seconds = preparation_started.elapsed().as_secs_f64();
     let after_preparation = inventory(&evaluator)?;
     // u32::MAX is reserved and disjoint from every production range.
     let mut random = cultivation_rng::draw_stream(config.seed, u32::MAX);
     let warmup = sampler.draw(&mut random, config.max_entropy_words)?;
-    evaluator.linear_prescribed_contributions(&warmup.faults)?;
+    full_t_masses(&evaluator, &warmup.faults, false)?;
     let after_warmup = inventory(&evaluator)?;
     let mut histogram: HashMap<Contribution, u64> = HashMap::new();
+    let zero = ExactField::zero();
+    let mut rejected_by_detectors = 0u32;
+    let mut reused_no_fault = 0u32;
+    let mut evaluated_full_t = 0u32;
+    let mut skipped_zero_targets = 0u32;
+    let mut reused_signature = 0u32;
     let mut completed = 0u32;
     let mut entropy_words = 0u64;
     let mut failure = None;
@@ -185,27 +229,80 @@ pub(crate) fn run(mut args: impl Iterator<Item = String>) -> Result<Value, Box<d
         let result = (|| -> Result<(), Box<dyn Error>> {
             let mut random = cultivation_rng::draw_stream(config.seed, index);
             let draw = sampler.draw(&mut random, config.max_entropy_words)?;
-            let result = evaluator.linear_prescribed_contributions(&draw.faults)?;
-            if result.acceptance_resources.quotient_rank != 0
-                || result.acceptance_resources.terms > 1
-                || result
-                    .target_resources
-                    .is_none_or(|s| s.quotient_rank != 0 || s.terms > 1)
-            {
-                return Err(
-                    "cultivation draw violated its fixed prepared full-T contribution policy"
-                        .into(),
-                );
-            }
+            let mut skipped_target = false;
+            let (accepted, error, score_count) = if !screen_target {
+                let (accepted, error, _) = full_t_masses(&evaluator, &draw.faults, false)?;
+                (
+                    Cow::Owned(accepted),
+                    Cow::Owned(error),
+                    &mut evaluated_full_t,
+                )
+            } else if draw.faults.is_empty() {
+                (
+                    Cow::Borrowed(&no_fault_accepted),
+                    Cow::Borrowed(&no_fault_error),
+                    &mut reused_no_fault,
+                )
+            } else if !sampler.passes_detector_constraints(closure, &draw, &mut residual) {
+                (
+                    Cow::Borrowed(&zero),
+                    Cow::Borrowed(&zero),
+                    &mut rejected_by_detectors,
+                )
+            } else if let Some(signatures) = &signatures {
+                signature.fill(0);
+                for fault in &draw.faults {
+                    for (word, mask) in signature
+                        .iter_mut()
+                        .zip(signatures[fault.site][fault.alternative].words())
+                    {
+                        *word ^= mask;
+                    }
+                }
+                if signature.iter().all(|&word| word == 0) {
+                    (
+                        Cow::Borrowed(&no_fault_accepted),
+                        Cow::Borrowed(&no_fault_error),
+                        &mut reused_signature,
+                    )
+                } else if let Some((accepted, error)) = score_cache.get(signature.as_slice()) {
+                    (
+                        Cow::Owned(accepted.clone()),
+                        Cow::Owned(error.clone()),
+                        &mut reused_signature,
+                    )
+                } else {
+                    let (accepted, error, skipped) = full_t_masses(&evaluator, &draw.faults, true)?;
+                    skipped_target = skipped;
+                    if score_cache.len() < 4096 {
+                        score_cache.insert(signature.clone(), (accepted.clone(), error.clone()));
+                    }
+                    (
+                        Cow::Owned(accepted),
+                        Cow::Owned(error),
+                        &mut evaluated_full_t,
+                    )
+                }
+            } else {
+                let (accepted, error, skipped) = full_t_masses(&evaluator, &draw.faults, true)?;
+                skipped_target = skipped;
+                (
+                    Cow::Owned(accepted),
+                    Cow::Owned(error),
+                    &mut evaluated_full_t,
+                )
+            };
             let key = Contribution {
                 weight: draw.weight,
-                accepted: result.accepted,
-                error: result.error,
+                accepted,
+                error,
             };
             if histogram.len() == config.max_histogram_entries && !histogram.contains_key(&key) {
                 return Err("cultivation max_histogram_entries exceeded".into());
             }
             *histogram.entry(key).or_default() += 1;
+            *score_count += 1;
+            skipped_zero_targets += u32::from(skipped_target);
             entropy_words += draw.entropy_words as u64;
             completed += 1;
             Ok(())
@@ -244,6 +341,10 @@ pub(crate) fn run(mut args: impl Iterator<Item = String>) -> Result<Value, Box<d
             "insertions":{"catalog_entries":insertions.catalog_entries,"estimated_peak_bytes":insertions.estimated_peak_bytes}},
         "excluded_warmup":{"draws":1,"seed":config.seed,"index":u32::MAX},
         "sampling_seconds":sampling_seconds,
+        "score_work":{"rejected_by_detectors":rejected_by_detectors,
+                      "reused_no_fault":reused_no_fault,"reused_signature":reused_signature,
+                      "evaluated_full_t":evaluated_full_t},
+        "skipped_zero_targets":skipped_zero_targets,
         "inventory":{"after_preparation":after_preparation,"after_warmup":after_warmup,"after_sampling":inventory(&evaluator)?},
         "resources":resources(&evaluator)?}))
 }
