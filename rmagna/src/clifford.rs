@@ -1,6 +1,6 @@
 //! Exact Clifford circuits on affine quadratic kets.
 
-use crate::gf2::{BitVector, Gf2Error, transpose_columns};
+use crate::gf2::{BitVector, Gf2Error};
 use crate::quadratic::{QuadraticError, QuadraticForm};
 use crate::scalar::{ExactScalar, ScalarArithmetic, ScalarError};
 use crate::stabilizer::{AffineKet, StabilizerError};
@@ -178,8 +178,9 @@ impl CliffordCircuit {
         let Some(mut ket) = input.contract(arithmetic)? else {
             return Ok(None);
         };
+        let mut support_scratch = HadamardSupportScratch::default();
         for &gate in &self.gates {
-            let Some(next) = apply(gate, ket, arithmetic)? else {
+            let Some(next) = apply(gate, ket, arithmetic, &mut support_scratch)? else {
                 return Ok(None);
             };
             ket = next;
@@ -202,6 +203,7 @@ fn apply(
     gate: CliffordGate,
     ket: AffineKet,
     arithmetic: &ScalarArithmetic,
+    support_scratch: &mut HadamardSupportScratch,
 ) -> Result<Option<AffineKet>, CliffordError> {
     let width = ket.width();
     let (mut offset, mut columns, mut phase, mut coefficient) = ket.into_parts();
@@ -248,7 +250,7 @@ fn apply(
             let kernel = if deterministic {
                 None
             } else {
-                deleted_row_kernel(&columns, qubit)?
+                support_scratch.deleted_row_kernel(&columns, qubit)?
             };
             let n = columns.len();
             let paths = n.checked_add(1).ok_or(CliffordError::DimensionOverflow)?;
@@ -285,53 +287,141 @@ fn apply(
     Ok(Some(AffineKet::new(offset, columns, phase, coefficient)?))
 }
 
-/// Nullspace of canonical support after removing one boundary row. Streaming
-/// packed row reduction needs no equation provenance and stops at full rank.
-fn deleted_row_kernel(
-    columns: &[BitVector],
-    qubit: usize,
-) -> Result<Option<BitVector>, CliffordError> {
-    let count = columns.len();
-    let Some(first) = columns.first() else {
-        return Ok(None);
-    };
-    let mut echelon = vec![None::<BitVector>; count];
-    let mut rank = 0;
-    for (index, mut row) in transpose_columns(first.width(), columns)?
-        .into_iter()
-        .enumerate()
-    {
-        if index == qubit {
-            continue;
-        }
-        loop {
-            let Some(pivot) = row.ones().next() else {
-                break;
-            };
-            if let Some(previous) = &echelon[pivot] {
-                row.xor_assign(previous)?;
-            } else {
-                echelon[pivot] = Some(row);
-                rank += 1;
-                break;
+#[derive(Default)]
+struct HadamardSupportScratch {
+    rows: Vec<u64>,
+    pivot_rows: Vec<usize>,
+}
+
+impl HadamardSupportScratch {
+    /// Nullspace of canonical support after removing one boundary row.
+    /// Transpose directly into reusable packed storage and reduce in place.
+    fn deleted_row_kernel(
+        &mut self,
+        columns: &[BitVector],
+        qubit: usize,
+    ) -> Result<Option<BitVector>, CliffordError> {
+        let count = columns.len();
+        let Some(first) = columns.first() else {
+            return Ok(None);
+        };
+        let width = first.width();
+        let stride = count.div_ceil(64);
+        let len = width
+            .checked_mul(stride)
+            .ok_or(CliffordError::DimensionOverflow)?;
+        self.rows
+            .try_reserve(len.saturating_sub(self.rows.len()))
+            .map_err(|_| Gf2Error::AllocationFailed)?;
+        self.rows.resize(len, 0);
+        self.rows.fill(0);
+        for (column_index, column) in columns.iter().enumerate() {
+            let word = column_index / 64;
+            let bit = 1u64 << (column_index % 64);
+            for row in column.ones() {
+                self.rows[row * stride + word] |= bit;
             }
         }
-        if rank == count {
-            return Ok(None);
+
+        const NO_ROW: usize = usize::MAX;
+        self.pivot_rows.resize(count, NO_ROW);
+        self.pivot_rows.fill(NO_ROW);
+        let mut rank = 0;
+        for index in (0..width).filter(|&index| index != qubit) {
+            let start = index * stride;
+            let (earlier, rest) = self.rows.split_at_mut(start);
+            let row = &mut rest[..stride];
+            let mut word = 0;
+            while word < stride {
+                let bits = row[word];
+                if bits == 0 {
+                    word += 1;
+                    continue;
+                }
+                let pivot = word * 64 + bits.trailing_zeros() as usize;
+                let previous = self.pivot_rows[pivot];
+                if previous == NO_ROW {
+                    self.pivot_rows[pivot] = start;
+                    rank += 1;
+                    break;
+                }
+                for (value, &other) in row[word..]
+                    .iter_mut()
+                    .zip(&earlier[previous + word..previous + stride])
+                {
+                    *value ^= other;
+                }
+            }
+            if rank == count {
+                return Ok(None);
+            }
+        }
+        if rank.checked_add(1) != Some(count) {
+            return Err(CliffordError::InvalidCanonicalSupport);
+        }
+        let free = self
+            .pivot_rows
+            .iter()
+            .position(|&row| row == NO_ROW)
+            .ok_or(CliffordError::InvalidCanonicalSupport)?;
+        let mut kernel = vec![0u64; stride];
+        kernel[free / 64] = 1 << (free % 64);
+        for (pivot, &start) in self.pivot_rows.iter().enumerate().rev() {
+            if start != NO_ROW {
+                let parity = self.rows[start..start + stride]
+                    .iter()
+                    .zip(&kernel)
+                    .fold(0, |parity, (&row, &bit)| parity ^ (row & bit));
+                kernel[pivot / 64] |= u64::from(parity.count_ones() % 2) << (pivot % 64);
+            }
+        }
+        Ok(Some(BitVector::from_words(count, kernel)?))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::gf2::{LinearFactorization, transpose_columns};
+
+    #[test]
+    fn hadamard_support_reuses_scratch_across_word_boundaries_and_rank_changes() {
+        let mut scratch = HadamardSupportScratch::default();
+        for count in [1usize, 65, 129, 64, 2, 65] {
+            for redundant in [false, true] {
+                let width = count + usize::from(redundant);
+                let columns = (0..count)
+                    .map(|j| {
+                        BitVector::from_indices(
+                            width,
+                            [Some(j), j.checked_sub(1), redundant.then_some(count)]
+                                .into_iter()
+                                .flatten(),
+                        )
+                        .unwrap()
+                    })
+                    .collect::<Vec<_>>();
+                let rows = transpose_columns(width, &columns).unwrap();
+                for removed in [0, (width - 1).min(63), (width - 1).min(64), width - 1] {
+                    let retained = rows[..removed]
+                        .iter()
+                        .chain(&rows[removed + 1..])
+                        .cloned()
+                        .collect::<Vec<_>>();
+                    let expected = LinearFactorization::new(count, &retained)
+                        .unwrap()
+                        .nullspace()
+                        .unwrap();
+                    assert_eq!(
+                        scratch
+                            .deleted_row_kernel(&columns, removed)
+                            .unwrap()
+                            .as_slice(),
+                        expected.as_slice(),
+                        "count={count} redundant={redundant} removed={removed}"
+                    );
+                }
+            }
         }
     }
-    if rank.checked_add(1) != Some(count) {
-        return Err(CliffordError::InvalidCanonicalSupport);
-    }
-    let free = echelon
-        .iter()
-        .position(Option::is_none)
-        .ok_or(CliffordError::InvalidCanonicalSupport)?;
-    let mut kernel = BitVector::from_indices(count, [free])?;
-    for (pivot, row) in echelon.iter().enumerate().rev() {
-        if let Some(row) = row {
-            kernel.set(pivot, row.dot(&kernel)?)?;
-        }
-    }
-    Ok(Some(kernel))
 }
