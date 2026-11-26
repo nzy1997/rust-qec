@@ -284,7 +284,49 @@ fn tasks_with_observables_keep_exact_target_scoring() {
     );
     let target_only = run_source(&directory, "physical", 0, 64, physical);
     assert_eq!(with_observables["status"], "complete", "{with_observables}");
+    assert_eq!(with_observables["observable_count"], 1);
+    assert_eq!(target_only["observable_count"], 0);
     assert_eq!(with_observables["skipped_zero_targets"], 0);
     assert_eq!(with_observables["score_work"]["evaluated_full_t"], 64);
     assert_eq!(histogram(&with_observables), histogram(&target_only));
+
+    let payload_path = directory.0.join("observable-run.json");
+    std::fs::write(&payload_path, with_observables.to_string()).unwrap();
+    let benchmark_dir =
+        std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../benchmarks/magna_reproduction");
+    let output = std::process::Command::new("python3")
+        .args(["-I", "-B", "-c"])
+        .arg(
+            r#"
+import json
+import sys
+from pathlib import Path
+
+sys.path.insert(0, sys.argv[1])
+from cultivation_benchmark import exact, validate_score_work
+
+payload = json.loads(Path(sys.argv[2]).read_text())
+histogram = exact.histogram(payload)
+no_fault_draws = sum(count for (key, _, _), count in histogram.items() if key[0] == 0)
+assert 0 < no_fault_draws < payload["completed"]
+validate_score_work(payload, histogram)
+
+payload["score_work"].update(reused_no_fault=1, evaluated_full_t=63)
+try:
+    validate_score_work(payload, histogram)
+except ValueError as error:
+    assert str(error) == "cultivation observable tasks require complete scoring"
+else:
+    raise AssertionError("accepted observable results with a reported shortcut")
+"#,
+        )
+        .arg(benchmark_dir)
+        .arg(payload_path)
+        .output()
+        .expect("run the cultivation benchmark validator");
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
 }

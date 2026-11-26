@@ -126,7 +126,8 @@ def close(actual, expected, label):
             f'BH regenerated {label} differs from exported metrics')
 
 
-def validate_inventory(inventory, shots, *, preparation_assignments=0, skipped_terminal_queries=0):
+def validate_inventory(inventory, shots, *, preparation_assignments=0, skipped_terminal_queries=0,
+                       terminal_queries_per_assignment=2):
     require(set(inventory) == {'after_preparation', 'after_warmup', 'after_sampling'},
             'missing BH inventory stage')
     first = inventory['after_preparation']
@@ -145,7 +146,7 @@ def validate_inventory(inventory, shots, *, preparation_assignments=0, skipped_t
             for key, value in baseline.items():
                 if key not in {'closure_evaluations', 'fixed_evaluations'}:
                     require(actual[key] == value, 'BH per-draw construction detected: '+key)
-            expected = 2*assignments if owner == 'source' else 0
+            expected = terminal_queries_per_assignment*assignments if owner == 'source' else 0
             if owner == 'source' and name == 'after_sampling':
                 expected -= skipped_terminal_queries
             require(actual['closure_evaluations'] == actual['fixed_evaluations'] == expected,

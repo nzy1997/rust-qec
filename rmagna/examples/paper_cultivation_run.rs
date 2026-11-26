@@ -199,7 +199,8 @@ pub(crate) fn run(mut args: impl Iterator<Item = String>) -> Result<Value, Box<d
         return Err("cultivation query preparation was not fully retained".into());
     }
     let (no_fault_accepted, no_fault_error, _) = full_t_masses(&evaluator, &[], false)?;
-    let screen_target = modules.task().observables().is_empty();
+    let observable_count = modules.task().observables().len();
+    let screen_target = observable_count == 0;
     let signatures = evaluator.linear_target_fault_signatures(1 << 20)?;
     let mut signature = signatures
         .as_ref()
@@ -341,6 +342,7 @@ pub(crate) fn run(mut args: impl Iterator<Item = String>) -> Result<Value, Box<d
             "insertions":{"catalog_entries":insertions.catalog_entries,"estimated_peak_bytes":insertions.estimated_peak_bytes}},
         "excluded_warmup":{"draws":1,"seed":config.seed,"index":u32::MAX},
         "sampling_seconds":sampling_seconds,
+        "observable_count":observable_count,
         "score_work":{"rejected_by_detectors":rejected_by_detectors,
                       "reused_no_fault":reused_no_fault,"reused_signature":reused_signature,
                       "evaluated_full_t":evaluated_full_t},
