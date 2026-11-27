@@ -4187,6 +4187,10 @@ TQD campaigns remain separate roadmap work.
 
 ### B04 cultivation precision and timing
 
+See the [RP2 d5-T rare-event investigation](rp2-d5-rare-events.md) for the
+3,692 versus 4 comparison, the reproducible exact three-fault result, and
+the proposed protocol for future rare-event benchmarks.
+
 ```sh
 cargo build --locked --release -p rmagna --example paper_cultivation_run
 python3 benchmarks/magna_reproduction/paper_benchmark.py run \
